@@ -17,13 +17,13 @@ const teamMembers = [
     name: "James Milton",
     title: "Creative Technologist",
     image: "./images/1.png",
-    linkedin: "https://www.linkedin.com/in/jamesmilton",
+    linkedin: "https://www.linkedin.com/in/jamesxdigital/",
   },
   {
     name: "Pax (Pakwing) Man",
     title: "Creative Technology Director",
     image: "./images/2.png",
-    linkedin: "https://www.linkedin.com/in/paxman",
+    linkedin: "https://www.linkedin.com/in/pax-man-b0173047/",
   },
   {
     name: "Koen Mostert",
@@ -35,13 +35,13 @@ const teamMembers = [
     name: "Deniz Kurt",
     title: "Creative Technologist",
     image: "./images/6.png",
-    linkedin: "https://www.linkedin.com/in/denizkurt",
+    linkedin: "https://www.linkedin.com/in/denizezgikurt/",
   },
   {
     name: "Dwayne Paisley-Marshall",
     title: "Senior Creative Technologist",
     image: "./images/7.png",
-    linkedin: "https://www.linkedin.com/in/dwaynepaisleymarshall",
+    linkedin: "https://www.linkedin.com/in/ddpmarshall/",
 
   },
 ];
