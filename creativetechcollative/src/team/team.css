@@ -87,6 +87,13 @@
     .meetup-invite {
         margin-top: 0 !important;
     }
+
+    .close-button {
+        top: 30px !important;
+    }
+    .aboutcontent {
+        width: 100% !important;
+    }
   }
 
   .name-card {
