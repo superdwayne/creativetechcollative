@@ -28,7 +28,7 @@
   
   .team-member img {
     width: 100%;
-    height: auto;
+    height: 464px;
     object-fit: cover; /* This will ensure the images cover the area, change as needed */
   }
   
