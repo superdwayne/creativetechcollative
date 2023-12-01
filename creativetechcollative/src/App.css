@@ -1,0 +1,69 @@
+.about-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background: rgba(0, 0, 0, 0.90);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+}
+
+.aboutcontent {
+  position: relative;
+  background-color: white;
+  padding: 40px;
+  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+  border-radius: 8px;
+  width: 50%;
+  text-align: left;
+  
+}
+
+.close-button {
+  position: absolute;
+  top: 10px;
+  right: 10px;
+  border: none;
+  background: none;
+  cursor: pointer;
+  font-size: 24px;
+}
+
+/* You can further style the button to make it look more like an 'X' */
+.close-button:hover {
+  color: #ff0000; /* Change as needed */
+}
+
+
+.navbar {
+  display: flex;
+  max-width: 1400px;
+  margin: 0px auto;
+  justify-content: space-between;
+  align-items: center;
+  padding: 10px 20px;
+  background: #F0F0F0; /* Or any other color as per your design */
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1); /* Optional: adds shadow for depth */
+}
+
+.nav-brand {
+  font-size: 12px; /* Adjust size as needed */
+  font-weight: normal; /* Adjust weight as needed */
+}
+
+.nav-links a {
+  text-decoration: none;
+  color: #000000; /* Or any other color as per your design */
+  margin-left: 20px; /* Space between links */
+  font-size: 12px; /* Adjust size as needed */
+}
+
+/* You might want to add :hover effects or active class styling */
+.nav-links a:hover {
+  text-decoration: underline;
+}
+
+

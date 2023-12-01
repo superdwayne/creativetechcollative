@@ -1,0 +1,160 @@
+/* TeamPage.css */
+.team-container {
+    max-width: 1400px;
+    margin: 0 auto;
+    padding: 0 20px;
+  }
+  
+  .header {
+    padding: 50px 20px;
+    text-align: left;
+    width: 60%;
+  }
+  
+  .team-grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 20px;
+    padding: 20px;
+  }
+
+  
+  
+  .team-member {
+    text-align: center;
+    margin-bottom: 20px;
+    background-color: #F0F0F0;
+  }
+  
+  .team-member img {
+    width: 100%;
+    height: auto;
+    object-fit: cover; /* This will ensure the images cover the area, change as needed */
+  }
+  
+  .team-member h3 {
+    margin: 10px 0 5px;
+  }
+  
+  .team-member p {
+    margin: 0;
+  }
+  
+  .meetup-invite {
+    text-align: center;
+    margin-top: -66px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+
+  }
+  
+  .meetup-invite button {
+    padding: 10px 20px;
+    font-size: 16px;
+    cursor: pointer;
+    background-color: #007bff;
+    color: white;
+    border: none;
+    border-radius: 5px;
+    transition: background-color 0.3s ease;
+  }
+  
+  .meetup-invite button:hover {
+    background-color: #0056b3;
+  }
+
+  .visionaries h2 {
+    font-size: 40px;
+    font-weight: 400;
+  }
+  
+  /* Responsive Styles */
+  @media (max-width: 1024px) {
+    .team-grid {
+      grid-template-columns: repeat(2, 1fr);
+    }
+  }
+  
+  @media (max-width: 768px) {
+    .team-grid {
+      grid-template-columns: 1fr; /* Stack them on smaller screens */
+    }
+    .header {
+        width: 100%;
+    }
+  }
+
+  .name-card {
+    display: flex;
+    align-items: center;
+    justify-content: start;
+    gap: 10px; /* Adjust the gap as needed */
+    padding: 20px;
+    background-color: #F0F0F0;
+  }
+  
+  .name-card h1 {
+    font-size: 24px; /* Adjust font size as needed */
+    margin: 0;
+    font-weight: normal; /* Adjust font weight as needed */
+  }
+  
+  .name-card p {
+    font-size: 15px; /* Adjust font size as needed */
+    margin: 0;
+    text-align: left;
+    color: #000; /* Adjust text color as needed */
+  }
+  
+  .name-card img {
+    width: 32px; /* Adjust image size as needed */
+    height: auto;
+  }
+  
+  small {
+    color: #B3B3B3;
+  }
+  
+  /* You can add additional media queries for other screen sizes if needed */
+  
+  /* NameCard.css */
+.name-card {
+    display: flex;
+    justify-content: space-between;
+    align-items: center; /* Align items vertically */
+    padding: 20px;
+    background: #F0F0F0; /* Assuming a white background; change as needed */  }
+  
+  .name-card-text {
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+  }
+  
+  .name-card-text h1 {
+    font-size: 18px; /* Adjust the size as needed */
+    margin: 0 0 5px 0; /* Adjust margin as needed */
+    font-weight: normal; /* Adjust weight as needed */
+    text-align: left;
+   
+  }
+  
+  .name-card-text p {
+    font-size: 15px; /* Adjust the size as needed */
+    margin: 0;
+    text-align: left;
+    color: #B3B3B3; /* Adjust color as needed */
+  }
+  
+  .linkedin-logo {
+    margin-left: auto; /* Pushes the LinkedIn logo to the right */
+  }
+  
+  .linkedin-logo img {
+    width: 32px; /* Adjust size as needed */
+    height: auto;
+  }
+  
+  /* Add media queries for responsiveness if needed */
+  
