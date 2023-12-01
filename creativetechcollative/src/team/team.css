@@ -83,6 +83,12 @@
     .header {
         width: 100%;
     }
+
+    .meetup-invite {
+       
+        margin-top: 0 !important;
+
+    }
   }
 
   .name-card {
