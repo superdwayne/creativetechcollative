@@ -1,5 +1,6 @@
 import TeamPage from './team/team';
-
+import ReactGA from 'react-ga';
+ReactGA.initialize('UA-294935751-1'); // Replace with your Google Analytics tracking ID
 import React, { useEffect, useState } from 'react';
 import './App.css';
 const AboutOverlay = ({ onClose }) => {
