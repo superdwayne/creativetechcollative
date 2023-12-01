@@ -95,6 +95,9 @@
         width: 100% !important;
         top: 150px !important;
     }
+    .aboutcontent h2 {
+        font-size: 20px !important;
+    }
   }
 
   .name-card {
