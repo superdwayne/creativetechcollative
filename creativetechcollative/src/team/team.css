@@ -81,7 +81,7 @@
       grid-template-columns: 1fr; /* Stack them on smaller screens */
     }
     .header {
-        width: 100%;
+        width: 90% !important;
     }
 
     .meetup-invite {
@@ -93,7 +93,7 @@
     }
     .aboutcontent {
         width: 100% !important;
-        top: 50px !important;
+        top: 150px !important;
     }
   }
 
