@@ -3,7 +3,6 @@ import ReactGA from 'react-ga';
 import React, { useEffect, useState } from 'react';
 import './App.css';
 
-ReactGA.initialize('UA-294935751-1'); // Replace with your Google Analytics tracking ID
 
 const AboutOverlay = ({ onClose }) => {
   return (
