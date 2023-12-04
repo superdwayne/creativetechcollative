@@ -1,8 +1,11 @@
 import TeamPage from './team/team';
 import ReactGA from 'react-ga';
+
 import React, { useEffect, useState } from 'react';
 import './App.css';
 
+const TRACKING_ID = "UA-294935751-1"; // OUR_TRACKING_ID
+ReactGA.initialize(TRACKING_ID);
 
 const AboutOverlay = ({ onClose }) => {
   return (
