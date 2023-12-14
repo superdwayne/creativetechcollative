@@ -1,4 +1,70 @@
 /* TeamPage.css */
+@import url('https://fonts.googleapis.com/css2?family=DM+Sans:opsz,wght@9..40,300;9..40,700&family=Lora:wght@400;600&display=swap');
+
+.grid-container {
+  display: flex;
+  flex-direction: column;
+  gap: 10px; /* Adjust the space between rows */
+}
+
+.flex-row {
+  display: flex;
+  gap: 10px; /* Adjust the space between items */
+}
+
+.flex-cell {
+  flex: 1;
+  display: flex;
+
+  align-items: center;
+}
+
+
+.spacer {
+    display: block;
+    padding: 40px;
+}
+
+/* CreativeTechCollective.css */
+.collective-container {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    padding: 50px 20px;
+  }
+  
+  .collective-content {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 100px;
+    margin: auto;
+  }
+  
+   h1 {
+    font-size: 40px; /* Adjust size as needed */
+    font-weight: bold;
+    font-family: 'DM Sans';
+    width: 90%;
+  }
+
+  h3 {
+    font-size: 24px; /* Adjust size as needed */
+    font-weight: bold;
+    margin-bottom: 20px;
+    color: #565555;
+    font-family: 'DM Sans';
+    width: 90%;
+  }
+  
+  
+  /* Responsive styles */
+  @media (max-width: 768px) {
+    .collective-content {
+      grid-template-columns: 1fr;
+    }
+  }
+  
+
 .team-container {
     max-width: 1400px;
     margin: 0 auto;
@@ -15,7 +81,7 @@
     display: grid;
     grid-template-columns: repeat(3, 1fr);
     gap: 20px;
-    padding: 20px;
+    margin-top: 50px;
   }
 
   
@@ -53,15 +119,16 @@
     padding: 10px 20px;
     font-size: 16px;
     cursor: pointer;
-    background-color: #007bff;
-    color: white;
+    background-color: #F0F0F0;
+    color: #000;
     border: none;
     border-radius: 5px;
     transition: background-color 0.3s ease;
   }
   
   .meetup-invite button:hover {
-    background-color: #0056b3;
+    background-color: #000;
+    color: #fff;
   }
 
   .visionaries h2 {
@@ -97,6 +164,14 @@
     }
     .aboutcontent h2 {
         font-size: 20px !important;
+    }
+    .spacer {
+        display: block;
+        padding: 0px !important;
+    }
+
+    .flex-row {
+      flex-direction: column;
     }
   }
 
