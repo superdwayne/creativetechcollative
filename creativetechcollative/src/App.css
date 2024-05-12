@@ -307,4 +307,8 @@ small {
   .name-card-text {
     width: 70vw !important;
   }
+
+  .mobilehide {
+    display: none !important;
+  }
 }

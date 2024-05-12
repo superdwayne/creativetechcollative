@@ -28,7 +28,7 @@ const handleSubmit = async (event) => {
 
 
   return (
-    <form onSubmit={handleSubmit}>
+    <form onSubmit={handleSubmit} className='mobilehide'>
 <input
   type="email"
   placeholder="Enter your email here"
