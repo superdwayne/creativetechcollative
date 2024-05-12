@@ -1,0 +1,24 @@
+.scrolling-wrapper {
+    width: 100%; /* Full width of the container */
+    overflow: hidden; /* Hides anything outside of this container */
+    position: relative;
+    height: 50px; /* Adjust based on your design needs */
+    color: #fff;
+  }
+  
+  .scrolling-text {
+    position: absolute;
+    white-space: nowrap; /* Ensures the text stays in a single line */
+    display: block;
+    animation: scroll 60s linear infinite; /* Adjust timing as needed */
+  }
+  
+  @keyframes scroll {
+    from {
+      left: 100%;
+    }
+    to {
+      left: -100%;
+    }
+  }
+  

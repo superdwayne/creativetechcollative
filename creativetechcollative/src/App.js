@@ -1,69 +1,129 @@
-import TeamPage from './team/team';
-import ReactGA from 'react-ga';
 
 import React, { useEffect, useState } from 'react';
+import { BrowserRouter as Router, Route, Routes } from 'react-router-dom';
+import { Canvas, extend } from '@react-three/fiber';
+import { LumaSplatsThree } from "@lumaai/luma-web";
+import TeamPage from './team/teampage';
+import HorizontalScrollingText from './htext/htext';
+
+import HamburgerMenu from './hamburger/hamburger'; // Adjust the path as necessary
+
+// import SceneWithLumaSplats from './splat/splat'
+import ReactGA from 'react-ga';
 import './App.css';
 
-const TRACKING_ID = "UA-294935751-1"; // OUR_TRACKING_ID
+// Extend R3F to recognize LumaSplats
+extend({ LumaSplats: LumaSplatsThree });
+
+const TRACKING_ID = "UA-294935751-1"; // Your tracking ID
 ReactGA.initialize(TRACKING_ID);
 
-// const AboutOverlay = ({ onClose }) => {
-//   return (
-//     <div className="about-overlay">
-      
-//       <div className='aboutcontent'>
-//       <button className="close-button" onClick={onClose}>X</button>
-//         <h2>At the Creative Technology Collective, we are a dynamic team of eight creative technologists, blending art and technology to redefine digital expression. Our diverse skills range from software engineering and digital artistry to interactive media and beyond. United by a philosophy of collaborative intelligence, each of us brings unique insights and expertise, fueling innovation and pioneering concepts. </h2>
-//         <h2>We hold monthly meetups to discuss the latest in the world of creative tech, fostering a space for learning, sharing, and sparking new ideas. Our mission extends beyond creating groundbreaking technology; we aim to inspire and share our collective wisdom with the community, driving forward the future of digital creativity.</h2>
-//       </div>     
-//     </div>
-//   );
-// };
 
-const Weather = ({ onAboutClick }) => {
-  const [weather, setWeather] = useState(null);
-
-  useEffect(() => {
-    const fetchWeather = async () => {
-      const apiKey = '0128f326def470b7fe59e5815edbc56b';
-      const url = `https://api.openweathermap.org/data/2.5/weather?q=Amsterdam&appid=${apiKey}&units=metric`;
-
-      try {
-        const response = await fetch(url);
-        const data = await response.json();
-        setWeather(data);
-      } catch (error) {
-        console.error('Error fetching weather data:', error);
-      }
-    };
-
-    fetchWeather();
-  }, []);
-
-  if (!weather) {
-    return <div>Loading...</div>;
-  }
-
-  return (
-    <nav className="navbar">
-      <div className="nav-brand"> Creative Technology Collective  </div>
-      <div className="nav-links">
-        <a target="_blank" href="mailto:ddpmarshall@gmail.com?subject=I want to support">
-        Support us
-        </a>
-
-      </div>
-    </nav>
-  );
-};
 
 function App() {
- 
+
+
+    const [pixels, setPixels] = useState([]);
+
+    useEffect(() => {
+        const interval = setInterval(() => {
+            const newPixel = {
+                id: Math.random(),
+                startX: Math.random() * window.innerWidth
+            };
+            setPixels(currentPixels => [...currentPixels, newPixel]);
+        }, 150); // Create a new pixel every 150ms
+
+        return () => clearInterval(interval);
+    }, []);
+
+    const removePixel = id => {
+        setPixels(currentPixels => currentPixels.filter(pixel => pixel.id !== id));
+    };
+
+  const [cursorPos, setCursorPos] = useState({ x: 0, y: 0 });
+  const [scale, setScale] = useState(3);
+  const [pageColor, setPageColor] = useState('#000');
+  const [contentVisible, setContentVisible] = useState(false);
+  const [animationPlayed, setAnimationPlayed] = useState(false);
+
+  const handleMouseMove = (event) => {
+    setCursorPos({ x: event.clientX, y: event.clientY });
+  };
+
+  const handleMouseDown = () => {
+    setScale(currentScale => currentScale + 0.1);
+  };
+
+  const handleMouseUp = () => {
+    setScale(1); // Reset scale to 1 on mouse up
+  };
+
+  const handleIconClick = () => {
+    if (!animationPlayed) {
+      setPageColor('#FFF'); // Change the background color
+      setTimeout(() => {
+        setContentVisible(true); // Show the content after the color transition
+        setAnimationPlayed(true);
+      }, 500);
+    } else {
+      setContentVisible(false); // Hide the content
+      setTimeout(() => {
+        setPageColor('#000'); // Change the background color back
+        setAnimationPlayed(false);
+      }, 500);
+    }
+  };
+
+
+
+  useEffect(() => {
+    window.addEventListener('mousemove', handleMouseMove);
+    window.addEventListener('mousedown', handleMouseDown);
+    window.addEventListener('mouseup', handleMouseUp);
+
+    return () => {
+      window.removeEventListener('mousemove', handleMouseMove);
+      window.removeEventListener('mousedown', handleMouseDown);
+      window.removeEventListener('mouseup', handleMouseUp);
+    };
+  }, []);
+
   return (
     <>
-      <Weather />
-      <TeamPage />
+        <Router>
+        <HamburgerMenu />
+       
+    </Router>
+   
+    <div className='mobile' style={{ width: '90vw', height: '90vh', overflow: 'hidden', margin: '0px auto' }}>
+      <iframe
+        src="https://unicorn.studio/embed/0jXySgHZoWysSC5mZKqm?scale=1&fps=60"
+        style={{ width: '100%', height: '100%', border: 'none' }}
+        loading="lazy"
+        title="Unicorn Studio Embed"
+      ></iframe>
+    </div>
+
+    <TeamPage />
+    {/* <HorizontalScrollingText /> */}
+    <footer className="footer team-container">
+      <div className="footer-content">
+        <div className="footer-section left">
+      
+         
+        </div>
+        <div className="footer-section right">
+          <div className="social-links">
+            <a href="https://www.instagram.com/creativetechnologist.nl/">Instagram</a>
+            <a href="https://www.linkedin.com/company/creativetechnologycollective/">Linked-in</a>
+          </div>
+        </div>
+      </div>
+    </footer>
+   
     </>
-  );
+);
 }
 export default App;
+
