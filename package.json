@@ -1,0 +1,12 @@
+{
+  "dependencies": {
+    "@lumaai/luma-web": "^0.2.2",
+    "@react-three/drei": "^9.105.3",
+    "@react-three/fiber": "^8.16.1",
+    "@supabase/supabase-js": "^2.43.1",
+    "react-router-dom": "^6.23.0",
+    "react-slick": "^0.30.2",
+    "slick-carousel": "^1.8.1",
+    "three": "^0.163.0"
+  }
+}

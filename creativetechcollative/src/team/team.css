@@ -89,7 +89,6 @@
   .team-member {
     text-align: center;
     margin-bottom: 20px;
-    background-color: #F0F0F0;
   }
   
   .team-member img {
@@ -214,12 +213,13 @@
     justify-content: space-between;
     align-items: center; /* Align items vertically */
     padding: 20px;
-    background: #F0F0F0; /* Assuming a white background; change as needed */  }
+    background: #000; /* Assuming a white background; change as needed */  }
   
   .name-card-text {
     display: flex;
     flex-direction: column;
     justify-content: center;
+    width: 20vw;
   }
   
   .name-card-text h1 {
@@ -227,6 +227,7 @@
     margin: 0 0 5px 0; /* Adjust margin as needed */
     font-weight: normal; /* Adjust weight as needed */
     text-align: left;
+    color: #fff;
    
   }
   
@@ -248,3 +249,28 @@
   
   /* Add media queries for responsiveness if needed */
   
+
+  .team-container {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: space-around;
+    padding: 20px;
+  }
+  
+  .team-member {
+    flex-basis: 30%; /* Adjust size for responsiveness */
+    text-align: center;
+    margin-bottom: 20px;
+  }
+  
+  .team-member img {
+    width: 100%; /* Responsive image size */
+    height: auto;
+
+  }
+
+  .team-member p {
+    font-size: 12px;
+    color: #fff;
+    text-align: left;
+  }
