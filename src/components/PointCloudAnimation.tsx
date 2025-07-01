@@ -13,7 +13,6 @@ const PointCloudAnimation: React.FC<PointCloudAnimationProps> = ({
 }) => {
   const containerRef = useRef<HTMLDivElement>(null);
   const webglRef = useRef<any>({});
-  const tailRef = useRef<any>({});
 
   // Handle journey start animation - moved to separate useEffect
   useEffect(() => {
@@ -53,7 +52,6 @@ const PointCloudAnimation: React.FC<PointCloudAnimationProps> = ({
     if (!containerRef.current) return;
 
     const webgl = webglRef.current;
-    const tail = tailRef.current;
 
     // Initialize Three.js
     webgl.container = containerRef.current;
@@ -70,19 +68,10 @@ const PointCloudAnimation: React.FC<PointCloudAnimationProps> = ({
     webgl.clock = new THREE.Clock(true);
     webgl.loader.crossOrigin = '';
     
-    // Initialize mouse and raycaster early to prevent undefined errors
-    webgl.raycaster = new THREE.Raycaster();
-    webgl.mouse = new THREE.Vector2(0, 0);
-
-    webgl.threshold = 80; // Increased threshold to reduce particles
-    tail.on = false;
-
     // Load the provided image
-    webgl.texture = webgl.loader.load(imageUrl, (loadedTexture) => {
+    webgl.texture = webgl.loader.load(imageUrl, (loadedTexture: THREE.Texture) => {
       pixelExtraction(loadedTexture);
       initParticles();
-      initTail();
-      initRaycaster();
       resize();
       webgl.scene.add(webgl.particlesMesh);
       
@@ -134,10 +123,10 @@ const PointCloudAnimation: React.FC<PointCloudAnimationProps> = ({
       webgl.geometryParticles.setAttribute('position', positions);
 
       const uvs = new THREE.BufferAttribute(new Float32Array(4 * 2), 2);
-      uvs.setXYZ(0, 0.0, 0.0);
-      uvs.setXYZ(1, 1.0, 0.0);
-      uvs.setXYZ(2, 0.0, 1.0);
-      uvs.setXYZ(3, 1.0, 1.0);
+      uvs.setXY(0, 0.0, 0.0);
+      uvs.setXY(1, 1.0, 0.0);
+      uvs.setXY(2, 0.0, 1.0);
+      uvs.setXY(3, 1.0, 1.0);
       webgl.geometryParticles.setAttribute('uv', uvs);
 
       webgl.geometryParticles.setIndex(new THREE.BufferAttribute(new Uint16Array([0, 2, 1, 2, 3, 1]), 1));
@@ -166,7 +155,6 @@ const PointCloudAnimation: React.FC<PointCloudAnimationProps> = ({
         uSize: { value: 1.0 }, // Smaller particles
         uTextureSize: { value: new THREE.Vector2(webgl.width, webgl.height) },
         uTexture: { value: webgl.texture },
-        uTouch: { value: null },
         uAlphaCircle: { value: 0.0 },
         uAlphaSquare: { value: 1.0 },
         uCircleORsquare: { value: 0.0 },
@@ -183,95 +171,10 @@ const PointCloudAnimation: React.FC<PointCloudAnimationProps> = ({
       webgl.particlesMesh = new THREE.Mesh(webgl.geometryParticles, materialParticles);
     }
 
-    function initTail() {
-      tail.array = [];
-      tail.size = 60; // Reduced tail complexity
-      tail.maxAge = 50;
-      tail.radius = 0.08;
-      tail.red = 255;
-      tail.canvas = document.createElement('canvas');
-      tail.canvas.width = tail.canvas.height = tail.size;
-      tail.ctx = tail.canvas.getContext('2d');
-      tail.ctx!.fillStyle = 'black';
-      tail.ctx!.fillRect(0, 0, tail.canvas.width, tail.canvas.height);
-      tail.texture = new THREE.Texture(tail.canvas);
-      webgl.particlesMesh.material.uniforms.uTouch.value = tail.texture;
-    }
-
-    function initRaycaster() {
-      const geometryPlate = new THREE.PlaneGeometry(webgl.width, webgl.height, 1, 1);
-      const materialPlate = new THREE.MeshBasicMaterial({ color: 0xFFFFFF, wireframe: true, depthTest: false });
-      materialPlate.visible = false;
-      webgl.hoverPlate = new THREE.Mesh(geometryPlate, materialPlate);
-      webgl.scene.add(webgl.hoverPlate);
-    }
-
-    function onMouseMove(event: MouseEvent) {
-      webgl.mouse.x = (event.clientX / webgl.renderer.domElement.clientWidth) * 2 - 1;
-      webgl.mouse.y = -(event.clientY / webgl.renderer.domElement.clientHeight) * 2 + 1;
-      webgl.raycaster.setFromCamera(webgl.mouse, webgl.camera);
-      
-      // Only proceed if hoverPlate is initialized
-      const intersects = webgl.hoverPlate ? webgl.raycaster.intersectObjects([webgl.hoverPlate]) : [];
-      if (webgl.particlesMesh) {
-        webgl.particlesMesh.rotation.y = webgl.mouse.x / 8;
-        webgl.particlesMesh.rotation.x = -webgl.mouse.y / 8;
-      }
-      if (intersects[0] && tail.on) buildTail(intersects[0].uv);
-    }
-
-    function buildTail(uv: THREE.Vector2) {
-      let force = 0;
-      const last = tail.array[tail.array.length - 1];
-      if (last) {
-        const dx = last.x - uv.x;
-        const dy = last.y - uv.y;
-        const dd = dx * dx + dy * dy;
-        force = Math.min(dd * 10000, 1);
-      }
-      tail.array.push({ x: uv.x, y: uv.y, age: 0, force });
-    }
-
     function animate() {
       webgl.particlesMesh.material.uniforms.uTime.value += webgl.clock.getDelta();
-      if (tail.on) drawTail();
-      tail.texture.needsUpdate = true;
-      webgl.texture.needsUpdate = true;
       webgl.renderer.render(webgl.scene, webgl.camera);
       webgl.raf = requestAnimationFrame(animate);
-    }
-
-    function drawTail() {
-      tail.ctx.fillStyle = 'black';
-      tail.ctx.fillRect(0, 0, tail.canvas.width, tail.canvas.height);
-      tail.array.forEach((point: any, i: number) => {
-        point.age++;
-        if (point.age > tail.maxAge) {
-          tail.array.splice(i, 1);
-        } else {
-          const pos = {
-            x: point.x * tail.size,
-            y: (1 - point.y) * tail.size
-          };
-
-          let intensity = 1;
-          if (point.age < tail.maxAge * 0.3) {
-            intensity = easeOutSine(point.age / (tail.maxAge * 0.3), 0, 1, 1);
-          } else {
-            intensity = easeOutSine(1 - (point.age - tail.maxAge * 0.3) / (tail.maxAge * 0.7), 0, 1, 1);
-          }
-          intensity *= point.force;
-          const radius = tail.size * tail.radius * intensity;
-          const grd = tail.ctx.createRadialGradient(pos.x, pos.y, radius * 0.25, pos.x, pos.y, radius);
-          grd.addColorStop(0, 'rgba(' + tail.red + ', 255, 255, 0.2)');
-          grd.addColorStop(1, 'rgba(0, 0, 0, 0.0)');
-
-          tail.ctx.beginPath();
-          tail.ctx.fillStyle = grd;
-          tail.ctx.arc(pos.x, pos.y, radius, 0, Math.PI * 2);
-          tail.ctx.fill();
-        }
-      });
     }
 
     function resize() {
@@ -283,30 +186,14 @@ const PointCloudAnimation: React.FC<PointCloudAnimationProps> = ({
       const fovHeight = 2 * Math.tan((webgl.camera.fov * Math.PI) / 180 / 2) * webgl.camera.position.z;
       const scale = fovHeight / webgl.height + f;
       webgl.particlesMesh.scale.set(scale, scale, 1);
-      if (webgl.hoverPlate) webgl.hoverPlate.scale.set(scale, scale, 1);
     }
 
-    const easeOutSine = (t: number, b: number, c: number, d: number) => {
-      return c * Math.sin(t / d * (Math.PI / 2)) + b;
-    };
-
-    // Event listeners
-    window.addEventListener('mousemove', onMouseMove);
+    // Only resize event remains
     window.addEventListener('resize', resize);
-
-    const handleClick = () => {
-      tail.on = true;
-    };
-
-    webgl.container.addEventListener('click', handleClick);
 
     // Cleanup
     return () => {
-      window.removeEventListener('mousemove', onMouseMove);
       window.removeEventListener('resize', resize);
-      if (webgl.container) {
-        webgl.container.removeEventListener('click', handleClick);
-      }
       if (webgl.raf) {
         cancelAnimationFrame(webgl.raf);
       }
@@ -446,7 +333,6 @@ const PointCloudAnimation: React.FC<PointCloudAnimationProps> = ({
     <div 
       ref={containerRef} 
       className="w-full h-full"
-      style={{ cursor: 'pointer' }}
     />
   );
 };

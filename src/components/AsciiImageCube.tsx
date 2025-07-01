@@ -6,12 +6,14 @@ interface AsciiImageCubeProps {
   size?: number;
   rotationSpeed?: number;
   position?: { x: number; y: number; z: number };
+  forceVisible?: boolean;
 }
 
 const AsciiImageCube: React.FC<AsciiImageCubeProps> = ({ 
   size = 2.5, 
   rotationSpeed = 0.01,
-  position = { x: 0, y: 0, z: 0 }
+  position = { x: 0, y: 0, z: 0 },
+  forceVisible = false
 }) => {
   const containerRef = useRef<HTMLDivElement>(null);
   const sceneRef = useRef<THREE.Scene | null>(null);
@@ -496,6 +498,13 @@ const AsciiImageCube: React.FC<AsciiImageCubeProps> = ({
       renderer.dispose();
     };
   }, [size, rotationSpeed, position, hasDroppedIn]);
+
+  // If forceVisible is true, set hasDroppedIn to true immediately
+  useEffect(() => {
+    if (forceVisible && !hasDroppedIn) {
+      setHasDroppedIn(true);
+    }
+  }, [forceVisible, hasDroppedIn]);
 
   return (
     <div 

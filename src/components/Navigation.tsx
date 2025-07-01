@@ -18,7 +18,7 @@ const Navigation: React.FC<NavigationProps> = ({
   const location = useLocation();
 
   const navItems = [
-    { id: 'home', label: 'Our Mission', mobileLabel: 'Mission', path: '/' },
+    { id: 'home', label: 'Home', mobileLabel: 'Home', path: '/' },
     { id: 'resources', label: 'Resources', path: '/resources' },
     { id: 'members', label: 'Members', path: '/members' },
     { id: 'cases', label: 'Collaborations', mobileLabel: 'Collabs', path: '/collaborations' },
@@ -59,7 +59,7 @@ const Navigation: React.FC<NavigationProps> = ({
                 <button
                   key={item.id}
                   onClick={() => handleNavigation(item.path)}
-                  className={`px-2 py-1 rounded-lg transition-colors font-medium font-primary ${
+                  className={`px-2 py-1 rounded-lg transition-colors font-secondary font-medium ${
                     isActive(item.path)
                       ? 'bg-zinc-800 text-white' 
                       : 'text-zinc-400 hover:text-white hover:bg-zinc-800/50'
@@ -118,9 +118,9 @@ const Navigation: React.FC<NavigationProps> = ({
                       animationDelay: `${index * 100}ms`
                     }}
                   >
-                    <span className="text-6xl md:text-7xl font-black font-primary uppercase tracking-tight leading-none block">
+                    <span className="text-6xl md:text-7xl font-black font-secondary font-medium uppercase tracking-tight leading-none block">
                     </span>
-                    <span className="text-5xl md:text-7xl font-black font-primary uppercase tracking-tight leading-none block">
+                    <span className="text-5xl md:text-7xl font-black font-secondary font-medium uppercase tracking-tight leading-none block">
                       {item.mobileLabel || item.label}
                     </span>
                   </button>

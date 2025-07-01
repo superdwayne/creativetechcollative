@@ -16,6 +16,7 @@ import MembershipFormPage from './pages/MembershipFormPage';
 import Footer from './components/ui/footer';
 import { CookieNotice } from './components/ui/cookie-notice';
 import N8nOnboardingPage from './pages/N8nOnboardingPage';
+import MissionPage from './pages/MissionPage';
 
 // Helper function to get appropriate icon for category/tag
 const getCategoryIcon = (name: string): string => {
@@ -262,11 +263,12 @@ function App() {
           <Routes>
             <Route 
               path="/" 
+              element={<HomePage />} 
+            />
+            <Route 
+              path="/mission" 
               element={
-                <HomePage 
-                  showCubeIcon={showCubeIcon}
-                  setShowCubeIcon={setShowCubeIcon}
-                />
+                <MissionPage />
               } 
             />
             <Route 
@@ -287,14 +289,7 @@ function App() {
                 </div>
               } 
             />
-            <Route 
-              path="/cases" 
-              element={
-                <div className="w-full">
-                  <CasesPage />
-                </div>
-              } 
-            />
+           
             <Route 
               path="/collaborations" 
               element={

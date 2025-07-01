@@ -6,6 +6,7 @@ interface ImageCubeProps {
   size?: number;
   rotationSpeed?: number;
   position?: { x: number; y: number; z: number };
+  forceVisible?: boolean;
 }
 
 // Redirect to ASCII version
