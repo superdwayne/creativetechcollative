@@ -8,6 +8,11 @@ import { Input } from '../components/ui/input';
 import { ButtonColorful } from '../components/ui/button-colorful';
 import Footer from '../components/ui/footer';
 import { getWebhookUrl } from '@/utils/webhookUtils';
+import { IframeMask } from '../components/ui/iframe-overlay';
+import { IframeZoomWrapper } from '../components/ui/iframe-zoom-control';
+import { AdvancedIframeMask, GradientIframeMask, AnimatedBorderMask } from '../components/ui/iframe-mask-advanced';
+import { IframeMaskDemo } from '../components/ui/iframe-mask-demo';
+
 
 const HomePage = () => {
   const [journeyStarted, setJourneyStarted] = useState(() => {
@@ -21,12 +26,18 @@ const HomePage = () => {
   const [submitMessage, setSubmitMessage] = useState('');
   // Track if splash has been dismissed (for animation)
   const [splashDismissed, setSplashDismissed] = useState(false);
+  const [conversationStarted, setConversationStarted] = useState(false);
+  const [iframeLoaded, setIframeLoaded] = useState(false);
 
   useEffect(() => {
     if (!journeyStarted && sessionStorage.getItem('ctcSplashSeen') === 'true') {
       setJourneyStarted(true);
     }
   }, []);
+
+
+
+
 
   // Function to capitalize first letter of each word
   const capitalizeName = (name: string): string => {
@@ -220,20 +231,88 @@ const HomePage = () => {
           </div>
         </section>
 
-        {/* Mascotte.AI Digital Human Section */}
+                {/* Mascotte.AI Digital Human Section */}
         <section className="relative z-20 flex justify-center items-center py-12 bg-black">
-          <div className="w-full max-w-7xl h-[70vh] min-h-[500px] mx-auto">
-            <iframe
-              name="Mascotte.AI Digital Human"
-              src="https://mascotte.ai/embed?data=Dw0QEkU5PSwFAwAHUR9LSkc"
-              style={{ width: '100%', height: '100%', minHeight: '500px', border: 'none', display: 'block' }}
-              allow="fullscreen"
-              sandbox="allow-same-origin allow-scripts allow-popups allow-forms"
-              title="Mascotte.AI Digital Human"
-            />
+          <div className="w-full max-w-7xl h-[70vh] min-h-[500px] mx-auto relative flex">
+            <div className="relative w-1/2 h-full">
+              <iframe
+                name="Mascotte.AI Digital Human"
+                src="https://mascotte.ai/embed?data=JgQDAR4sOTIFAwAHUh9LSkc&lang=false"
+                style={{ 
+                  width: '100%', 
+                  height: '100%', 
+                  minHeight: '500px', 
+                  border: 'none', 
+                  display: 'block'
+                }}
+                allow="microphone; camera"
+                sandbox="allow-same-origin allow-scripts allow-popups allow-forms"
+                title="Mascotte.AI Digital Human"
+                onLoad={() => setIframeLoaded(true)}
+              />
+              
+
+            </div>
+            
+            {/* About the Collective Text */}
+            <div className="w-1/2 flex items-center px-8">
+              <div className="text-left max-w-lg">
+                <h3 className="text-3xl md:text-4xl font-primary text-white mb-6">Hello, I'm flux</h3>
+                <p className="text-zinc-300 text-xl font-secondary leading-relaxed">
+                  I'm your AI guide into the world of Creative Technology, a community of pioneers at the intersection of creativity and technology. I'm here to help you explore the latest trends and tools in creative technology, and to connect you with other creative technologists.
+                </p>
+              </div>
+            </div>
+            
+            {/* Comprehensive overlay to hide ALL interface elements */}
+            <div className="absolute inset-0 pointer-events-none">
+              {/* Top section - hide hamburger menu and top controls */}
+              <div className="absolute top-0 right-0 w-20 h-20 bg-black"></div>
+              
+              {/* Bottom section - hide all bottom controls and input */}
+              <div className="absolute bottom-0 left-0 right-48 h-16 bg-black rounded"></div>
+              
+              <div className="absolute bottom-10 left-0 right-48 h-16 bg-black rounded"></div>
+              
+              <div className="absolute bottom-20 left-0 right-48 h-16 bg-black rounded"></div>
+              
+              <div className="absolute bottom-30 left-0 right-48 h-16 bg-black rounded"></div>
+              
+              <div className="absolute bottom-35 left-0 right-48 h-16 bg-black rounded"></div>
+              
+              <div className="absolute bottom-40 left-0 right-48 h-5 bg-black rounded"></div>
+              <div className="absolute bottom-40 left-0 right-48 h-1 bg-black rounded"></div>
+              
+              
+              {/* Overlay to cover the SVG position - only show after conversation starts */}
+             
+                <div id="trash-can-overlay" className="absolute" style={{
+                  bottom: '0rem',
+                  top: '0rem',
+                  right: '634px',
+                  height: '39rem',
+                  width: '2rem',
+                  borderRadius: '0',
+                  backgroundColor: 'black'
+                }}></div>
+
+<div id="lang-overlay" className="absolute" style={{
+                  bottom: '5rem',
+                  top: '79px',
+                  right: '663px',
+                  height: '60px',
+                  width: '39rem',
+                  borderRadius: '0',
+                  backgroundColor: 'black'
+                }}></div>
+            
+              
+              {/* Additional coverage for microphone and trash can area */}
+              <div className="absolute bottom-4 right-4 w-32 h-16 bg-black"></div>
+            </div>
           </div>
         </section>
-
+           
         {/* Scroll cue/button to scroll past the iframe */}
         <div className="flex justify-center items-center pb-8">
           <button
@@ -253,28 +332,9 @@ const HomePage = () => {
           </button>
         </div>
 
-        {/* Our Mission Section (replaces What is a Creative Technologist) */}
-        <section className="py-40 relative z-20 bg-black">
-          <div className="max-w-7xl mx-auto">
-            <div className="flex justify-start mb-16">
-              <div className="max-w-2xl text-left">
-                <ScrollTriggeredText
-                  words="Our Mission"
-                  className="text-4xl md:text-5xl font-primary text-white mb-6"
-                  duration={0.8}
-                  filter={false}
-                />
-                <ScrollTriggeredText
-                  words="We're on a mission to make Creative Technology open to all—breaking down barriers, spreading knowledge, and putting powerful tools into the hands of anyone ready to build what's next."
-                  className="text-zinc-300 text-lg font-secondary font-medium leading-relaxed mb-8"
-                  duration={0.6}
-                  delay={0.8}
-                  filter={false}
-                />
-              </div>
-            </div>
-          </div>
-        </section>
+
+
+
 
         {/* Membership Section */}
         {/*
@@ -308,12 +368,14 @@ const HomePage = () => {
         </section>
         */}
 
+
+
         {/* Our Sponsors Section */}
         <section className="py-40 relative z-20">
           <div className="max-w-7xl mx-auto">
             <div className="text-center mb-16">
               <ScrollTriggeredText 
-                words="Our Supporters"
+                words="Our Partners"
                 className="text-4xl md:text-5xl font-primary text-white mb-4"
                 duration={0.8}
                 filter={false}
@@ -326,51 +388,67 @@ const HomePage = () => {
                 filter={false}
               />
             </div>
-            <div className="grid grid-cols-1 md:grid-cols-3 relative z-10 max-w-4xl mx-auto">
-              <div className="flex flex-col border border-zinc-800 md:border-r md:border-l md:border-b md:border-t-0 py-10 relative group/supporter">
-                <div className="opacity-0 group-hover/supporter:opacity-100 transition duration-200 absolute inset-0 h-full w-full bg-gradient-to-t from-zinc-800 to-transparent pointer-events-none" />
+            <div className="grid grid-cols-4 gap-4 relative z-10 max-w-6xl mx-auto">
+              <div className="flex flex-col py-6 relative">
                 <div className="mb-4 relative z-10 px-10 flex justify-center items-center h-20 md:h-24">
                   <img 
                     src="/sponsors/Leonardo-AI.png" 
                     alt="Leonardo AI" 
-                    className="max-h-16 md:max-h-20 max-w-full object-contain opacity-90 group-hover/supporter:opacity-100 transition-opacity duration-300"
+                    className="h-16 md:h-20 w-auto object-contain"
                   />
                 </div>
                 <div className="text-center relative z-10 px-10">
-                  <span className="group-hover/supporter:translate-y-1 transition duration-200 inline-block text-white font-secondary text-lg font-medium">
-                    
+                  <span className="inline-block text-white font-secondary text-lg font-medium">
+                    Leonardo AI
                   </span>
                 </div>
               </div>
               
-              <div className="flex flex-col border border-zinc-800 md:border-r md:border-b md:border-l-0 md:border-t-0 py-10 relative group/supporter">
-                <div className="opacity-0 group-hover/supporter:opacity-100 transition duration-200 absolute inset-0 h-full w-full bg-gradient-to-t from-zinc-800 to-transparent pointer-events-none" />
-                <div className="mb-4 relative z-10 px-10 flex justify-center items-center h-20 md:h-24">
-                  <img 
-                    src="/sponsors/newamsterdam.jpg" 
-                    alt="Luma Labs" 
-                    className="max-h-16 md:max-h-20 max-w-full object-contain opacity-90 group-hover/supporter:opacity-100 transition-opacity duration-300"
-                  />
-                </div>
-                <div className="text-center relative z-10 px-10">
-                  <span className="group-hover/supporter:translate-y-1 transition duration-200 inline-block text-white font-secondary text-lg font-medium">
-                    
-                  </span>
-                </div>
-              </div>
+           
               
-              <div className="flex flex-col border border-zinc-800 md:border-r md:border-b md:border-l-0 md:border-t-0 py-10 relative group/supporter">
-                <div className="opacity-0 group-hover/supporter:opacity-100 transition duration-200 absolute inset-0 h-full w-full bg-gradient-to-t from-zinc-800 to-transparent pointer-events-none" />
+              <div className="flex flex-col py-6 relative">
                 <div className="mb-4 relative z-10 px-10 flex justify-center items-center h-20 md:h-24">
                   <img 
                     src="/sponsors/SAMA.png" 
                     alt="Sama Street art" 
-                    className="max-h-16 md:max-h-20 max-w-full object-contain opacity-90 group-hover/supporter:opacity-100 transition-opacity duration-300"
+                    className="h-16 md:h-20 w-auto object-contain"
                   />
                 </div>
                 <div className="text-center relative z-10 px-10">
-                  <span className="group-hover/supporter:translate-y-1 transition duration-200 inline-block text-white font-secondary text-lg font-medium">
-                
+                  <span className="inline-block text-white font-secondary text-lg font-medium">
+                    SAMA
+                  </span>
+                </div>
+              </div>
+              
+              <div className="flex flex-col py-6 relative">
+                <div className="mb-4 relative z-10 px-10 flex justify-center items-center h-20 md:h-24">
+                  <img 
+                    src="/sponsors/KIRI.png" 
+                    alt="KIRI Engine" 
+                    className="h-16 md:h-20 w-auto object-contain"
+                  />
+                </div>
+                <div className="text-center relative z-10 px-10">
+                  <span className="inline-block text-white font-secondary text-lg font-medium">
+                    KIRI Engine
+                  </span>
+                </div>
+              </div>
+              
+            
+              
+              <div className="flex flex-col py-6 relative">
+                <div className="mb-4 relative z-10 px-10 flex justify-center items-center h-20 md:h-24">
+                  <img 
+                    src="/sponsors/instagram-logo.jpg" 
+                    alt="Solaya" 
+                    className="h-16 md:h-20 w-auto object-contain rounded-full"
+                  />
+                </div>
+                <div className="text-center relative z-10 px-10">
+                  <span className="inline-block text-white font-secondary text-lg font-medium">
+                    Solaya
                   </span>
                 </div>
               </div>

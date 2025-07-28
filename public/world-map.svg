@@ -1,0 +1,75 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1000 500" style="background: #0f172a;">
+  <defs>
+    <linearGradient id="oceanGradient" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" style="stop-color:#0f172a;stop-opacity:1" />
+      <stop offset="100%" style="stop-color:#1e293b;stop-opacity:1" />
+    </linearGradient>
+    <linearGradient id="landGradient" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" style="stop-color:#1e293b;stop-opacity:1" />
+      <stop offset="100%" style="stop-color:#334155;stop-opacity:1" />
+    </linearGradient>
+    <filter id="glow">
+      <feGaussianBlur stdDeviation="3" result="coloredBlur"/>
+      <feMerge> 
+        <feMergeNode in="coloredBlur"/>
+        <feMergeNode in="SourceGraphic"/>
+      </feMerge>
+    </filter>
+  </defs>
+  
+  <!-- Ocean background -->
+  <rect width="1000" height="500" fill="url(#oceanGradient)" />
+  
+  <!-- Continents -->
+  <g fill="url(#landGradient)" stroke="#475569" stroke-width="1">
+    <!-- North America -->
+    <path d="M 120 80 L 280 60 L 380 100 L 420 160 L 400 220 L 320 280 L 220 300 L 140 260 L 120 200 L 120 80 Z" />
+    <path d="M 120 200 L 140 260 L 220 300 L 320 280 L 400 220 L 420 160 L 380 100 L 280 60 L 120 80 L 120 200 Z" />
+    
+    <!-- South America -->
+    <path d="M 320 280 L 360 320 L 400 400 L 420 480 L 400 520 L 360 540 L 320 520 L 300 480 L 320 280 Z" />
+    
+    <!-- Europe -->
+    <path d="M 540 140 L 620 120 L 680 130 L 700 160 L 680 190 L 620 180 L 540 160 L 540 140 Z" />
+    
+    <!-- Africa -->
+    <path d="M 560 160 L 620 140 L 680 160 L 700 220 L 680 280 L 620 320 L 560 300 L 560 160 Z" />
+    
+    <!-- Asia -->
+    <path d="M 720 120 L 900 100 L 1000 140 L 1020 220 L 1000 300 L 900 340 L 720 320 L 720 120 Z" />
+    
+    <!-- Australia -->
+    <path d="M 900 340 L 960 320 L 1000 340 L 1000 380 L 960 400 L 900 380 L 900 340 Z" />
+  </g>
+  
+  <!-- Country highlights for member countries -->
+  <g filter="url(#glow)">
+    <!-- Netherlands highlight -->
+    <circle cx="620" cy="160" r="15" fill="#10b981" opacity="0.4" stroke="#059669" stroke-width="2" />
+    
+    <!-- UK highlight -->
+    <circle cx="600" cy="140" r="12" fill="#10b981" opacity="0.4" stroke="#059669" stroke-width="2" />
+    
+    <!-- Portugal highlight -->
+    <circle cx="580" cy="180" r="10" fill="#10b981" opacity="0.4" stroke="#059669" stroke-width="2" />
+  </g>
+  
+  <!-- Location markers -->
+  <g>
+    <!-- Amsterdam -->
+    <circle cx="620" cy="160" r="8" fill="none" stroke="#10b981" stroke-width="2" opacity="0.6" />
+    <circle cx="620" cy="160" r="5" fill="#10b981" stroke="white" stroke-width="2" />
+    <text x="635" y="155" fill="white" font-size="12" font-weight="bold">8</text>
+    
+    <!-- London -->
+    <circle cx="600" cy="140" r="8" fill="none" stroke="#10b981" stroke-width="2" opacity="0.6" />
+    <circle cx="600" cy="140" r="5" fill="#10b981" stroke="white" stroke-width="2" />
+    <text x="615" y="135" fill="white" font-size="12" font-weight="bold">4</text>
+    
+    <!-- Lisbon -->
+    <circle cx="580" cy="180" r="8" fill="none" stroke="#10b981" stroke-width="2" opacity="0.6" />
+    <circle cx="580" cy="180" r="5" fill="#10b981" stroke="white" stroke-width="2" />
+    <text x="595" y="175" fill="white" font-size="12" font-weight="bold">1</text>
+  </g>
+</svg>

@@ -473,7 +473,7 @@ const MissionPage: React.FC = () => (
   <div className="min-h-screen flex items-center justify-center px-8 py-40 bg-black">
     <div className="max-w-3xl mx-auto text-center">
       <ScrollTriggeredText
-        words="Our Mission"
+        words="About the Collective"
         className="text-5xl md:text-7xl font-primary font-medium text-white mb-8"
         duration={0.8}
         filter={false}
@@ -489,4 +489,4 @@ const MissionPage: React.FC = () => (
   </div>
 );
 
-export default MissionPage;
+export default CasesPage;

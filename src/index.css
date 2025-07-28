@@ -1,6 +1,31 @@
 @import url("https://fonts.cdnfonts.com/css/thegoodmonolith");
 @import url("https://fonts.cdnfonts.com/css/pp-neue-montreal");
 
+.info-language-flags {
+
+  display: none !important;
+}
+
+.h-16 {
+height: 5rem !important;  
+}
+.bottom-40 {
+  bottom: 10rem !important;
+}
+
+.h-5 {
+  height: 2.25rem !important;
+}
+
+.bg-main-gradient
+{
+  background-color: #000000 !important;
+}
+
+#chat-container {
+  display: none !important;
+}
+
 :root {
   /* Colors */
   --warm-off-white: #f5f5f0;

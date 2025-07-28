@@ -5,7 +5,8 @@ import Navigation from './components/Navigation';
 import ResourcesSidebar from './components/ResourcesSidebar';
 import HomePage from './pages/HomePage';
 import ResourcesPage from './pages/ResourcesPage';
-import CasesPage from './pages/CasesPage';
+import CasesPage from './pages/CollaborationsPage';
+import CollaborationsPage from './pages/CollaborationsPage';
 import MembersPage from './components/MembersPage';
 import { Contact2 } from './components/ui/contact-2';
 import TermsConditions from './components/TermsConditions';
@@ -27,10 +28,6 @@ const getCategoryIcon = (name: string): string => {
     'learning': '📚',
     'media': '🎬',
     'tools': '🛠️',
-    
-    // Allowed tags only
-    'tools': '🛠️',
-    'design': '🎨',
     'ai': '🤖',
     'audio': '🔊',
     '3d': '📦',
@@ -294,7 +291,7 @@ function App() {
               path="/collaborations" 
               element={
                 <div className="w-full">
-                  <CasesPage />
+                  <CollaborationsPage />
                 </div>
               } 
             />

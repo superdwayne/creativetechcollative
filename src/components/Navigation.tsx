@@ -20,6 +20,7 @@ const Navigation: React.FC<NavigationProps> = ({
   const navItems = [
     { id: 'home', label: 'Home', mobileLabel: 'Home', path: '/' },
     { id: 'resources', label: 'Resources', path: '/resources' },
+    { id: 'mission', label: 'About the Collective', path: '/mission' },
     { id: 'members', label: 'Members', path: '/members' },
     { id: 'cases', label: 'Collaborations', mobileLabel: 'Collabs', path: '/collaborations' },
     { id: 'contact', label: 'Contact', path: '/contact' }
@@ -41,7 +42,7 @@ const Navigation: React.FC<NavigationProps> = ({
     <>
       {/* Top Navigation */}
       <div className="fixed top-0 left-0 right-0 z-50 bg-transparent animate-in slide-in-from-top duration-300">
-        <div className="w-full px-6 py-4">
+        <div className="w-full px-4 py-4">
           <div className="flex items-center justify-between">
             <div className={`text-xl font-black text-left flex items-center transition-all duration-1000 ease-out ${
               showCubeIcon ? 'opacity-100 visible transform translate-y-0' : 'opacity-0 invisible transform -translate-y-2 pointer-events-none'
@@ -54,12 +55,12 @@ const Navigation: React.FC<NavigationProps> = ({
             </div>
             
             {/* Desktop Navigation */}
-            <nav className="hidden md:flex items-center space-x-4 ml-auto">
+            <nav className="hidden md:flex items-center space-x-2 ml-auto">
               {navItems.map((item) => (
                 <button
                   key={item.id}
                   onClick={() => handleNavigation(item.path)}
-                  className={`px-2 py-1 rounded-lg transition-colors font-secondary font-medium ${
+                  className={`px-2 py-1 rounded-lg transition-colors font-secondary font-medium text-sm ${
                     isActive(item.path)
                       ? 'bg-zinc-800 text-white' 
                       : 'text-zinc-400 hover:text-white hover:bg-zinc-800/50'
