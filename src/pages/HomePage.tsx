@@ -257,7 +257,7 @@ const HomePage = () => {
             {/* About the Collective Text */}
             <div className="w-1/2 flex items-center px-8">
               <div className="text-left max-w-lg">
-                <h3 className="text-3xl md:text-4xl font-primary text-white mb-6">Hello, I'm flux</h3>
+                <h3 className="text-3xl md:text-4xl font-primary text-white mb-6">Hello, I'm igor</h3>
                 <p className="text-zinc-300 text-xl font-secondary leading-relaxed">
                   I'm your AI guide into the world of Creative Technology, a community of pioneers at the intersection of creativity and technology. I'm here to help you explore the latest trends and tools in creative technology, and to connect you with other creative technologists.
                 </p>
@@ -266,46 +266,9 @@ const HomePage = () => {
             
             {/* Comprehensive overlay to hide ALL interface elements */}
             <div className="absolute inset-0 pointer-events-none">
-              {/* Top section - hide hamburger menu and top controls */}
-              <div className="absolute top-0 right-0 w-20 h-20 bg-black"></div>
-              
-              {/* Bottom section - hide all bottom controls and input */}
-              <div className="absolute bottom-0 left-0 right-48 h-16 bg-black rounded"></div>
-              
-              <div className="absolute bottom-10 left-0 right-48 h-16 bg-black rounded"></div>
-              
-              <div className="absolute bottom-20 left-0 right-48 h-16 bg-black rounded"></div>
-              
-              <div className="absolute bottom-30 left-0 right-48 h-16 bg-black rounded"></div>
-              
-              <div className="absolute bottom-35 left-0 right-48 h-16 bg-black rounded"></div>
-              
-              <div className="absolute bottom-40 left-0 right-48 h-5 bg-black rounded"></div>
-              <div className="absolute bottom-40 left-0 right-48 h-1 bg-black rounded"></div>
-              
-              
-              {/* Overlay to cover the SVG position - only show after conversation starts */}
              
-                <div id="trash-can-overlay" className="absolute" style={{
-                  bottom: '0rem',
-                  top: '0rem',
-                  right: '634px',
-                  height: '39rem',
-                  width: '2rem',
-                  borderRadius: '0',
-                  backgroundColor: 'black'
-                }}></div>
 
-<div id="lang-overlay" className="absolute" style={{
-                  bottom: '5rem',
-                  top: '79px',
-                  right: '663px',
-                  height: '60px',
-                  width: '39rem',
-                  borderRadius: '0',
-                  backgroundColor: 'black'
-                }}></div>
-            
+
               
               {/* Additional coverage for microphone and trash can area */}
               <div className="absolute bottom-4 right-4 w-32 h-16 bg-black"></div>
@@ -325,10 +288,7 @@ const HomePage = () => {
             className="group flex flex-col items-center text-zinc-400 hover:text-pink-400 transition-colors focus:outline-none"
             aria-label="Scroll to next section"
           >
-            <span className="mb-1">Scroll down</span>
-            <svg className="animate-bounce" width="24" height="24" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7" />
-            </svg>
+         
           </button>
         </div>
 

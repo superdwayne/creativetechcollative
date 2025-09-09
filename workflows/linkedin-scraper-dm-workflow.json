@@ -1,0 +1,379 @@
+{
+  "name": "LinkedIn Follower Auto-DM (Web Scraping)",
+  "nodes": [
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "minutes",
+              "minutesInterval": 15
+            }
+          ]
+        }
+      },
+      "id": "schedule-trigger",
+      "name": "Check Every 15 Minutes",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.1,
+      "position": [240, 300]
+    },
+    {
+      "parameters": {
+        "url": "https://www.linkedin.com/company/creativetechnologycollective/followers/",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "linkedInApi",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "User-Agent",
+              "value": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
+            },
+            {
+              "name": "Accept",
+              "value": "text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8"
+            }
+          ]
+        },
+        "options": {
+          "timeout": 30000,
+          "followRedirect": true
+        }
+      },
+      "id": "fetch-followers-page",
+      "name": "Fetch Followers Page",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.1,
+      "position": [460, 300],
+      "credentials": {
+        "linkedInApi": {
+          "id": "linkedin-session-credentials",
+          "name": "LinkedIn Session"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "// Parse LinkedIn followers page HTML\nconst html = $input.first().json.data;\nconst cheerio = require('cheerio');\nconst $ = cheerio.load(html);\n\n// Extract follower information from the page\nconst followers = [];\n\n// LinkedIn uses various selectors for follower cards\nconst followerSelectors = [\n  '.org-people-profile-card',\n  '.people-search-result',\n  '.follower-card',\n  '[data-test-id=\"people-search-result\"]'\n];\n\nfollowerSelectors.forEach(selector => {\n  $(selector).each((index, element) => {\n    const $element = $(element);\n    \n    // Extract profile information\n    const nameElement = $element.find('.actor-name, .name, .t-16, .t-black, .t-bold').first();\n    const profileLinkElement = $element.find('a[href*=\"/in/\"]').first();\n    const imageElement = $element.find('img').first();\n    \n    if (nameElement.length && profileLinkElement.length) {\n      const name = nameElement.text().trim();\n      const profileUrl = profileLinkElement.attr('href');\n      const imageUrl = imageElement.attr('src') || '';\n      \n      // Extract LinkedIn profile ID from URL\n      const profileIdMatch = profileUrl.match(/\\/in\\/([^\\/?]+)/);\n      const profileId = profileIdMatch ? profileIdMatch[1] : null;\n      \n      if (name && profileId) {\n        followers.push({\n          name: name,\n          profileId: profileId,\n          profileUrl: profileUrl.startsWith('http') ? profileUrl : `https://linkedin.com${profileUrl}`,\n          imageUrl: imageUrl,\n          scrapedAt: new Date().toISOString()\n        });\n      }\n    }\n  });\n});\n\n// Remove duplicates based on profileId\nconst uniqueFollowers = followers.filter((follower, index, self) => \n  index === self.findIndex(f => f.profileId === follower.profileId)\n);\n\nconsole.log(`Found ${uniqueFollowers.length} unique followers`);\n\nreturn uniqueFollowers.map(follower => ({ json: follower }));"
+      },
+      "id": "parse-followers",
+      "name": "Parse Followers",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [680, 300]
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "SELECT follower_profile_id FROM linkedin_followers_scraped WHERE follower_profile_id = $1",
+        "additionalFields": {
+          "mode": "independently"
+        },
+        "options": {
+          "queryParameters": "={{ [$json.profileId] }}"
+        }
+      },
+      "id": "check-existing-follower",
+      "name": "Check Existing Follower",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.4,
+      "position": [900, 300],
+      "credentials": {
+        "postgres": {
+          "id": "postgres-credentials",
+          "name": "PostgreSQL"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict"
+          },
+          "conditions": [
+            {
+              "id": "new-follower-check",
+              "leftValue": "={{ $json.length }}",
+              "rightValue": 0,
+              "operator": {
+                "type": "number",
+                "operation": "equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "filter-new-followers",
+      "name": "Filter New Followers",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [1120, 300]
+    },
+    {
+      "parameters": {
+        "url": "={{ $('parse-followers').item.json.profileUrl }}",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "User-Agent",
+              "value": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
+            }
+          ]
+        },
+        "options": {
+          "timeout": 15000
+        }
+      },
+      "id": "fetch-profile-details",
+      "name": "Fetch Profile Details",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.1,
+      "position": [1340, 200],
+      "credentials": {
+        "linkedInApi": {
+          "id": "linkedin-session-credentials",
+          "name": "LinkedIn Session"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "// Extract additional profile information\nconst html = $input.first().json.data;\nconst followerData = $('parse-followers').item.json;\nconst cheerio = require('cheerio');\nconst $ = cheerio.load(html);\n\n// Extract first name from full name\nconst fullName = followerData.name;\nconst firstName = fullName.split(' ')[0];\n\n// Try to extract additional info from profile\nconst headline = $('.text-body-medium').first().text().trim() || '';\nconst location = $('[data-test-id=\"profile-location\"]').text().trim() || '';\n\n// Create personalized message based on available information\nlet personalizedMessage = `Hi ${firstName}! 👋\\n\\nThank you for following Creative Technology Collective! We're thrilled to have you join our community of innovators, creators, and tech enthusiasts.\\n\\n🚀 Here's what you can expect:\\n• Cutting-edge insights on emerging technologies\\n• Exclusive access to our community resources\\n• Networking opportunities with fellow creatives\\n• Early access to our workshops and events`;\n\n// Add personalization based on headline if available\nif (headline && headline.length > 0) {\n  if (headline.toLowerCase().includes('developer') || headline.toLowerCase().includes('engineer')) {\n    personalizedMessage += `\\n\\nI noticed you're in development - you'll love our technical deep-dives and coding workshops!`;\n  } else if (headline.toLowerCase().includes('designer') || headline.toLowerCase().includes('creative')) {\n    personalizedMessage += `\\n\\nAs someone in the creative field, you'll find our design-tech intersection content particularly valuable!`;\n  } else if (headline.toLowerCase().includes('founder') || headline.toLowerCase().includes('entrepreneur')) {\n    personalizedMessage += `\\n\\nGreat to have another entrepreneur in our community - our startup-focused content will be right up your alley!`;\n  }\n}\n\npersonalizedMessage += `\\n\\nFeel free to reach out if you have any questions or ideas you'd like to share. We're always excited to connect with passionate individuals like yourself!\\n\\nWelcome aboard! 🎉\\n\\nBest regards,\\nThe CTC Team\\n\\nP.S. Check out our latest resources at creativetechnologists.nl`;\n\nreturn {\n  json: {\n    profileId: followerData.profileId,\n    profileUrl: followerData.profileUrl,\n    fullName: fullName,\n    firstName: firstName,\n    headline: headline,\n    location: location,\n    message: personalizedMessage,\n    timestamp: new Date().toISOString()\n  }\n};"
+      },
+      "id": "create-personalized-message",
+      "name": "Create Personalized Message",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [1560, 200]
+    },
+    {
+      "parameters": {
+        "url": "https://www.linkedin.com/messaging/compose/",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "User-Agent",
+              "value": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
+            },
+            {
+              "name": "Content-Type",
+              "value": "application/x-www-form-urlencoded"
+            }
+          ]
+        },
+        "sendBody": true,
+        "bodyParameters": {
+          "parameters": [
+            {
+              "name": "recipients",
+              "value": "={{ $json.profileId }}"
+            },
+            {
+              "name": "message",
+              "value": "={{ $json.message }}"
+            }
+          ]
+        },
+        "options": {
+          "timeout": 30000
+        }
+      },
+      "id": "send-linkedin-message",
+      "name": "Send LinkedIn Message",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.1,
+      "position": [1780, 200],
+      "credentials": {
+        "linkedInApi": {
+          "id": "linkedin-session-credentials",
+          "name": "LinkedIn Session"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "create",
+        "table": "linkedin_followers_scraped",
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "follower_profile_id": "={{ $json.profileId }}",
+            "follower_name": "={{ $json.fullName }}",
+            "first_name": "={{ $json.firstName }}",
+            "profile_url": "={{ $json.profileUrl }}",
+            "headline": "={{ $json.headline }}",
+            "location": "={{ $json.location }}",
+            "follow_detected_date": "={{ $json.timestamp }}",
+            "message_sent": true,
+            "message_content": "={{ $json.message }}"
+          }
+        },
+        "options": {}
+      },
+      "id": "log-to-database",
+      "name": "Log to Database",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.4,
+      "position": [2000, 200],
+      "credentials": {
+        "postgres": {
+          "id": "postgres-credentials",
+          "name": "PostgreSQL"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "amount": 5,
+        "unit": "seconds"
+      },
+      "id": "rate-limit-delay",
+      "name": "Rate Limit Delay",
+      "type": "n8n-nodes-base.wait",
+      "typeVersion": 1,
+      "position": [1340, 400]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Error handling and logging\nconst error = $input.first();\nconsole.error('LinkedIn Scraping Error:', error);\n\n// Send notification to admin about the error\nreturn {\n  json: {\n    status: 'error',\n    message: 'LinkedIn scraping workflow encountered an error',\n    error: error.json || error.message || 'Unknown error',\n    timestamp: new Date().toISOString(),\n    workflow: 'LinkedIn Follower Auto-DM (Web Scraping)'\n  }\n};"
+      },
+      "id": "error-handler",
+      "name": "Error Handler",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [1120, 500]
+    }
+  ],
+  "connections": {
+    "Check Every 15 Minutes": {
+      "main": [
+        [
+          {
+            "node": "Fetch Followers Page",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Fetch Followers Page": {
+      "main": [
+        [
+          {
+            "node": "Parse Followers",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Parse Followers": {
+      "main": [
+        [
+          {
+            "node": "Check Existing Follower",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Check Existing Follower": {
+      "main": [
+        [
+          {
+            "node": "Filter New Followers",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Filter New Followers": {
+      "main": [
+        [
+          {
+            "node": "Rate Limit Delay",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Error Handler",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Rate Limit Delay": {
+      "main": [
+        [
+          {
+            "node": "Fetch Profile Details",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Fetch Profile Details": {
+      "main": [
+        [
+          {
+            "node": "Create Personalized Message",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Create Personalized Message": {
+      "main": [
+        [
+          {
+            "node": "Send LinkedIn Message",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Send LinkedIn Message": {
+      "main": [
+        [
+          {
+            "node": "Log to Database",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "pinData": {},
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "staticData": null,
+  "tags": [
+    {
+      "createdAt": "2025-01-28T12:40:00.000Z",
+      "updatedAt": "2025-01-28T12:40:00.000Z",
+      "id": "linkedin-scraping",
+      "name": "LinkedIn Scraping"
+    }
+  ],
+  "triggerCount": 1,
+  "updatedAt": "2025-01-28T12:40:00.000Z",
+  "versionId": "1"
+}

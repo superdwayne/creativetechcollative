@@ -1,0 +1,324 @@
+{
+  "name": "LinkedIn Follower Auto-DM (Simple)",
+  "nodes": [
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "minutes",
+              "minutesInterval": 30
+            }
+          ]
+        }
+      },
+      "id": "schedule-trigger",
+      "name": "Check Every 30 Minutes",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.1,
+      "position": [240, 300]
+    },
+    {
+      "parameters": {
+        "url": "https://www.linkedin.com/company/creativetechnologycollective/followers/",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "User-Agent",
+              "value": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
+            },
+            {
+              "name": "Cookie",
+              "value": "li_at=YOUR_LI_AT_COOKIE; JSESSIONID=YOUR_JSESSIONID; bcookie=YOUR_BCOOKIE"
+            }
+          ]
+        },
+        "options": {
+          "timeout": 30000,
+          "followRedirect": true
+        }
+      },
+      "id": "fetch-followers-page",
+      "name": "Fetch Followers Page",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.1,
+      "position": [460, 300]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Simple follower parsing without external dependencies\nconst html = $input.first().json.data;\n\n// Extract follower names using simple regex patterns\nconst followers = [];\n\n// Look for LinkedIn profile links and names\nconst profileLinkRegex = /href=\"\\/in\\/([^\"\\?]+)[^\"]*\"/g;\nconst nameRegex = /<span[^>]*class=\"[^\"]*(?:actor-name|name|t-16|t-black|t-bold)[^\"]*\"[^>]*>([^<]+)<\\/span>/g;\n\nlet profileMatch;\nconst profileIds = [];\nwhile ((profileMatch = profileLinkRegex.exec(html)) !== null) {\n  profileIds.push(profileMatch[1]);\n}\n\nlet nameMatch;\nconst names = [];\nwhile ((nameMatch = nameRegex.exec(html)) !== null) {\n  const name = nameMatch[1].trim();\n  if (name && name.length > 1 && !name.includes('LinkedIn')) {\n    names.push(name);\n  }\n}\n\n// Match names with profile IDs (simple approach)\nfor (let i = 0; i < Math.min(profileIds.length, names.length); i++) {\n  if (profileIds[i] && names[i]) {\n    followers.push({\n      name: names[i],\n      profileId: profileIds[i],\n      profileUrl: `https://linkedin.com/in/${profileIds[i]}`,\n      scrapedAt: new Date().toISOString()\n    });\n  }\n}\n\n// Remove duplicates\nconst uniqueFollowers = followers.filter((follower, index, self) => \n  index === self.findIndex(f => f.profileId === follower.profileId)\n);\n\nconsole.log(`Found ${uniqueFollowers.length} unique followers`);\n\nreturn uniqueFollowers.map(follower => ({ json: follower }));"
+      },
+      "id": "parse-followers",
+      "name": "Parse Followers",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [680, 300]
+    },
+    {
+      "parameters": {
+        "operation": "read",
+        "documentId": "YOUR_GOOGLE_SHEET_ID",
+        "sheetName": "LinkedIn Followers",
+        "options": {
+          "range": "A:A"
+        }
+      },
+      "id": "get-existing-followers",
+      "name": "Get Existing Followers",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4,
+      "position": [900, 300],
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "google-sheets-credentials",
+          "name": "Google Sheets OAuth2 API"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "// Check if follower is new\nconst currentFollower = $('parse-followers').item.json;\nconst existingFollowers = $input.first().json;\n\n// Extract profile IDs from existing followers sheet\nconst existingProfileIds = existingFollowers.map(row => row[0]).filter(id => id && id.length > 0);\n\n// Check if current follower is new\nconst isNewFollower = !existingProfileIds.includes(currentFollower.profileId);\n\nif (isNewFollower) {\n  return {\n    json: {\n      ...currentFollower,\n      isNew: true\n    }\n  };\n} else {\n  // Return empty to stop workflow for this follower\n  return null;\n}"
+      },
+      "id": "check-new-follower",
+      "name": "Check New Follower",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [1120, 300]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict"
+          },
+          "conditions": [
+            {
+              "id": "is-new-check",
+              "leftValue": "={{ $json.isNew }}",
+              "rightValue": true,
+              "operator": {
+                "type": "boolean",
+                "operation": "true"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "filter-new-followers",
+      "name": "Filter New Followers",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [1340, 300]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Create personalized welcome message\nconst followerData = $input.first().json;\nconst fullName = followerData.name;\nconst firstName = fullName.split(' ')[0];\n\n// Create personalized message\nconst personalizedMessage = `Hi ${firstName}! 👋\n\nThank you for following Creative Technology Collective! We're thrilled to have you join our community of innovators, creators, and tech enthusiasts.\n\n🚀 Here's what you can expect:\n• Cutting-edge insights on emerging technologies\n• Exclusive access to our community resources\n• Networking opportunities with fellow creatives\n• Early access to our workshops and events\n\nFeel free to reach out if you have any questions or ideas you'd like to share. We're always excited to connect with passionate individuals like yourself!\n\nWelcome aboard! 🎉\n\nBest regards,\nThe CTC Team\n\nP.S. Check out our latest resources at creativetechnologists.nl`;\n\nreturn {\n  json: {\n    profileId: followerData.profileId,\n    profileUrl: followerData.profileUrl,\n    fullName: fullName,\n    firstName: firstName,\n    message: personalizedMessage,\n    timestamp: new Date().toISOString(),\n    date: new Date().toLocaleDateString(),\n    time: new Date().toLocaleTimeString()\n  }\n};"
+      },
+      "id": "create-message",
+      "name": "Create Message",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [1560, 200]
+    },
+    {
+      "parameters": {
+        "operation": "append",
+        "documentId": "YOUR_GOOGLE_SHEET_ID",
+        "sheetName": "LinkedIn Followers",
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "Profile ID": "={{ $json.profileId }}",
+            "Name": "={{ $json.fullName }}",
+            "First Name": "={{ $json.firstName }}",
+            "Profile URL": "={{ $json.profileUrl }}",
+            "Date Added": "={{ $json.date }}",
+            "Time Added": "={{ $json.time }}",
+            "Message Sent": "Yes",
+            "Message": "={{ $json.message }}"
+          }
+        },
+        "options": {}
+      },
+      "id": "log-to-sheets",
+      "name": "Log to Google Sheets",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4,
+      "position": [1780, 200],
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "google-sheets-credentials",
+          "name": "Google Sheets OAuth2 API"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "resource": "message",
+        "chatId": "@creativetechnologycollective",
+        "text": "🎉 New LinkedIn Follower!\n\n👤 Name: {{ $json.fullName }}\n🔗 Profile: {{ $json.profileUrl }}\n⏰ Time: {{ $json.time }}\n\n✅ Welcome message prepared!\n\nMessage preview:\n{{ $json.message.substring(0, 200) }}..."
+      },
+      "id": "notify-telegram",
+      "name": "Notify via Telegram",
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.1,
+      "position": [2000, 200],
+      "credentials": {
+        "telegramApi": {
+          "id": "telegram-bot-credentials",
+          "name": "Telegram Bot API"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "amount": 10,
+        "unit": "seconds"
+      },
+      "id": "rate-limit-delay",
+      "name": "Rate Limit Delay",
+      "type": "n8n-nodes-base.wait",
+      "typeVersion": 1,
+      "position": [1340, 400]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Simple error logging\nconst error = $input.first();\nconsole.error('LinkedIn Workflow Error:', error);\n\nreturn {\n  json: {\n    status: 'error',\n    message: 'LinkedIn follower workflow failed',\n    error: error.message || 'Unknown error',\n    timestamp: new Date().toISOString()\n  }\n};"
+      },
+      "id": "error-handler",
+      "name": "Error Handler",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [1120, 500]
+    }
+  ],
+  "connections": {
+    "Check Every 30 Minutes": {
+      "main": [
+        [
+          {
+            "node": "Fetch Followers Page",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Fetch Followers Page": {
+      "main": [
+        [
+          {
+            "node": "Parse Followers",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Parse Followers": {
+      "main": [
+        [
+          {
+            "node": "Get Existing Followers",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get Existing Followers": {
+      "main": [
+        [
+          {
+            "node": "Check New Follower",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Check New Follower": {
+      "main": [
+        [
+          {
+            "node": "Filter New Followers",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Filter New Followers": {
+      "main": [
+        [
+          {
+            "node": "Rate Limit Delay",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Error Handler",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Rate Limit Delay": {
+      "main": [
+        [
+          {
+            "node": "Create Message",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Create Message": {
+      "main": [
+        [
+          {
+            "node": "Log to Google Sheets",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Log to Google Sheets": {
+      "main": [
+        [
+          {
+            "node": "Notify via Telegram",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "pinData": {},
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "staticData": null,
+  "tags": [
+    {
+      "createdAt": "2025-01-28T12:40:00.000Z",
+      "updatedAt": "2025-01-28T12:40:00.000Z",
+      "id": "linkedin-simple",
+      "name": "LinkedIn Simple"
+    }
+  ],
+  "triggerCount": 1,
+  "updatedAt": "2025-01-28T12:40:00.000Z",
+  "versionId": "1"
+}

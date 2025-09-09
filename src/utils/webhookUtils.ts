@@ -20,6 +20,12 @@ export const getWebhookBaseUrl = (): string => {
  */
 export const getWebhookUrl = (endpoint: string): string => {
   const baseUrl = getWebhookBaseUrl();
+  
+  // Special handling for resources endpoint
+  if (endpoint === 'resources') {
+    return 'https://n8n.creativetechnologists.nl/webhook/resources';
+  }
+  
   return `${baseUrl}/${endpoint}`;
 };
 

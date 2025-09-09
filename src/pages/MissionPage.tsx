@@ -4,6 +4,7 @@ import { BackgroundBeams } from '../components/ui/background-beams';
 import { ButtonColorful } from '../components/ui/button-colorful';
 import Footer from '../components/ui/footer';
 import WorldMap from '../components/WorldMap';
+import ImageCube from '../components/ImageCube';
 
 const MissionPage: React.FC = () => {
   const handleJoinClick = () => {
@@ -14,24 +15,56 @@ const MissionPage: React.FC = () => {
   return (
     <div className="min-h-screen bg-black">
       {/* Hero Section */}
-      <section className="relative py-40 overflow-hidden">
+      <section className="min-h-screen flex items-center justify-center pt-24 pb-40 overflow-hidden relative z-20">
+        <ImageCube size={6.0} rotationSpeed={0.01} position={{ x: 0, y: 0, z: 0 }} forceVisible={true} />
         <BackgroundBeams />
-        <div className="relative z-10 max-w-7xl mx-auto px-6">
-          <div className="text-center">
+        <div className="text-left w-full pl-4 md:pl-8 relative z-10" style={{ maxWidth: '96rem', overflow: 'visible' }}>
+          {/* Title */}
+          <div className="mb-16 relative">
             <ScrollTriggeredText
               words="Our Mission"
-              className="text-5xl md:text-7xl font-primary font-medium text-white mb-8"
+              className="text-4xl md:text-5xl font-primary text-white mb-4 leading-tight"
               duration={0.8}
               filter={false}
+              twoLines={true}
             />
-            <ScrollTriggeredText
-              words="We're on a mission to make Creative Technology open to all—breaking down barriers, spreading knowledge, and putting powerful tools into the hands of anyone ready to build what's next."
-              className="text-zinc-300 text-xl md:text-2xl font-secondary font-medium leading-relaxed max-w-4xl mx-auto mb-12"
-              duration={0.6}
-              delay={0.8}
+          </div>
+          <ScrollTriggeredText
+            words="We're on a mission to make Creative Technology open to all—breaking down barriers, spreading knowledge, and putting powerful tools into the hands of anyone ready to build what's next."
+            className="text-zinc-400 text-xl font-medium max-w-2xl font-secondary pr-8 lg:pr-0 relative z-30"
+            duration={0.6}
+            delay={1.2}
+            filter={false}
+          />
+        </div>
+      </section>
+
+      {/* New Div Section */}
+      <section className="min-h-screen flex items-center justify-center pt-24 pb-40 overflow-hidden relative z-20">
+        <div className="text-left w-full pl-4 md:pl-8 relative z-10" style={{ maxWidth: '96rem', overflow: 'visible' }}>
+          {/* Title */}
+          <div className="mb-16 relative">
+            <ScrollTriggeredText 
+              words="Thriving in community"
+              className="text-4xl md:text-5xl font-primary text-white mb-4 leading-tight"
+              duration={0.8}
               filter={false}
+              twoLines={true}
             />
-           
+          </div>
+          <ScrollTriggeredText 
+            words="Every month, we gather to share knowledge and push boundaries. In between, we partner with forward-thinking companies to unlock the transformative potential of Creative Technology—turning ideas into reality and innovation into impact."
+            className="text-zinc-400 text-xl font-medium max-w-2xl font-secondary pr-8 lg:pr-0 relative z-30"
+            duration={0.6}
+            delay={1.2}
+            filter={false}
+          />
+          <div className="mt-8">
+            <ButtonColorful
+              onClick={() => window.location.href = '/contact'}
+              label="Partner with us"
+              className="px-8 py-4 text-lg font-semibold"
+            />
           </div>
         </div>
       </section>
@@ -48,11 +81,18 @@ const MissionPage: React.FC = () => {
             />
             <ScrollTriggeredText
               words="To build a globally-connected yet locally-anchored collective of creative technologists that champions the craft, accelerates innovation, and fosters shared learning across cultures, industries, and disciplines."
-              className="text-zinc-400 text-lg font-medium max-w-3xl mx-auto font-secondary"
+              className="text-zinc-400 text-lg font-medium max-w-3xl mx-auto font-secondary mb-8"
               duration={0.6}
               delay={0.6}
               filter={false}
             />
+            <div className="flex justify-center">
+              <ButtonColorful
+                onClick={() => window.location.href = '/membership-form'}
+                label="Become a Global Member"
+                className="px-8 py-4 text-lg font-medium"
+              />
+            </div>
           </div>
         </div>
         <div className="w-full">

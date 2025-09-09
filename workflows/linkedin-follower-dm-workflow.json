@@ -1,0 +1,301 @@
+{
+  "name": "LinkedIn Follower Auto-DM",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "linkedin-follower",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "id": "webhook-trigger",
+      "name": "LinkedIn Follower Webhook",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 1,
+      "position": [240, 300],
+      "webhookId": "linkedin-follower-webhook"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict"
+          },
+          "conditions": [
+            {
+              "id": "follower-check",
+              "leftValue": "={{ $json.eventType }}",
+              "rightValue": "MEMBER_COMPANY_FOLLOW",
+              "operator": {
+                "type": "string",
+                "operation": "equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "filter-follow-events",
+      "name": "Filter Follow Events",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [460, 300]
+    },
+    {
+      "parameters": {
+        "resource": "person",
+        "operation": "get",
+        "personId": "={{ $json.actor.split('urn:li:person:')[1] }}",
+        "additionalFields": {
+          "projection": "(id,firstName,lastName,profilePicture)"
+        }
+      },
+      "id": "get-follower-profile",
+      "name": "Get Follower Profile",
+      "type": "n8n-nodes-base.linkedIn",
+      "typeVersion": 1,
+      "position": [680, 200],
+      "credentials": {
+        "linkedInOAuth2Api": {
+          "id": "linkedin-oauth-credentials",
+          "name": "LinkedIn OAuth2 API"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "// Extract follower information and create personalized message\nconst followerData = $input.first();\nconst firstName = followerData.json.firstName?.localized?.en_US || 'there';\nconst lastName = followerData.json.lastName?.localized?.en_US || '';\nconst fullName = `${firstName} ${lastName}`.trim();\nconst personId = followerData.json.id;\n\n// Create personalized welcome message\nconst personalizedMessage = `Hi ${firstName}! 👋\n\nThank you for following Creative Technology Collective! We're thrilled to have you join our community of innovators, creators, and tech enthusiasts.\n\n🚀 Here's what you can expect:\n• Cutting-edge insights on emerging technologies\n• Exclusive access to our community resources\n• Networking opportunities with fellow creatives\n• Early access to our workshops and events\n\nFeel free to reach out if you have any questions or ideas you'd like to share. We're always excited to connect with passionate individuals like yourself!\n\nWelcome aboard! 🎉\n\nBest regards,\nThe CTC Team\n\nP.S. Check out our latest resources at creativetechnologists.nl`;\n\nreturn {\n  json: {\n    recipientId: personId,\n    recipientName: fullName,\n    firstName: firstName,\n    message: personalizedMessage,\n    timestamp: new Date().toISOString()\n  }\n};"
+      },
+      "id": "create-personalized-message",
+      "name": "Create Personalized Message",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [900, 200]
+    },
+    {
+      "parameters": {
+        "resource": "message",
+        "operation": "send",
+        "conversationId": "",
+        "message": "={{ $json.message }}",
+        "additionalFields": {
+          "recipients": [
+            "={{ 'urn:li:person:' + $json.recipientId }}"
+          ]
+        }
+      },
+      "id": "send-linkedin-dm",
+      "name": "Send LinkedIn DM",
+      "type": "n8n-nodes-base.linkedIn",
+      "typeVersion": 1,
+      "position": [1120, 200],
+      "credentials": {
+        "linkedInOAuth2Api": {
+          "id": "linkedin-oauth-credentials",
+          "name": "LinkedIn OAuth2 API"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "create",
+        "table": "linkedin_followers",
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "follower_id": "={{ $json.recipientId }}",
+            "follower_name": "={{ $json.recipientName }}",
+            "first_name": "={{ $json.firstName }}",
+            "follow_date": "={{ $json.timestamp }}",
+            "message_sent": true,
+            "message_content": "={{ $json.message }}"
+          }
+        },
+        "options": {}
+      },
+      "id": "log-to-database",
+      "name": "Log to Database",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.4,
+      "position": [1340, 200],
+      "credentials": {
+        "postgres": {
+          "id": "postgres-credentials",
+          "name": "PostgreSQL"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ { \"status\": \"success\", \"message\": \"Welcome DM sent to \" + $json.recipientName, \"timestamp\": $json.timestamp } }}"
+      },
+      "id": "webhook-response",
+      "name": "Webhook Response",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1,
+      "position": [1560, 200]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Log error details for debugging\nconst error = $input.first();\nconsole.error('LinkedIn DM Workflow Error:', error);\n\nreturn {\n  json: {\n    status: 'error',\n    message: 'Failed to process LinkedIn follower',\n    error: error.json || error,\n    timestamp: new Date().toISOString()\n  }\n};"
+      },
+      "id": "error-handler",
+      "name": "Error Handler",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [680, 400]
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ $json }}"
+      },
+      "id": "error-response",
+      "name": "Error Response",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1,
+      "position": [900, 400]
+    },
+    {
+      "parameters": {
+        "resource": "message",
+        "operation": "send",
+        "conversationId": "",
+        "message": "🚨 LinkedIn DM Workflow Alert\n\nThere was an issue processing a new follower for Creative Technology Collective.\n\nError Details:\n{{ $json.error }}\n\nTimestamp: {{ $json.timestamp }}\n\nPlease check the n8n workflow logs for more details.",
+        "additionalFields": {
+          "recipients": [
+            "urn:li:person:YOUR_ADMIN_PERSON_ID"
+          ]
+        }
+      },
+      "id": "notify-admin",
+      "name": "Notify Admin",
+      "type": "n8n-nodes-base.linkedIn",
+      "typeVersion": 1,
+      "position": [1120, 400],
+      "credentials": {
+        "linkedInOAuth2Api": {
+          "id": "linkedin-oauth-credentials",
+          "name": "LinkedIn OAuth2 API"
+        }
+      }
+    }
+  ],
+  "connections": {
+    "LinkedIn Follower Webhook": {
+      "main": [
+        [
+          {
+            "node": "Filter Follow Events",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Filter Follow Events": {
+      "main": [
+        [
+          {
+            "node": "Get Follower Profile",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Error Handler",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get Follower Profile": {
+      "main": [
+        [
+          {
+            "node": "Create Personalized Message",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Create Personalized Message": {
+      "main": [
+        [
+          {
+            "node": "Send LinkedIn DM",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Send LinkedIn DM": {
+      "main": [
+        [
+          {
+            "node": "Log to Database",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Log to Database": {
+      "main": [
+        [
+          {
+            "node": "Webhook Response",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Error Handler": {
+      "main": [
+        [
+          {
+            "node": "Notify Admin",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Notify Admin": {
+      "main": [
+        [
+          {
+            "node": "Error Response",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "pinData": {},
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "staticData": null,
+  "tags": [
+    {
+      "createdAt": "2025-01-28T12:40:00.000Z",
+      "updatedAt": "2025-01-28T12:40:00.000Z",
+      "id": "linkedin-automation",
+      "name": "LinkedIn Automation"
+    }
+  ],
+  "triggerCount": 1,
+  "updatedAt": "2025-01-28T12:40:00.000Z",
+  "versionId": "1"
+}

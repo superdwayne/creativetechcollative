@@ -9,13 +9,9 @@ const MembershipFormPage: React.FC = () => {
   const [formData, setFormData] = useState({
     firstName: '',
     lastName: '',
-    email: '',
-    telephone: '',
-    dateOfBirth: '',
-    gender: '',
-    companyName: '',
+    location: '',
     jobTitle: '',
-    motivation: ''
+    email: ''
   });
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [submitMessage, setSubmitMessage] = useState('');
@@ -35,28 +31,7 @@ const MembershipFormPage: React.FC = () => {
     return emailRegex.test(email.trim());
   };
 
-  // Phone validation function
-  const isValidPhone = (phone: string): boolean => {
-    const phoneRegex = /^[\+]?[1-9][\d]{0,15}$/;
-    return phoneRegex.test(phone.replace(/[\s\-\(\)]/g, ''));
-  };
-
-  // Date validation function
-  const isValidDate = (date: string): boolean => {
-    const dateRegex = /^\d{2}\/\d{2}\/\d{4}$/;
-    if (!dateRegex.test(date)) return false;
-    
-    const [month, day, year] = date.split('/').map(Number);
-    const dateObj = new Date(year, month - 1, day);
-    const currentDate = new Date();
-    const age = currentDate.getFullYear() - year;
-    
-    return dateObj.getMonth() === month - 1 && 
-           dateObj.getDate() === day && 
-           age >= 16 && age <= 100; // Reasonable age range
-  };
-
-  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) => {
+  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { name, value } = e.target;
     setFormData(prev => ({
       ...prev,
@@ -89,43 +64,8 @@ const MembershipFormPage: React.FC = () => {
       return;
     }
 
-    if (!formData.email.trim()) {
-      setSubmitMessage('Please enter your email address');
-      return;
-    }
-
-    if (!isValidEmail(formData.email)) {
-      setSubmitMessage('Please enter a valid email address');
-      return;
-    }
-
-    if (!formData.telephone.trim()) {
-      setSubmitMessage('Please enter your telephone number');
-      return;
-    }
-
-    if (!isValidPhone(formData.telephone)) {
-      setSubmitMessage('Please enter a valid telephone number');
-      return;
-    }
-
-    if (!formData.dateOfBirth.trim()) {
-      setSubmitMessage('Please enter your date of birth');
-      return;
-    }
-
-    if (!isValidDate(formData.dateOfBirth)) {
-      setSubmitMessage('Please enter a valid date of birth (MM/DD/YYYY)');
-      return;
-    }
-
-    if (!formData.gender) {
-      setSubmitMessage('Please select your gender');
-      return;
-    }
-
-    if (!formData.companyName.trim()) {
-      setSubmitMessage('Please enter your company name or "Self Employed"');
+    if (!formData.location.trim()) {
+      setSubmitMessage('Please enter your location');
       return;
     }
 
@@ -134,8 +74,13 @@ const MembershipFormPage: React.FC = () => {
       return;
     }
 
-    if (!formData.motivation.trim()) {
-      setSubmitMessage('Please tell us why you would like to join or describe your field');
+    if (!formData.email.trim()) {
+      setSubmitMessage('Please enter your email address');
+      return;
+    }
+
+    if (!isValidEmail(formData.email)) {
+      setSubmitMessage('Please enter a valid email address');
       return;
     }
 
@@ -162,13 +107,9 @@ const MembershipFormPage: React.FC = () => {
         body: JSON.stringify({
           firstName: formData.firstName.trim(),
           lastName: formData.lastName.trim(),
-          email: formData.email.trim(),
-          telephone: formData.telephone.trim(),
-          dateOfBirth: formData.dateOfBirth.trim(),
-          gender: formData.gender,
-          companyName: formData.companyName.trim(),
+          location: formData.location.trim(),
           jobTitle: formData.jobTitle.trim(),
-          motivation: formData.motivation.trim(),
+          email: formData.email.trim(),
           timestamp: new Date().toISOString(),
           source: 'membership_application'
         }),
@@ -181,13 +122,9 @@ const MembershipFormPage: React.FC = () => {
         setFormData({
           firstName: '',
           lastName: '',
-          email: '',
-          telephone: '',
-          dateOfBirth: '',
-          gender: '',
-          companyName: '',
+          location: '',
           jobTitle: '',
-          motivation: ''
+          email: ''
         });
       } else {
         const errorText = await response.text().catch(() => 'Unknown error');
@@ -269,107 +206,20 @@ const MembershipFormPage: React.FC = () => {
                 />
               </div>
 
-              {/* Email */}
+              {/* Location */}
               <div>
-                <label htmlFor="email" className="block text-sm font-medium text-zinc-300 mb-2 font-secondary">
-                  Email address *
-                </label>
-                <Input
-                  type="email"
-                  id="email"
-                  name="email"
-                  value={formData.email}
-                  onChange={handleInputChange}
-                  disabled={isSubmitting}
-                  className="w-full focus-visible:ring-pink-500 h-12"
-                  placeholder="your@email.com"
-                  required
-                />
-              </div>
-
-              {/* Telephone */}
-              <div>
-                <label htmlFor="telephone" className="block text-sm font-medium text-zinc-300 mb-2 font-secondary">
-                  Telephone number *
-                </label>
-                <Input
-                  type="tel"
-                  id="telephone"
-                  name="telephone"
-                  value={formData.telephone}
-                  onChange={handleInputChange}
-                  disabled={isSubmitting}
-                  className="w-full focus-visible:ring-pink-500 h-12"
-                  placeholder="+31 6 12345678"
-                  required
-                />
-              </div>
-
-              {/* Date of Birth */}
-              <div>
-                <label htmlFor="dateOfBirth" className="block text-sm font-medium text-zinc-300 mb-2 font-secondary">
-                  Date of Birth (MM/DD/YYYY) *
+                <label htmlFor="location" className="block text-sm font-medium text-zinc-300 mb-2 font-secondary">
+                  Location *
                 </label>
                 <Input
                   type="text"
-                  id="dateOfBirth"
-                  name="dateOfBirth"
-                  value={formData.dateOfBirth}
+                  id="location"
+                  name="location"
+                  value={formData.location}
                   onChange={handleInputChange}
                   disabled={isSubmitting}
                   className="w-full focus-visible:ring-pink-500 h-12"
-                  placeholder="MM/DD/YYYY"
-                  pattern="\d{2}/\d{2}/\d{4}"
-                  required
-                />
-              </div>
-
-              {/* Gender */}
-              <div>
-                <label htmlFor="gender" className="block text-sm font-medium text-zinc-300 mb-2 font-secondary">
-                  Gender *
-                </label>
-                <select
-                  id="gender"
-                  name="gender"
-                  value={formData.gender}
-                  onChange={handleInputChange}
-                  disabled={isSubmitting}
-                  className="w-full bg-zinc-900 border border-zinc-700 rounded-lg px-3 py-3 pr-10 text-white focus:outline-none focus:border-pink-500 transition-colors font-primary h-12"
-                  required
-                >
-                  <option value="" disabled className="text-zinc-400">
-                    Select gender
-                  </option>
-                  <option value="male" className="text-white">
-                    Male
-                  </option>
-                  <option value="female" className="text-white">
-                    Female
-                  </option>
-                  <option value="non-binary" className="text-white">
-                    Non-binary
-                  </option>
-                  <option value="prefer-not-to-say" className="text-white">
-                    Prefer not to say
-                  </option>
-                </select>
-              </div>
-
-              {/* Company Name */}
-              <div>
-                <label htmlFor="companyName" className="block text-sm font-medium text-zinc-300 mb-2 font-secondary">
-                  Company name or self employed *
-                </label>
-                <Input
-                  type="text"
-                  id="companyName"
-                  name="companyName"
-                  value={formData.companyName}
-                  onChange={handleInputChange}
-                  disabled={isSubmitting}
-                  className="w-full focus-visible:ring-pink-500 h-12"
-                  placeholder="Company name or 'Self Employed'"
+                  placeholder="City, Country"
                   required
                 />
               </div>
@@ -392,20 +242,20 @@ const MembershipFormPage: React.FC = () => {
                 />
               </div>
 
-              {/* Motivation / Field Description */}
+              {/* Email */}
               <div>
-                <label htmlFor="motivation" className="block text-sm font-medium text-zinc-300 mb-2 font-secondary">
-                  Why would you like to join our community? Please describe your field or what you hope to gain from membership. *
+                <label htmlFor="email" className="block text-sm font-medium text-zinc-300 mb-2 font-secondary">
+                  Email address *
                 </label>
-                <textarea
-                  id="motivation"
-                  name="motivation"
-                  rows={5}
-                  value={formData.motivation}
+                <Input
+                  type="email"
+                  id="email"
+                  name="email"
+                  value={formData.email}
                   onChange={handleInputChange}
                   disabled={isSubmitting}
-                  className="w-full bg-zinc-900 border border-zinc-700 rounded-lg px-3 py-3 text-white placeholder-zinc-400 focus:outline-none focus:border-pink-500 transition-colors font-primary resize-none text-sm md:text-base min-h-[120px] disabled:opacity-50"
-                  placeholder="Tell us about your background in creative technology, what projects you're working on, what you hope to learn or contribute to our community, or any other relevant information..."
+                  className="w-full focus-visible:ring-pink-500 h-12"
+                  placeholder="your@email.com"
                   required
                 />
               </div>
@@ -430,7 +280,7 @@ const MembershipFormPage: React.FC = () => {
                 <ButtonColorful
                   type="submit"
                   disabled={isSubmitting}
-                  label={isSubmitting ? 'Submitting Application...' : 'Submit Application'}
+                  label={isSubmitting ? 'Submitting Application...' : 'Join the Community'}
                   className="w-full sm:w-auto min-h-[48px] px-8 text-base font-semibold disabled:opacity-50"
                 />
                 <button

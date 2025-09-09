@@ -1,7 +1,9 @@
 import React, { useState, useMemo, useEffect } from 'react';
-import { Search, Star, ExternalLink, Tag, Loader2 } from 'lucide-react';
+import { Search, Star, ExternalLink, Tag, Loader2, Sparkles } from 'lucide-react';
 import Footer from '../components/ui/footer';
 import { getWebhookUrl } from '@/utils/webhookUtils';
+import { useFeatureFlags } from '@/utils/featureFlags';
+import FeatureFlagAdmin from '../components/FeatureFlagAdmin';
 
 interface LinkItem {
   id: string;
@@ -133,12 +135,24 @@ interface LinkCardProps {
   link: LinkItem;
   featured?: boolean;
   columnIndex?: number;
+  isHighlighted?: boolean;
+  highlightConfig?: {
+    backgroundColor?: string;
+    borderColor?: string;
+    title?: string;
+    description?: string;
+  };
 }
 
-function LinkCard({ link, featured = false, columnIndex }: LinkCardProps) {
+function LinkCard({ link, featured = false, columnIndex, isHighlighted = false, highlightConfig }: LinkCardProps) {
+  const baseClasses = "group rounded-xl overflow-hidden border transition-all duration-300 hover:transform hover:scale-[1.02] mb-4 md:mb-6";
+  const highlightClasses = isHighlighted 
+    ? `${highlightConfig?.backgroundColor || 'bg-gradient-to-r from-pink-500/10 to-purple-500/10'} ${highlightConfig?.borderColor || 'border-pink-500/50'} border-2 shadow-[0_0_20px_rgba(236,72,153,0.3)] animate-glow-pulse`
+    : "bg-zinc-900 border-zinc-800 hover:border-zinc-700";
+  
   return (
     <div 
-      className="group bg-zinc-900 rounded-xl overflow-hidden border border-zinc-800 hover:border-zinc-700 transition-all duration-300 hover:transform hover:scale-[1.02] mb-4 md:mb-6"
+      className={`${baseClasses} ${highlightClasses}`}
       style={{ 
         breakInside: 'avoid',
         pageBreakInside: 'avoid'
@@ -160,11 +174,16 @@ function LinkCard({ link, featured = false, columnIndex }: LinkCardProps) {
       <div className="p-3 md:p-4">
         <div className="flex items-start justify-between gap-2 mb-2">
           <h3 className="text-sm md:text-base text-white group-hover:text-pink-400 transition-colors font-primary">
-            {link.title}
+            {isHighlighted && highlightConfig?.title ? highlightConfig.title : link.title}
           </h3>
-          {featured && (
-            <Star className="w-4 h-4 text-yellow-400 flex-shrink-0" />
-          )}
+          <div className="flex items-center gap-1">
+            {isHighlighted && (
+              <Sparkles className="w-4 h-4 text-pink-400 flex-shrink-0" />
+            )}
+            {featured && (
+              <Star className="w-4 h-4 text-yellow-400 flex-shrink-0" />
+            )}
+          </div>
         </div>
         
         <div className="text-xs text-zinc-500 mb-2 font-secondary">
@@ -172,7 +191,7 @@ function LinkCard({ link, featured = false, columnIndex }: LinkCardProps) {
         </div>
         
         <p className="text-xs md:text-sm text-zinc-400 mb-3 md:mb-4 leading-relaxed font-normal font-secondary">
-          {link.description}
+          {isHighlighted && highlightConfig?.description ? highlightConfig.description : link.description}
         </p>
         
         <div className="flex items-center justify-between">
@@ -215,6 +234,7 @@ const ResourcesPage: React.FC<ResourcesPageProps> = ({
   const [resources, setResources] = useState<LinkItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const featureFlags = useFeatureFlags();
 
   // Use external activeCategory if provided, otherwise use internal state
   const activeCategory = externalActiveCategory !== undefined ? externalActiveCategory : internalActiveCategory;
@@ -232,28 +252,45 @@ const ResourcesPage: React.FC<ResourcesPageProps> = ({
         const username = import.meta.env.VITE_N8N_BASIC_AUTH_USERNAME;
         const password = import.meta.env.VITE_N8N_BASIC_AUTH_PASSWORD;
 
+        console.log('Webhook URL:', webhookUrl);
+        console.log('Username configured:', !!username);
+        console.log('Password configured:', !!password);
+        console.log('Username length:', username?.length);
+        console.log('Password length:', password?.length);
+
         if (!username || !password) {
           throw new Error('Authentication credentials not configured');
         }
 
-        // Create Basic Auth header
-        const basicAuth = btoa(`${username}:${password}`);
+        // Create Basic Auth header - URL decode the password first
+        const decodedPassword = decodeURIComponent(password);
+        const basicAuth = btoa(`${username}:${decodedPassword}`);
+
+        console.log('Attempting to fetch from:', webhookUrl);
+        console.log('Basic Auth header (first 20 chars):', `Basic ${basicAuth}`.substring(0, 20) + '...');
 
         const response = await fetch(webhookUrl, {
           method: 'GET',
           headers: {
             'Authorization': `Basic ${basicAuth}`,
-            'Content-Type': 'application/json'
+            'Content-Type': 'application/json',
+            'Accept': 'application/json'
           },
           // Add timeout
           signal: AbortSignal.timeout(15000) // 15 second timeout
         });
 
+        console.log('Response status:', response.status);
+        console.log('Response headers:', Object.fromEntries(response.headers.entries()));
+
         if (!response.ok) {
-          throw new Error(`Failed to fetch resources: ${response.status} ${response.statusText}`);
+          const errorText = await response.text().catch(() => 'Unknown error');
+          console.error('Server error response:', errorText);
+          throw new Error(`Failed to fetch resources: ${response.status} ${response.statusText} - ${errorText}`);
         }
 
         const data = await response.json();
+        console.log('Response data received:', data);
         
         // Transform the data to match our LinkItem interface
         console.log('Raw webhook data:', data);
@@ -308,15 +345,30 @@ const ResourcesPage: React.FC<ResourcesPageProps> = ({
 
           setResources(transformedResources);
         }
-      } catch (err: any) {
-        console.error('Error fetching resources:', err);
+              } catch (err: any) {
+        console.error('Error fetching resources:', {
+          name: err.name,
+          message: err.message,
+          stack: err.stack,
+          cause: err.cause
+        });
         
         if (err.name === 'TimeoutError') {
           setError('Request timed out. Please try again.');
         } else if (err.message.includes('Failed to fetch')) {
-          setError('Unable to connect to the server. Please check your connection.');
+          // Check if it's likely a CORS issue
+          const webhookUrl = getWebhookUrl('resources');
+          if (window.location.protocol === 'https:' && webhookUrl?.startsWith('http:')) {
+            setError('Mixed content error: Cannot make HTTP requests from HTTPS page.');
+          } else {
+            setError('Unable to connect to the server. This may be due to network restrictions or CORS policy. Please try again later or contact support.');
+          }
+        } else if (err.message.includes('NetworkError') || err.message.includes('network')) {
+          setError('Network error. Please check your internet connection and try again.');
+        } else if (err.message.includes('CORS')) {
+          setError('Cross-origin request blocked. Please contact support to resolve this issue.');
         } else {
-          setError(err.message || 'Failed to load resources. Please try again later.');
+          setError(err.message || 'Something went wrong. Please try again later or contact support if the issue persists.');
         }
       } finally {
         setLoading(false);
@@ -497,13 +549,19 @@ const ResourcesPage: React.FC<ResourcesPageProps> = ({
       <div key={gridKey} className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 md:gap-6">
         {organizedColumns.map((column, columnIndex) => (
           <div key={`column-${columnIndex}`} className="flex flex-col">
-            {column.map((link) => (
-              <LinkCard 
-                key={link.id} 
-                link={link} 
-                columnIndex={columnIndex}
-              />
-            ))}
+            {column.map((link) => {
+              const isHighlighted = link.featured === false;
+              
+              return (
+                <LinkCard 
+                  key={link.id} 
+                  link={link} 
+                  columnIndex={columnIndex}
+                  isHighlighted={isHighlighted}
+                  highlightConfig={featureFlags.highlightedResource}
+                />
+              );
+            })}
           </div>
         ))}
       </div>
@@ -520,6 +578,7 @@ const ResourcesPage: React.FC<ResourcesPageProps> = ({
       )}
       
       <Footer />
+      <FeatureFlagAdmin />
     </>
   );
 };

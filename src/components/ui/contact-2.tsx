@@ -161,12 +161,9 @@ export const Contact2: React.FC<Contact2Props> = ({
       <div className="w-full max-w-4xl mx-auto px-4 md:px-8">
         {/* Header */}
         <div className="text-center mb-12 md:mb-16 pt-16 md:pt-8">
-          <MorphingText 
-            texts={morphingTexts}
-            className="text-5xl md:text-6xl lg:text-8xl font-primary text-white leading-tight mb-6 md:mb-8 h-[1.2em] flex items-center justify-center"
-            morphTime={1.2}
-            cooldownTime={0.8}
-          />
+          <h1 className="text-5xl md:text-6xl lg:text-8xl font-primary text-white leading-tight mb-6 md:mb-8">
+            Let's connect
+          </h1>
           <p className="text-zinc-400 text-base md:text-lg font-medium font-secondary max-w-2xl mx-auto">
             {description}
           </p>

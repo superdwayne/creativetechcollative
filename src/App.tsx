@@ -8,6 +8,13 @@ import ResourcesPage from './pages/ResourcesPage';
 import CasesPage from './pages/CollaborationsPage';
 import CollaborationsPage from './pages/CollaborationsPage';
 import MembersPage from './components/MembersPage';
+import MembersInfinite from './components/MembersInfinite';
+import MembersPageGrid from './components/MembersPageGrid';
+import MembersPageDaybreak from './components/MembersPageDaybreak';
+import MembersDemo from './components/MembersDemo';
+import MembersPageSimple from './components/MembersPageSimple';
+import MembersPageWhisper from './components/MembersPageWhisper';
+import MembersPageWhisperActual from './components/MembersPageWhisperActual';
 import { Contact2 } from './components/ui/contact-2';
 import TermsConditions from './components/TermsConditions';
 import PrivacyPolicy from './components/PrivacyPolicy';
@@ -18,6 +25,7 @@ import Footer from './components/ui/footer';
 import { CookieNotice } from './components/ui/cookie-notice';
 import N8nOnboardingPage from './pages/N8nOnboardingPage';
 import MissionPage from './pages/MissionPage';
+import TeamPage from './pages/TeamPage';
 
 // Helper function to get appropriate icon for category/tag
 const getCategoryIcon = (name: string): string => {
@@ -222,7 +230,7 @@ function App() {
       )}
 
       {/* Navigation for Members page */}
-      {location.pathname === '/members' && (
+      {(location.pathname === '/members' || location.pathname === '/members-daybreak' || location.pathname === '/members-demo' || location.pathname === '/members-simple' || location.pathname === '/members-whisper') && (
         <div className="fixed top-0 left-0 right-0 z-[200]">
           <Navigation 
             showCubeIcon={showCubeIcon}
@@ -283,6 +291,46 @@ function App() {
               element={
                 <div className="fixed inset-0">
                   <MembersPage />
+                </div>
+              } 
+            />
+            <Route 
+              path="/members-grid" 
+              element={
+                <div className="fixed inset-0">
+                  <MembersPageGrid />
+                </div>
+              } 
+            />
+            <Route 
+              path="/members-daybreak" 
+              element={
+                <div className="fixed inset-0">
+                  <MembersPageDaybreak />
+                </div>
+              } 
+            />
+            <Route 
+              path="/members-demo" 
+              element={
+                <div className="fixed inset-0">
+                  <MembersDemo />
+                </div>
+              } 
+            />
+            <Route 
+              path="/members-simple" 
+              element={
+                <div className="fixed inset-0">
+                  <MembersPageSimple />
+                </div>
+              } 
+            />
+            <Route 
+              path="/members-whisper" 
+              element={
+                <div className="fixed inset-0">
+                  <MembersPageWhisperActual />
                 </div>
               } 
             />
@@ -381,11 +429,19 @@ function App() {
                 </div>
               } 
             />
+            <Route 
+              path="/team" 
+              element={
+                <div className="w-full">
+                  <TeamPage />
+                </div>
+              } 
+            />
           </Routes>
         </div>
         
         {/* Global Footer - only show on contact, terms, and privacy pages */}
-        {(location.pathname === '/contact' || location.pathname === '/terms' || location.pathname === '/privacy' || location.pathname === '/terms-and-conditions' || location.pathname === '/privacy-policy' || location.pathname === '/faq' || location.pathname === '/cases' || location.pathname === '/collaborations' || location.pathname === '/n8n-onboarding' || location.pathname === '/membership-form') && (
+        {(location.pathname === '/contact' || location.pathname === '/terms' || location.pathname === '/privacy' || location.pathname === '/terms-and-conditions' || location.pathname === '/privacy-policy' || location.pathname === '/faq' || location.pathname === '/cases' || location.pathname === '/collaborations' || location.pathname === '/n8n-onboarding' || location.pathname === '/membership-form' || location.pathname === '/team') && (
           <div className="w-full">
             <Footer />
           </div>
