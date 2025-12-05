@@ -1,8 +1,7 @@
 import React, { useState, useEffect } from 'react';
-import { Routes, Route, useLocation } from 'react-router-dom';
+import { Routes, Route, useLocation, Navigate } from 'react-router-dom';
 import RotatingCube from './components/RotatingCube';
 import Navigation from './components/Navigation';
-import ResourcesSidebar from './components/ResourcesSidebar';
 import HomePage from './pages/HomePage';
 import ResourcesPage from './pages/ResourcesPage';
 import CasesPage from './pages/CollaborationsPage';
@@ -16,6 +15,7 @@ import MembersPageSimple from './components/MembersPageSimple';
 import MembersPageWhisper from './components/MembersPageWhisper';
 import MembersPageWhisperActual from './components/MembersPageWhisperActual';
 import { Contact2 } from './components/ui/contact-2';
+import ContactPage from './pages/ContactPage';
 import TermsConditions from './components/TermsConditions';
 import PrivacyPolicy from './components/PrivacyPolicy';
 import FAQPage from './components/FAQPage';
@@ -26,6 +26,14 @@ import { CookieNotice } from './components/ui/cookie-notice';
 import N8nOnboardingPage from './pages/N8nOnboardingPage';
 import MissionPage from './pages/MissionPage';
 import TeamPage from './pages/TeamPage';
+import TeamPageScattered from './pages/TeamPageScattered';
+import TeamPageGlobe from './pages/TeamPageGlobe';
+import PartnersPage from './pages/PartnersPage';
+import PlaygroundPage from './pages/PlaygroundPage';
+import VortexEntry from './components/VortexEntry';
+import VortexDemo from './pages/VortexDemo';
+import HeroPage from './pages/HeroPage';
+import SplashPage from './pages/SplashPage';
 
 // Helper function to get appropriate icon for category/tag
 const getCategoryIcon = (name: string): string => {
@@ -66,57 +74,8 @@ const sampleLinks = [
 function App() {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [showCubeIcon, setShowCubeIcon] = useState(true);
-  const [showResourcesNav, setShowResourcesNav] = useState(true);
-  const [activeCategory, setActiveCategory] = useState<string>('');
   const location = useLocation();
 
-  // Generate categories dynamically from existing tags and categories
-  const [categories, setCategories] = useState(() => {
-    const categoryMap = new Map<string, { icon: string; count: number }>();
-    
-    // First, add existing categories from the links
-    sampleLinks.forEach(link => {
-      if (link.category) {
-        const existing = categoryMap.get(link.category);
-        categoryMap.set(link.category, {
-          icon: existing?.icon || getCategoryIcon(link.category),
-          count: (existing?.count || 0) + 1
-        });
-      }
-    });
-    
-    // Then, add categories from tags that aren't already categories
-    sampleLinks.forEach(link => {
-      link.tags.forEach(tag => {
-        if (!categoryMap.has(tag)) {
-          // Check if any links have this tag
-          const tagCount = sampleLinks.filter(l => 
-            l.tags.includes(tag) || l.category === tag
-          ).length;
-          
-          if (tagCount > 0) {
-            categoryMap.set(tag, {
-              icon: getCategoryIcon(tag),
-              count: tagCount
-            });
-          }
-        }
-      });
-    });
-    
-    // Convert to array and sort by count (most used first)
-    return Array.from(categoryMap.entries())
-      .map(([id, data]) => ({
-        id,
-        name: id,
-        icon: data.icon
-      }))
-      .sort((a, b) => {
-        const aCount = categoryMap.get(a.id)?.count || 0;
-        const bCount = categoryMap.get(b.id)?.count || 0;
-        return bCount - aCount;
-      });
-  });
 
   // Handle scroll effects
   useEffect(() => {
@@ -130,18 +89,10 @@ function App() {
       const containerScrollY = scrollableElement ? scrollableElement.scrollTop : 0;
       const totalScrollY = Math.max(windowScrollY, containerScrollY);
       
-      if (location.pathname === '/resources') {
-        if (totalScrollY > 10) {
-          setShowResourcesNav(false);
-        } else if (totalScrollY <= 5) {
-          setShowResourcesNav(true);
-        }
-      } else {
-        if (totalScrollY > 10) {
-          setShowCubeIcon(false);
-        } else if (totalScrollY <= 5) {
-          setShowCubeIcon(true);
-        }
+      if (totalScrollY > 10) {
+        setShowCubeIcon(false);
+      } else if (totalScrollY <= 5) {
+        setShowCubeIcon(true);
       }
     };
 
@@ -151,11 +102,7 @@ function App() {
       
       if (Math.abs(e.deltaY) > 0) {
         if (e.deltaY > 0) {
-          if (location.pathname === '/resources') {
-            setShowResourcesNav(false);
-          } else {
-            setShowCubeIcon(false);
-          }
+          setShowCubeIcon(false);
         }
       }
     };
@@ -174,11 +121,7 @@ function App() {
       const deltaY = Math.abs(touchStartY - touchY);
       
       if (deltaY > 5 && !hasTouchMoved) {
-        if (location.pathname === '/resources') {
-          setShowResourcesNav(false);
-        } else {
-          setShowCubeIcon(false);
-        }
+        setShowCubeIcon(false);
         hasTouchMoved = true;
       }
     };
@@ -208,11 +151,8 @@ function App() {
     } else {
       // All other pages show the cube icon (always visible on desktop)
       setShowCubeIcon(true);
-      setShowResourcesNav(true);
     }
   }, [location.pathname]);
-
-  const isResourcesPage = location.pathname === '/resources';
 
   const handleNavigation = (path: string) => {
     window.location.href = path;
@@ -220,55 +160,25 @@ function App() {
 
   return (
     <div className="min-h-screen bg-black text-white flex">
-      {/* Navigation for non-resources pages */}
-      {!isResourcesPage && location.pathname !== '/members' && (
-        <Navigation 
-          showCubeIcon={showCubeIcon}
-          mobileMenuOpen={mobileMenuOpen}
-          setMobileMenuOpen={setMobileMenuOpen}
-        />
-      )}
 
-      {/* Navigation for Members page */}
-      {(location.pathname === '/members' || location.pathname === '/members-daybreak' || location.pathname === '/members-demo' || location.pathname === '/members-simple' || location.pathname === '/members-whisper') && (
-        <div className="fixed top-0 left-0 right-0 z-[200]">
-          <Navigation 
-            showCubeIcon={showCubeIcon}
-            mobileMenuOpen={mobileMenuOpen}
-            setMobileMenuOpen={setMobileMenuOpen}
-          />
-        </div>
-      )}
-
-      {/* Sidebar for Resources page */}
-      {isResourcesPage && (
-        <>
-          {/* Mobile Navigation for Resources - use the same navigation component */}
-          <div className="md:hidden">
-            <Navigation 
-              showCubeIcon={showResourcesNav}
-              mobileMenuOpen={mobileMenuOpen}
-              setMobileMenuOpen={setMobileMenuOpen}
-            />
-          </div>
-
-          {/* Desktop Sidebar */}
-          <ResourcesSidebar 
-            categories={categories}
-            activeCategory={activeCategory}
-            setActiveCategory={setActiveCategory}
-            setCategories={setCategories}
-          />
-        </>
-      )}
+      {/* Navigation */}
+      <Navigation 
+        showCubeIcon={showCubeIcon}
+        mobileMenuOpen={mobileMenuOpen}
+        setMobileMenuOpen={setMobileMenuOpen}
+      />
 
       {/* Main Content */}
-      <div className={`flex-1 ${!isResourcesPage && location.pathname !== '/members' && location.pathname !== '/cases' ? 'p-4 md:p-8 pt-24' : isResourcesPage ? 'p-4 md:p-8 pt-20 md:pt-8' : location.pathname === '/cases' ? 'pt-24' : ''}`}>
+      <div className={`flex-1 ${location.pathname !== '/cases' ? 'p-4 md:p-8 pt-24' : 'pt-24'}`}>
         <div className={location.pathname === '/cases' ? 'w-full' : 'max-w-7xl mx-auto'}>
           <Routes>
             <Route 
               path="/" 
-              element={<HomePage />} 
+              element={<HeroPage />} 
+            />
+            <Route 
+              path="/home" 
+              element={<Navigate to="/" replace />} 
             />
             <Route 
               path="/mission" 
@@ -277,20 +187,18 @@ function App() {
               } 
             />
             <Route 
-              path="/resources" 
+              path="/playground" 
               element={
-                <ResourcesPage 
-                  activeCategory={activeCategory}
-                  setActiveCategory={setActiveCategory}
-                  setCategories={setCategories} 
-                />
+                <div className="w-full">
+                  <PlaygroundPage />
+                </div>
               } 
             />
             <Route 
-              path="/members" 
+              path="/resources" 
               element={
-                <div className="fixed inset-0">
-                  <MembersPage />
+                <div className="w-full">
+                  <ResourcesPage />
                 </div>
               } 
             />
@@ -346,13 +254,8 @@ function App() {
             <Route 
               path="/contact" 
               element={
-                <div className="w-full min-h-screen flex flex-col">
-                  <Contact2 
-                    title="Get In Touch"
-                    description="Ready to collaborate, share resources, or join our creative technology community? We'd love to connect with you."
-                    email="hello@creativetechcollective.com"
-                    web={{ label: "creativetechcollective.com", url: "https://creativetechcollective.com" }}
-                  />
+                <div className="w-full">
+                  <ContactPage />
                 </div>
               } 
             />
@@ -437,11 +340,31 @@ function App() {
                 </div>
               } 
             />
+            <Route 
+              path="/team-scattered" 
+              element={<TeamPageScattered />} 
+            />
+            <Route 
+              path="/team-globe" 
+              element={<TeamPageGlobe />} 
+            />
+            <Route 
+              path="/partners" 
+              element={
+                <div className="w-full">
+                  <PartnersPage />
+                </div>
+              } 
+            />
+            <Route 
+              path="/vortex-demo" 
+              element={<VortexDemo />} 
+            />
           </Routes>
         </div>
         
         {/* Global Footer - only show on contact, terms, and privacy pages */}
-        {(location.pathname === '/contact' || location.pathname === '/terms' || location.pathname === '/privacy' || location.pathname === '/terms-and-conditions' || location.pathname === '/privacy-policy' || location.pathname === '/faq' || location.pathname === '/cases' || location.pathname === '/collaborations' || location.pathname === '/n8n-onboarding' || location.pathname === '/membership-form' || location.pathname === '/team') && (
+        {(location.pathname === '/contact' || location.pathname === '/terms' || location.pathname === '/privacy' || location.pathname === '/terms-and-conditions' || location.pathname === '/privacy-policy' || location.pathname === '/faq' || location.pathname === '/cases' || location.pathname === '/collaborations' || location.pathname === '/n8n-onboarding' || location.pathname === '/membership-form' || location.pathname === '/team' || location.pathname === '/partners') && (
           <div className="w-full">
             <Footer />
           </div>

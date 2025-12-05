@@ -30,7 +30,7 @@ const MissionPage: React.FC = () => {
             />
           </div>
           <ScrollTriggeredText
-            words="We're on a mission to make Creative Technology open to all—breaking down barriers, spreading knowledge, and putting powerful tools into the hands of anyone ready to build what's next."
+            words="To establish Creative Technology as a visible and influential discipline—one that pioneers new ground through partnerships, experimentation, and demonstrations that empower practitioners to shape the future."
             className="text-zinc-400 text-xl font-medium max-w-2xl font-secondary pr-8 lg:pr-0 relative z-30"
             duration={0.6}
             delay={1.2}

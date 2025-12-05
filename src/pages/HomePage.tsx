@@ -27,7 +27,6 @@ const HomePage = () => {
   // Track if splash has been dismissed (for animation)
   const [splashDismissed, setSplashDismissed] = useState(false);
   const [conversationStarted, setConversationStarted] = useState(false);
-  const [iframeLoaded, setIframeLoaded] = useState(false);
 
   useEffect(() => {
     if (!journeyStarted && sessionStorage.getItem('ctcSplashSeen') === 'true') {
@@ -214,7 +213,7 @@ const HomePage = () => {
             {/* Title that shows on page load */}
             <div className="mb-16 relative">
               <ScrollTriggeredText 
-                words="Amsterdam's First Creative Tech Community"
+                words="Creative Technology Collective"
                 className="text-4xl md:text-5xl font-primary text-white mb-4 leading-tight"
                 duration={0.8}
                 filter={false}
@@ -231,66 +230,6 @@ const HomePage = () => {
           </div>
         </section>
 
-                {/* Mascotte.AI Digital Human Section */}
-        <section className="relative z-20 flex justify-center items-center py-12 bg-black">
-          <div className="w-full max-w-7xl h-[70vh] min-h-[500px] mx-auto relative flex">
-            <div className="relative w-1/2 h-full">
-              <iframe
-                name="Mascotte.AI Digital Human"
-                src="https://mascotte.ai/embed?data=JgQDAR4sOTIFAwAHUh9LSkc&lang=false"
-                style={{ 
-                  width: '100%', 
-                  height: '100%', 
-                  minHeight: '500px', 
-                  border: 'none', 
-                  display: 'block'
-                }}
-                allow="microphone; camera"
-                sandbox="allow-same-origin allow-scripts allow-popups allow-forms"
-                title="Mascotte.AI Digital Human"
-                onLoad={() => setIframeLoaded(true)}
-              />
-              
-
-            </div>
-            
-            {/* About the Collective Text */}
-            <div className="w-1/2 flex items-center px-8">
-              <div className="text-left max-w-lg">
-                <h3 className="text-3xl md:text-4xl font-primary text-white mb-6">Hello, I'm igor</h3>
-                <p className="text-zinc-300 text-xl font-secondary leading-relaxed">
-                  I'm your AI guide into the world of Creative Technology, a community of pioneers at the intersection of creativity and technology. I'm here to help you explore the latest trends and tools in creative technology, and to connect you with other creative technologists.
-                </p>
-              </div>
-            </div>
-            
-            {/* Comprehensive overlay to hide ALL interface elements */}
-            <div className="absolute inset-0 pointer-events-none">
-             
-
-
-              
-              {/* Additional coverage for microphone and trash can area */}
-              <div className="absolute bottom-4 right-4 w-32 h-16 bg-black"></div>
-            </div>
-          </div>
-        </section>
-           
-        {/* Scroll cue/button to scroll past the iframe */}
-        <div className="flex justify-center items-center pb-8">
-          <button
-            onClick={() => {
-              const membershipSection = document.getElementById('membership-section');
-              if (membershipSection) {
-                membershipSection.scrollIntoView({ behavior: 'smooth' });
-              }
-            }}
-            className="group flex flex-col items-center text-zinc-400 hover:text-pink-400 transition-colors focus:outline-none"
-            aria-label="Scroll to next section"
-          >
-         
-          </button>
-        </div>
 
 
 
@@ -330,95 +269,10 @@ const HomePage = () => {
 
 
 
-        {/* Our Sponsors Section */}
-        <section className="py-40 relative z-20">
-          <div className="max-w-7xl mx-auto">
-            <div className="text-center mb-16">
-              <ScrollTriggeredText 
-                words="Our Partners"
-                className="text-4xl md:text-5xl font-primary text-white mb-4"
-                duration={0.8}
-                filter={false}
-              />
-              <ScrollTriggeredText 
-                words="Proudly supported by innovative companies pushing the boundaries of creative technology"
-                className="text-zinc-400 text-lg font-medium max-w-2xl mx-auto font-secondary"
-                duration={0.6}
-                delay={0.6}
-                filter={false}
-              />
-            </div>
-            <div className="grid grid-cols-4 gap-4 relative z-10 max-w-6xl mx-auto">
-              <div className="flex flex-col py-6 relative">
-                <div className="mb-4 relative z-10 px-10 flex justify-center items-center h-20 md:h-24">
-                  <img 
-                    src="/sponsors/Leonardo-AI.png" 
-                    alt="Leonardo AI" 
-                    className="h-16 md:h-20 w-auto object-contain"
-                  />
-                </div>
-                <div className="text-center relative z-10 px-10">
-                  <span className="inline-block text-white font-secondary text-lg font-medium">
-                    Leonardo AI
-                  </span>
-                </div>
-              </div>
-              
-           
-              
-              <div className="flex flex-col py-6 relative">
-                <div className="mb-4 relative z-10 px-10 flex justify-center items-center h-20 md:h-24">
-                  <img 
-                    src="/sponsors/SAMA.png" 
-                    alt="Sama Street art" 
-                    className="h-16 md:h-20 w-auto object-contain"
-                  />
-                </div>
-                <div className="text-center relative z-10 px-10">
-                  <span className="inline-block text-white font-secondary text-lg font-medium">
-                    SAMA
-                  </span>
-                </div>
-              </div>
-              
-              <div className="flex flex-col py-6 relative">
-                <div className="mb-4 relative z-10 px-10 flex justify-center items-center h-20 md:h-24">
-                  <img 
-                    src="/sponsors/KIRI.png" 
-                    alt="KIRI Engine" 
-                    className="h-16 md:h-20 w-auto object-contain"
-                  />
-                </div>
-                <div className="text-center relative z-10 px-10">
-                  <span className="inline-block text-white font-secondary text-lg font-medium">
-                    KIRI Engine
-                  </span>
-                </div>
-              </div>
-              
-            
-              
-              <div className="flex flex-col py-6 relative">
-                <div className="mb-4 relative z-10 px-10 flex justify-center items-center h-20 md:h-24">
-                  <img 
-                    src="/sponsors/instagram-logo.jpg" 
-                    alt="Solaya" 
-                    className="h-16 md:h-20 w-auto object-contain rounded-full"
-                  />
-                </div>
-                <div className="text-center relative z-10 px-10">
-                  <span className="inline-block text-white font-secondary text-lg font-medium">
-                    Solaya
-                  </span>
-                </div>
-              </div>
-            </div>
-          </div>
-        </section>
 
-        {/* Hero Section */}
-        <section className="min-h-screen flex items-center justify-center py-40 relative z-20">
-          <div className="max-w-6xl mx-auto text-center">
+        {/* Newsletter Section */}
+        <section id="newsletter" className="min-h-screen flex items-center justify-center py-40 relative z-20">
+          <div className="max-w-6xl mx-auto text-left md:text-center px-4 md:px-0">
             <ScrollTriggeredText 
               words="Stay Connected"
               className="text-4xl md:text-5xl font-primary text-white mb-4"
@@ -427,13 +281,13 @@ const HomePage = () => {
             />
             <ScrollTriggeredText 
               words="Subscribe to our newsletter for the latest resources, insights, and opportunities in creative technology. Get curated content, exclusive updates, and early access to new tools and community events."
-              className="text-zinc-400 max-w-4xl mx-auto my-8 text-lg text-center relative z-10 font-medium font-secondary"
+              className="text-zinc-400 max-w-4xl md:mx-auto my-8 text-base sm:text-lg text-left md:text-center relative z-10 font-medium font-secondary"
               duration={0.6}
               delay={0.6}
               filter={false}
             />
-            <form onSubmit={handleEmailSubmit} className="max-w-2xl mx-auto mt-8 relative z-10">
-              <div className="flex mb-4">
+            <form onSubmit={handleEmailSubmit} className="max-w-2xl md:mx-auto mt-8 relative z-10">
+              <div className="flex flex-col sm:flex-row gap-3 sm:gap-0 mb-4">
                 <Input
                   type="text"
                   placeholder="Your name"
@@ -447,7 +301,7 @@ const HomePage = () => {
                     const capitalizedValue = capitalizeName(e.target.value);
                     setName(capitalizedValue);
                   }}
-                  className="w-48 focus-visible:ring-pink-500 h-12 rounded-r-none border-r-0"
+                  className="w-full sm:w-48 focus-visible:ring-pink-500 h-12 sm:rounded-r-none sm:border-r-0"
                   disabled={isSubmitting}
                 />
                 <Input
@@ -455,14 +309,14 @@ const HomePage = () => {
                   placeholder="Enter your email for updates"
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
-                  className="flex-1 focus-visible:ring-pink-500 h-12 rounded-l-none"
+                  className="w-full sm:flex-1 focus-visible:ring-pink-500 h-12 sm:rounded-l-none"
                   disabled={isSubmitting}
                 />
                 <ButtonColorful
                   type="submit"
                   disabled={isSubmitting}
                   label={isSubmitting ? 'Signing up...' : 'Sign up'}
-                  className="min-w-[120px] h-12 ml-2 disabled:opacity-50 px-8"
+                  className="min-w-[120px] h-12 sm:ml-2 disabled:opacity-50 px-8 w-full sm:w-auto"
                 />
               </div>
               {submitMessage && (

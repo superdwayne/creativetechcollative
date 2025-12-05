@@ -1,7 +1,6 @@
 import React, { useState, useEffect } from 'react';
-import { ExternalLink, Calendar, Tag, ChevronLeft, ChevronRight, Loader2 } from 'lucide-react';
+import { ExternalLink, Calendar, ChevronLeft, ChevronRight, Loader2 } from 'lucide-react';
 import { getWebhookUrl } from '@/utils/webhookUtils';
-import { ScrollTriggeredText } from '../components/ui/scroll-triggered-text';
 
 interface CaseStudy {
   id: string;
@@ -19,10 +18,9 @@ interface CaseStudy {
 interface ImageCarouselProps {
   images: string[];
   title: string;
-  caseId: string;
 }
 
-const ImageCarousel: React.FC<ImageCarouselProps> = ({ images, title, caseId }) => {
+const ImageCarousel: React.FC<ImageCarouselProps> = ({ images, title }) => {
   const [currentImageIndex, setCurrentImageIndex] = useState(0);
 
   const nextImage = () => {
@@ -110,16 +108,62 @@ const ImageCarousel: React.FC<ImageCarouselProps> = ({ images, title, caseId }) 
   );
 };
 
+// Static collaborations data
+const staticCollaborations: CaseStudy[] = [
+  {
+    id: 'tbwa-neboko',
+    title: 'Innovation Revolution NebokoLabs',
+    description: 'We had in-depth discussions about the future of Creative Technology and its evolving role within the creative industry—particularly as we navigate the impact of AI.\n\n💡 Creative Technology Is Central to What\'s Next\nAs innovation accelerates, creative technology is becoming a vital part of the creative process—shaping not only how ideas are formed but how experiences are brought to life.\n\n💡 The Field Is Broad, and Needs Clarity\nCreative technology includes a wide range of roles and specializations. Defining these more clearly can help the field mature and improve how we work together across disciplines.',
+    client: 'TBWA\\NEBOKO',
+    category: 'Event',
+    tags: ['Innovation', 'AI', 'Creative Technology'],
+    date: '2025-02-13',
+    images: [
+      '/collaborations/tbwa/tbwa-1.jpeg',
+      '/collaborations/tbwa/tbwa-2.jpeg',
+      '/collaborations/tbwa/tbwa-3.jpeg',
+      '/collaborations/tbwa/tbwa-4.jpeg',
+      '/collaborations/tbwa/tbwa-5.jpeg'
+    ],
+    url: undefined
+  },
+  {
+    id: 'solaya-snap',
+    title: 'SOLAYA Snap Lens',
+    description: 'Together with Solaya, we\'re proud to unveil a groundbreaking virtual try-on solution that redefines the future of e-commerce. Leveraging cutting-edge Gaussian splatting technology, our collaborative innovation brings products to life with unprecedented realism, transforming the way consumers interact with your brand.',
+    client: 'SOLAYA',
+    category: 'AR/VR',
+    tags: ['Snap', 'Innovation', 'Gaussian Splatting'],
+    date: '2025-01-11',
+    images: ['/collaborations/solaya/solaya-1.png'],
+    url: undefined
+  },
+  {
+    id: 'beyond-studio-ar',
+    title: 'Future of AR: Beyond Studio',
+    description: 'Together with Beyond Studio, we held an evening of discussion around the Future of AR. As a Creative Technology Collective we share our predictions on the AR landscape and provided tips and advice on how you can future proof yourself in the world of AR.',
+    client: 'Beyond Studio',
+    category: 'Presentation',
+    tags: ['AR', 'Future', 'Presentation'],
+    date: '2024-06-14',
+    images: [
+      '/collaborations/beyond-studio/beyond-1.jpg',
+      '/collaborations/beyond-studio/beyond-2.jpg',
+      '/collaborations/beyond-studio/beyond-3.png'
+    ],
+    url: undefined
+  }
+];
+
 const CasesPage: React.FC = () => {
-  const [caseStudies, setCaseStudies] = useState<CaseStudy[]>([]);
-  const [loading, setLoading] = useState(true);
+  const [caseStudies, setCaseStudies] = useState<CaseStudy[]>(staticCollaborations);
+  const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   // Fetch cases from webhook
   useEffect(() => {
     const fetchCases = async () => {
       try {
-        setLoading(true);
         setError(null);
 
         // Get credentials from environment variables
@@ -257,24 +301,17 @@ const CasesPage: React.FC = () => {
 
           console.log(`Final transformed cases count: ${transformedCases.length}`);
 
-          // Sort by date (newest first)
-          transformedCases.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
-
-          setCaseStudies(transformedCases);
+          // Merge webhook data with static data, sort by date
+          const allCases = [...transformedCases, ...staticCollaborations];
+          allCases.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+          setCaseStudies(allCases);
         } else {
-          console.log('No data received or data is not an array:', data);
-          setCaseStudies([]);
+          console.log('No data received or data is not an array, keeping static data');
+          // Keep static data
         }
       } catch (err: any) {
         console.error('Error fetching cases:', err);
-        
-        if (err.name === 'TimeoutError') {
-          setError('Request timed out. Please try again.');
-        } else if (err.message.includes('Failed to fetch')) {
-          setError('Unable to connect to the server. Please check your connection.');
-        } else {
-          setError(err.message || 'Failed to load case studies. Please try again later.');
-        }
+        // Keep static data on error, don't show error message
       } finally {
         setLoading(false);
       }
@@ -331,7 +368,22 @@ const CasesPage: React.FC = () => {
 
   return (
     <div className="min-h-screen bg-black text-white relative w-full">
-      {/* Case Studies */}
+      {/* Header Section */}
+      <section className="py-20 px-8 md:px-16 lg:px-24">
+        <div className="max-w-7xl mx-auto">
+          <span className="text-xs font-secondary tracking-[0.3em] text-zinc-500 uppercase mb-4 block">
+            Our Work
+          </span>
+          <h1 className="text-4xl md:text-5xl lg:text-6xl font-primary font-medium text-white mb-6">
+            Collaborations
+          </h1>
+          <p className="text-zinc-400 text-lg max-w-2xl font-secondary leading-relaxed">
+            Explore our portfolio of creative technology projects. From immersive experiences to AI-powered tools, we push the boundaries of what's possible.
+          </p>
+        </div>
+      </section>
+
+      {/* Case Studies Grid */}
       <div className="space-y-0">
         {caseStudies.map((caseStudy, index) => (
           <div key={caseStudy.id}>
@@ -384,18 +436,21 @@ const CasesPage: React.FC = () => {
                   </div>
 
                   {/* Description */}
-                  <div className="text-zinc-300 text-xs md:text-sm leading-relaxed font-secondary">
-                    {caseStudy.description.split('\n').map((line, index) => {
-                      // Process line to make text between <> bold
-                      const processedLine = line.replace(/<([^>]+)>/g, '<strong>$1</strong>');
-                      
-                      return (
-                      <React.Fragment key={index}>
-                        <span dangerouslySetInnerHTML={{ __html: processedLine }} />
-                        {index < caseStudy.description.split('\n').length - 1 && <br />}
-                      </React.Fragment>
-                      );
-                    })}
+                  <div className="text-zinc-300 text-sm md:text-base leading-relaxed font-secondary space-y-3">
+                    {caseStudy.description.split('\n\n').map((paragraph, pIndex) => (
+                      <div key={pIndex} className={paragraph.startsWith('💡') ? 'pl-0' : ''}>
+                        {paragraph.split('\n').map((line, lIndex) => {
+                          // Check if line starts with emoji for key takeaways
+                          const isKeyTakeaway = line.startsWith('💡');
+                          
+                          return (
+                            <p key={lIndex} className={isKeyTakeaway ? 'font-medium text-white mt-2' : ''}>
+                              {line}
+                            </p>
+                          );
+                        })}
+                      </div>
+                    ))}
                   </div>
 
                   {/* Tags */}
@@ -435,7 +490,6 @@ const CasesPage: React.FC = () => {
                   <ImageCarousel 
                     images={caseStudy.images} 
                     title={caseStudy.title}
-                    caseId={caseStudy.id}
                   />
                 ) : (
                   <div className="relative overflow-hidden bg-zinc-900 flex items-center justify-center" 
@@ -468,25 +522,5 @@ const CasesPage: React.FC = () => {
     </div>
   );
 };
-
-const MissionPage: React.FC = () => (
-  <div className="min-h-screen flex items-center justify-center px-8 py-40 bg-black">
-    <div className="max-w-3xl mx-auto text-center">
-      <ScrollTriggeredText
-        words="About the Collective"
-        className="text-5xl md:text-7xl font-primary font-medium text-white mb-8"
-        duration={0.8}
-        filter={false}
-      />
-      <ScrollTriggeredText
-        words="We're on a mission to make Creative Technology open to all—breaking down barriers, spreading knowledge, and putting powerful tools into the hands of anyone ready to build what's next."
-        className="text-zinc-300 text-xl font-secondary font-medium leading-relaxed"
-        duration={0.6}
-        delay={0.8}
-        filter={false}
-      />
-    </div>
-  </div>
-);
 
 export default CasesPage;

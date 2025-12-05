@@ -1,7 +1,6 @@
 import React, { useState } from 'react';
 import { Phone, Mail, Globe, MapPin, Loader2 } from 'lucide-react';
 import { MorphingText } from './morphing-text';
-import { FeaturesSection } from './features-section';
 import { ButtonColorful } from './button-colorful';
 import { getWebhookUrl } from '@/utils/webhookUtils';
 
@@ -287,31 +286,6 @@ export const Contact2: React.FC<Contact2Props> = ({
           </form>
         </div>
       </div>
-      
-      {/* Services Section */}
-      <section 
-        className="py-16 md:py-24"
-        style={{
-          position: 'relative',
-          left: '50%',
-          right: '50%',
-          marginLeft: '-50vw',
-          marginRight: '-50vw',
-          width: '100vw'
-        }}
-      >
-        <div className="max-w-7xl mx-auto px-4 md:px-8">
-          <div className="text-center mb-16">
-            <h3 className="text-4xl md:text-5xl font-primary text-white mb-4">
-              Services
-            </h3>
-            <p className="text-zinc-400 text-lg font-medium max-w-2xl mx-auto font-secondary">
-              Comprehensive solutions for creative technologists and innovative organizations
-            </p>
-          </div>
-          <FeaturesSection />
-        </div>
-      </section>
     </div>
   );
 };

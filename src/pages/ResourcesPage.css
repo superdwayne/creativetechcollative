@@ -1,0 +1,69 @@
+/* Scoped styles for Resources page */
+
+.resources-root {
+  overflow-x: hidden;
+}
+
+.resources-hero {
+  min-height: 60vh;
+  padding-top: 5rem;  /* matches pt-20 */
+  padding-bottom: 3rem; /* matches pb-12 */
+}
+
+@media (min-width: 768px) {
+  .resources-hero {
+    min-height: 100vh;
+    padding-top: 6rem;  /* md:pt-24 */
+    padding-bottom: 5rem; /* md:pb-20 */
+  }
+ 
+}
+
+.resources-intro {
+  font-size: 1rem; /* base */
+}
+
+@media (min-width: 640px) {
+  .resources-intro {
+    font-size: 1.125rem; /* sm */
+  }
+}
+
+@media (min-width: 768px) {
+  .resources-intro {
+    font-size: 1.25rem; /* md */
+  }
+}
+
+.resources-section {
+  padding: 1rem; /* p-4 */
+}
+
+@media (min-width: 768px) {
+  .resources-section {
+    padding: 1.5rem; /* md:p-6 */
+  }
+}
+
+.resources-card {
+  width: 14rem; /* w-56 */
+}
+
+@media (min-width: 640px) {
+  .resources-card {
+    width: 16rem; /* sm:w-64 */
+  }
+}
+
+.resources-tags {
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+}
+
+/* Optional: fine-tune snapping behavior */
+.resources-card-rail {
+  scroll-snap-type: x mandatory;
+  scroll-behavior: smooth;
+}
+
+

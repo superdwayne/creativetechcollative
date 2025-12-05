@@ -1,7 +1,8 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { ExternalLink, Instagram, Twitter, Linkedin, Github, Palette } from 'lucide-react';
+import { Grid, List, Filter } from 'lucide-react';
 import Footer from '../components/ui/footer';
-import MembersGallery from '../components/MembersGallery';
+import FloatingShapes from '../components/FloatingShapes';
+import TeamMasonryGrid from '../components/TeamMasonryGrid';
 
 interface TeamMember {
   id: string;
@@ -181,167 +182,296 @@ const teamMembers: TeamMember[] = [
   }
 ];
 
-const TeamMemberCard: React.FC<{ member: TeamMember; index: number }> = ({ member, index }) => {
-  const [isHovered, setIsHovered] = useState(false);
-  const cardRef = useRef<HTMLDivElement>(null);
+// Group members by role category for the credits table
+const roleCategories = [
+  {
+    category: 'Leadership',
+    members: teamMembers.filter(m => m.role.toLowerCase().includes('founder') || m.role.toLowerCase().includes('director') || m.role.toLowerCase().includes('lead'))
+  },
+  {
+    category: 'Design',
+    members: teamMembers.filter(m => m.role.toLowerCase().includes('design') || m.role.toLowerCase().includes('ux') || m.role.toLowerCase().includes('ui') || m.role.toLowerCase().includes('brand'))
+  },
+  {
+    category: 'Development',
+    members: teamMembers.filter(m => m.role.toLowerCase().includes('developer') || m.role.toLowerCase().includes('engineer') || m.role.toLowerCase().includes('devops') || m.role.toLowerCase().includes('technical'))
+  },
+  {
+    category: 'Strategy & Content',
+    members: teamMembers.filter(m => m.role.toLowerCase().includes('manager') || m.role.toLowerCase().includes('strategist') || m.role.toLowerCase().includes('content') || m.role.toLowerCase().includes('researcher'))
+  },
+];
+
+type ViewMode = 'grid' | 'list' | 'credits';
+type FilterMode = 'all' | 'leadership' | 'design' | 'development' | 'strategy';
+
+const TeamPage: React.FC = () => {
+  const [viewMode, setViewMode] = useState<ViewMode>('grid');
+  const [filterMode, setFilterMode] = useState<FilterMode>('all');
+  const [isLoaded, setIsLoaded] = useState(false);
+  const heroRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
-    const observer = new IntersectionObserver(
-      (entries) => {
-        entries.forEach((entry) => {
-          if (entry.isIntersecting) {
-            entry.target.classList.add('animate-fade-in');
-          }
-        });
-      },
-      { threshold: 0.1 }
-    );
-
-    if (cardRef.current) {
-      observer.observe(cardRef.current);
-    }
-
-    return () => observer.disconnect();
+    setIsLoaded(true);
   }, []);
 
+  const filteredMembers = teamMembers.filter(member => {
+    if (filterMode === 'all') return true;
+    if (filterMode === 'leadership') return member.role.toLowerCase().includes('founder') || member.role.toLowerCase().includes('director') || member.role.toLowerCase().includes('lead');
+    if (filterMode === 'design') return member.role.toLowerCase().includes('design') || member.role.toLowerCase().includes('ux') || member.role.toLowerCase().includes('ui') || member.role.toLowerCase().includes('brand');
+    if (filterMode === 'development') return member.role.toLowerCase().includes('developer') || member.role.toLowerCase().includes('engineer') || member.role.toLowerCase().includes('devops') || member.role.toLowerCase().includes('technical');
+    if (filterMode === 'strategy') return member.role.toLowerCase().includes('manager') || member.role.toLowerCase().includes('strategist') || member.role.toLowerCase().includes('content') || member.role.toLowerCase().includes('researcher');
+    return true;
+  });
+
   return (
-    <div
-      ref={cardRef}
-      className="opacity-0 transform translate-y-8 transition-all duration-700 ease-out"
-      style={{ transitionDelay: `${index * 100}ms` }}
-      onMouseEnter={() => setIsHovered(true)}
-      onMouseLeave={() => setIsHovered(false)}
-    >
-      <div className="group relative bg-white rounded-2xl overflow-hidden shadow-sm hover:shadow-xl transition-all duration-500 transform hover:-translate-y-2">
-        {/* Image */}
-        <div className="relative aspect-[4/5] overflow-hidden">
-          <img
-            src={member.image}
-            alt={member.name}
-            className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-110"
-            onError={(e) => {
-              const target = e.target as HTMLImageElement;
-              target.src = `https://via.placeholder.com/400/1f2937/9ca3af?text=${encodeURIComponent(member.name.charAt(0))}`;
-            }}
-          />
+    <div className="min-h-screen bg-black text-white overflow-x-hidden">
+      {/* Floating Shapes Background */}
+      <FloatingShapes count={25} />
+
+      {/* Hero Section - 100 Lost Species Style */}
+      <div 
+        ref={heroRef}
+        className="relative min-h-[70vh] flex flex-col items-center justify-center px-6 md:px-12"
+      >
+        {/* Large Serif Heading */}
+        <div className={`text-center transition-all duration-1000 ease-out ${isLoaded ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-8'}`}>
+          <h1 className="font-serif text-4xl sm:text-5xl md:text-6xl lg:text-7xl xl:text-8xl text-white leading-tight tracking-wide mb-8">
+            A diverse collective
+            <br />
+            <span className="text-white/80">of creative minds</span>
+            <br />
+            <span className="text-white/60">pushing boundaries.</span>
+          </h1>
           
-          {/* Gradient overlay */}
-          <div className="absolute inset-0 bg-gradient-to-t from-black/20 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-500" />
-          
-          {/* Social links overlay */}
-          <div className={`absolute inset-0 flex items-center justify-center transition-all duration-500 ${
-            isHovered ? 'opacity-100' : 'opacity-0'
-          }`}>
-            <div className="flex gap-3 transform translate-y-4 group-hover:translate-y-0 transition-transform duration-500">
-              {member.social.instagram && (
-                <a
-                  href={member.social.instagram}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="p-3 bg-white/95 text-gray-800 rounded-full hover:bg-white hover:scale-110 transition-all duration-200 shadow-lg"
-                >
-                  <Instagram className="w-5 h-5" />
-                </a>
-              )}
-              {member.social.twitter && (
-                <a
-                  href={member.social.twitter}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="p-3 bg-white/95 text-gray-800 rounded-full hover:bg-white hover:scale-110 transition-all duration-200 shadow-lg"
-                >
-                  <Twitter className="w-5 h-5" />
-                </a>
-              )}
-              {member.social.linkedin && (
-                <a
-                  href={member.social.linkedin}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="p-3 bg-white/95 text-gray-800 rounded-full hover:bg-white hover:scale-110 transition-all duration-200 shadow-lg"
-                >
-                  <Linkedin className="w-5 h-5" />
-                </a>
-              )}
-              {member.social.github && (
-                <a
-                  href={member.social.github}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="p-3 bg-white/95 text-gray-800 rounded-full hover:bg-white hover:scale-110 transition-all duration-200 shadow-lg"
-                >
-                  <Github className="w-5 h-5" />
-                </a>
-              )}
-              {member.social.website && (
-                <a
-                  href={member.social.website}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="p-3 bg-white/95 text-gray-800 rounded-full hover:bg-white hover:scale-110 transition-all duration-200 shadow-lg"
-                >
-                  <ExternalLink className="w-5 h-5" />
-                </a>
-              )}
-              {member.social.behance && (
-                <a
-                  href={member.social.behance}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="p-3 bg-white/95 text-gray-800 rounded-full hover:bg-white hover:scale-110 transition-all duration-200 shadow-lg"
-                >
-                  <Palette className="w-5 h-5" />
-                </a>
-              )}
+          <p className={`text-white/50 text-lg md:text-xl max-w-2xl mx-auto font-light tracking-wide transition-all duration-1000 delay-300 ${isLoaded ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-4'}`}>
+            Creative technologists, designers, and innovators united by a passion for exceptional digital experiences.
+          </p>
+        </div>
+
+        {/* Scroll Indicator */}
+        <div className={`absolute bottom-8 left-1/2 -translate-x-1/2 text-white/40 text-sm tracking-widest uppercase transition-all duration-1000 delay-500 ${isLoaded ? 'opacity-100' : 'opacity-0'}`}>
+          Scroll to explore
+        </div>
+      </div>
+
+      {/* Filter Tabs - 100 Lost Species Style */}
+      <div className="sticky top-0 z-40 bg-black/80 backdrop-blur-md border-b border-white/10">
+        <div className="max-w-7xl mx-auto px-6 md:px-12 py-4">
+          <div className="flex flex-wrap items-center justify-between gap-4">
+            {/* View Mode Tabs */}
+            <div className="flex items-center gap-2">
+              <button
+                onClick={() => setViewMode('grid')}
+                className={`flex items-center gap-2 px-4 py-2 rounded-full text-sm transition-all duration-300 ${
+                  viewMode === 'grid'
+                    ? 'bg-white text-black'
+                    : 'bg-white/10 text-white/70 hover:bg-white/20'
+                }`}
+              >
+                <Grid className="w-4 h-4" />
+                <span className="hidden sm:inline">By Visuals</span>
+              </button>
+              <button
+                onClick={() => setViewMode('list')}
+                className={`flex items-center gap-2 px-4 py-2 rounded-full text-sm transition-all duration-300 ${
+                  viewMode === 'list'
+                    ? 'bg-white text-black'
+                    : 'bg-white/10 text-white/70 hover:bg-white/20'
+                }`}
+              >
+                <List className="w-4 h-4" />
+                <span className="hidden sm:inline">By Names</span>
+              </button>
+              <button
+                onClick={() => setViewMode('credits')}
+                className={`flex items-center gap-2 px-4 py-2 rounded-full text-sm transition-all duration-300 ${
+                  viewMode === 'credits'
+                    ? 'bg-white text-black'
+                    : 'bg-white/10 text-white/70 hover:bg-white/20'
+                }`}
+              >
+                <Filter className="w-4 h-4" />
+                <span className="hidden sm:inline">By Role</span>
+              </button>
+            </div>
+
+            {/* Filter Dropdown */}
+            <div className="flex items-center gap-2">
+              <select
+                value={filterMode}
+                onChange={(e) => setFilterMode(e.target.value as FilterMode)}
+                className="bg-white/10 text-white/70 px-4 py-2 rounded-full text-sm border border-white/10 focus:outline-none focus:border-white/30 cursor-pointer"
+              >
+                <option value="all">All Roles</option>
+                <option value="leadership">Leadership</option>
+                <option value="design">Design</option>
+                <option value="development">Development</option>
+                <option value="strategy">Strategy & Content</option>
+              </select>
             </div>
           </div>
         </div>
-        
-        {/* Content */}
-        <div className="p-6">
-          <h3 className="text-xl font-semibold text-gray-900 mb-2 group-hover:text-gray-700 transition-colors duration-300">
-            {member.name}
-          </h3>
-          <p className="text-gray-600 mb-4 group-hover:text-gray-500 transition-colors duration-300">
-            {member.role}
-          </p>
-          <p className="text-gray-500 text-sm leading-relaxed group-hover:text-gray-600 transition-colors duration-300">
-            {member.bio}
-          </p>
-        </div>
       </div>
+
+      {/* Main Content */}
+      <div className="relative z-10 max-w-7xl mx-auto px-6 md:px-12 py-16">
+        {/* Grid View - Masonry Style */}
+        {viewMode === 'grid' && (
+          <TeamMasonryGrid members={filteredMembers} />
+        )}
+
+        {/* List View - Names with hover images */}
+        {viewMode === 'list' && (
+          <div className="space-y-1">
+            {filteredMembers.map((member, index) => (
+              <ListMemberItem key={member.id} member={member} index={index} />
+            ))}
+          </div>
+        )}
+
+        {/* Credits View - Table Style like 100 Lost Species */}
+        {viewMode === 'credits' && (
+          <div className="max-w-4xl mx-auto">
+            <table className="w-full">
+              <tbody>
+                {roleCategories.map((category, catIndex) => (
+                  category.members.length > 0 && (
+                    <tr 
+                      key={category.category}
+                      className="border-b border-white/10 group"
+                      style={{ animationDelay: `${catIndex * 0.1}s` }}
+                    >
+                      <td className="py-6 pr-8 align-top">
+                        <span className="text-white/50 text-sm uppercase tracking-widest font-light">
+                          {category.category}
+                        </span>
+                      </td>
+                      <td className="py-6">
+                        <div className="flex flex-wrap gap-x-6 gap-y-2">
+                          {category.members.map((member) => (
+                            <span 
+                              key={member.id}
+                              className="text-white text-lg md:text-xl font-light hover:text-white/70 transition-colors cursor-default"
+                            >
+                              {member.name}
+                            </span>
+                          ))}
+                        </div>
+                      </td>
+                    </tr>
+                  )
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </div>
+
+      {/* Member Count */}
+      <div className="relative z-10 text-center py-12 border-t border-white/10">
+        <p className="text-white/40 text-sm tracking-widest uppercase">
+          {filteredMembers.length} Creative Minds
+        </p>
+      </div>
+
+      <Footer />
+
+      {/* Custom Styles */}
+      <style>{`
+        @keyframes fade-in-up {
+          from {
+            opacity: 0;
+            transform: translateY(20px);
+          }
+          to {
+            opacity: 1;
+            transform: translateY(0);
+          }
+        }
+        
+        .animate-fade-in-up {
+          animation: fade-in-up 0.6s ease-out forwards;
+        }
+        
+        /* Elegant serif font fallback */
+        .font-serif {
+          font-family: 'Playfair Display', 'Georgia', 'Times New Roman', serif;
+        }
+        
+        /* Custom scrollbar */
+        ::-webkit-scrollbar {
+          width: 8px;
+        }
+        
+        ::-webkit-scrollbar-track {
+          background: #000;
+        }
+        
+        ::-webkit-scrollbar-thumb {
+          background: #333;
+          border-radius: 4px;
+        }
+        
+        ::-webkit-scrollbar-thumb:hover {
+          background: #444;
+        }
+      `}</style>
     </div>
   );
 };
 
-const TeamPage: React.FC = () => {
-  const [filter, setFilter] = useState<'all' | 'featured'>('all');
-  const [searchQuery, setSearchQuery] = useState('');
+// List Member Item Component with hover image preview
+const ListMemberItem: React.FC<{ member: TeamMember; index: number }> = ({ member, index }) => {
+  const [isHovered, setIsHovered] = useState(false);
+  const [mousePos, setMousePos] = useState({ x: 0, y: 0 });
 
-  const filteredMembers = teamMembers.filter(member => {
-    const matchesFilter = filter === 'all' || (filter === 'featured' && member.featured);
-    const matchesSearch = !searchQuery || 
-      member.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      member.role.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      member.bio.toLowerCase().includes(searchQuery.toLowerCase());
-    
-    return matchesFilter && matchesSearch;
-  });
+  const handleMouseMove = (e: React.MouseEvent) => {
+    setMousePos({ x: e.clientX, y: e.clientY });
+  };
 
   return (
-    <div className="min-h-screen bg-white">
-      {/* Simplified hero */}
-      <div className="py-16 text-center px-4">
-        <h1 className="text-5xl md:text-6xl font-bold text-gray-900 mb-4">Our Team</h1>
-        <p className="text-gray-600 text-lg md:text-xl">A diverse collective of creative technologists and designers.</p>
+    <div
+      className="group relative py-4 border-b border-white/5 cursor-pointer opacity-0 animate-fade-in-up"
+      style={{ animationDelay: `${index * 0.05}s`, animationFillMode: 'forwards' }}
+      onMouseEnter={() => setIsHovered(true)}
+      onMouseLeave={() => setIsHovered(false)}
+      onMouseMove={handleMouseMove}
+    >
+      <div className="flex items-center justify-between">
+        <div className="flex items-center gap-8">
+          <span className="text-white/30 text-sm font-mono w-8">
+            {String(index + 1).padStart(2, '0')}
+          </span>
+          <h3 className="font-serif text-2xl md:text-3xl lg:text-4xl text-white group-hover:text-white/70 transition-colors duration-300">
+            {member.name}
+          </h3>
+        </div>
+        <span className="text-white/40 text-sm uppercase tracking-widest hidden md:block">
+          {member.role}
+        </span>
       </div>
 
-      {/* Members gallery (uses the same gallery component) */}
-      <div className="max-w-7xl mx-auto px-4 md:px-8 pb-16">
-        <MembersGallery memberData={filteredMembers.map((m) => ({ id: m.id, name: m.name, description: m.role, image: m.image }))} />
-      </div>
-
-      <Footer />
+      {/* Floating Image Preview */}
+      {isHovered && (
+        <div
+          className="fixed pointer-events-none z-50 transition-opacity duration-200"
+          style={{
+            left: mousePos.x + 20,
+            top: mousePos.y - 100,
+          }}
+        >
+          <img
+            src={member.image}
+            alt={member.name}
+            className="w-48 h-64 object-cover rounded-sm shadow-2xl"
+            onError={(e) => {
+              const target = e.target as HTMLImageElement;
+              target.style.display = 'none';
+            }}
+          />
+        </div>
+      )}
     </div>
   );
 };
