@@ -54,24 +54,6 @@ const EmailSignup: React.FC<EmailSignupProps> = ({ hideIntro = false, minimal = 
     setSubmitMessage('');
 
     try {
-      // Get credentials from environment variables
-      const username = import.meta.env.VITE_N8N_BASIC_AUTH_USERNAME;
-      const password = import.meta.env.VITE_N8N_BASIC_AUTH_PASSWORD;
-      
-      console.log('Auth check:', {
-        hasUsername: !!username,
-        hasPassword: !!password,
-        usernameLength: username?.length,
-        passwordLength: password?.length
-      });
-
-      if (!username || !password) {
-        throw new Error('Authentication credentials not configured');
-      }
-
-      // Create Basic Auth header
-      const basicAuth = btoa(`${username}:${password}`);
-
       const requestData = {
         name: capitalizedName,
         email: email.trim(),
@@ -81,11 +63,10 @@ const EmailSignup: React.FC<EmailSignupProps> = ({ hideIntro = false, minimal = 
 
       console.log('Request data:', requestData);
 
-      const response = await fetch(getWebhookUrl('signup'), {
+      const response = await fetch(getWebhookUrl('sign-ups'), {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'Authorization': `Basic ${basicAuth}`
         },
         body: JSON.stringify(requestData)
       });

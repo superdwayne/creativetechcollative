@@ -37,7 +37,7 @@ const ResourcesPage: React.FC = () => {
       id: 'kiri-engine',
       title: 'Kiri Engine',
       description: '3D scanning and photogrammetry tools for creating high-quality 3D models from photos.',
-      url: 'https://www.kiriengine.com',
+      url: 'https://www.kiriengine.app/',
       category: 'AI Tools',
       image: '/sponsors/KIRI.png'
     },

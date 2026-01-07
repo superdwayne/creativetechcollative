@@ -21,9 +21,14 @@ export const getWebhookBaseUrl = (): string => {
 export const getWebhookUrl = (endpoint: string): string => {
   const baseUrl = getWebhookBaseUrl();
   
-  // Special handling for resources endpoint
+  // Special handling for resources endpoint - always use production
   if (endpoint === 'resources') {
     return 'https://n8n.creativetechnologists.nl/webhook/resources';
+  }
+  
+  // Special handling for sign-ups endpoint - use test endpoint for testing
+  if (endpoint === 'sign-ups') {
+    return 'https://n8n.creativetechnologists.nl/webhook/mailinglist';
   }
   
   return `${baseUrl}/${endpoint}`;

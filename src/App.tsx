@@ -34,6 +34,7 @@ import VortexEntry from './components/VortexEntry';
 import VortexDemo from './pages/VortexDemo';
 import HeroPage from './pages/HeroPage';
 import SplashPage from './pages/SplashPage';
+import NewsletterPage from './pages/NewsletterPage';
 
 // Helper function to get appropriate icon for category/tag
 const getCategoryIcon = (name: string): string => {
@@ -359,6 +360,14 @@ function App() {
             <Route 
               path="/vortex-demo" 
               element={<VortexDemo />} 
+            />
+            <Route 
+              path="/newsletter" 
+              element={
+                <div className="w-full">
+                  <NewsletterPage />
+                </div>
+              } 
             />
           </Routes>
         </div>

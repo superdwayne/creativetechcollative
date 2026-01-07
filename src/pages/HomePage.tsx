@@ -77,25 +77,14 @@ const HomePage = () => {
     setSubmitMessage('');
 
     // Declare webhookUrl here so it's available in catch
-    const webhookUrl = getWebhookUrl('mailinglist');
+    const webhookUrl = getWebhookUrl('sign-ups');
     try {
-      // Check if environment variables are available
-      const username = import.meta.env.VITE_N8N_BASIC_AUTH_USERNAME;
-      const password = import.meta.env.VITE_N8N_BASIC_AUTH_PASSWORD;
-      
-      if (!webhookUrl || !username || !password) {
-        console.error('Missing configuration:', { 
-          hasWebhookUrl: !!webhookUrl, 
-          hasUsername: !!username, 
-          hasPassword: !!password 
-        });
+      if (!webhookUrl) {
+        console.error('Missing webhook URL configuration');
         throw new Error('Configuration missing');
       }
 
       console.log('Attempting to submit to:', webhookUrl);
-
-      // Create Basic Auth header
-      const basicAuth = btoa(`${username}:${password}`);
 
       const requestData = {
         name: capitalizedName,
@@ -110,11 +99,10 @@ const HomePage = () => {
       const controller = new AbortController();
       const timeoutId = setTimeout(() => controller.abort(), 10000); // 10 second timeout
 
-      const response = await fetch('https://n8n.creativetechnologists.nl/webhook/sign-ups', {
+      const response = await fetch(webhookUrl, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'Authorization': `Basic ${basicAuth}`,
           'Accept': 'application/json',
         },
         body: JSON.stringify(requestData),

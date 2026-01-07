@@ -73,6 +73,17 @@ const ImageCarousel: React.FC<{ images: string[]; title: string }> = ({ images, 
 // Static collaborations data
 const staticCollaborations: CaseStudy[] = [
   {
+    id: 'adnight-mcp',
+    title: 'AI Agents & MCP Servers at ADNIGHT',
+    description: 'A deep dive into AI agents powered by MCP servers in collaboration with UNI_VERSE. This talk showcased custom-built MCP servers for 8th Wall and TouchDesigner with live demonstrations.\n\nThis wasn\'t about simple automations—it explored the real power of MCP and how it can supercharge your LLMs. The session demonstrated practical applications of Model Context Protocol in creative technology workflows, bridging the gap between AI capabilities and real-world creative tools.',
+    client: 'ADNIGHT / UNI_VERSE',
+    category: 'Presentation',
+    tags: ['AI', 'MCP', '8th Wall', 'TouchDesigner', 'AI Agents'],
+    date: '2025-12-20',
+    images: ['https://scontent.cdninstagram.com/v/t51.82787-15/561611891_17922032478156370_3459566483777620000_n.jpg?stp=dst-jpg_e35_tt6&_nc_cat=101&ig_cache_key=Mzc0MDI0MjA5NjY0NjA5MTU3Mw%3D%3D.3-ccb7-5&ccb=7-5&_nc_sid=58cdad&efg=eyJ2ZW5jb2RlX3RhZyI6InhwaWRzLjE0Mzl4MTQ0Mi5zZHIuQzMifQ%3D%3D&_nc_ohc=WSZTQQcu-dwQ7kNvwGIEs4u&_nc_oc=AdmKK44ZaH_u4Fb8buw07omAwi7f8b9NSf5sVxoN2UxOR-EqRdFxjteCcuLYQ55lpBk&_nc_ad=z-m&_nc_cid=1207&_nc_zt=23&_nc_ht=scontent.cdninstagram.com&_nc_gid=lxnhR-Y9m83rUyxciYgOXQ&oh=00_AflelGpgZMnt4AY6le95tldm_d7RzFRs7Fc61LkWVSr-Pw&oe=69445860'],
+    url: 'https://www.linkedin.com/feed/update/urn:li:activity:7381662568286679040'
+  },
+  {
     id: 'tbwa-neboko',
     title: 'Innovation Revolution NebokoLabs',
     description: 'We had in-depth discussions about the future of Creative Technology and its evolving role within the creative industry—particularly as we navigate the impact of AI.\n\n💡 Creative Technology Is Central to What\'s Next\nAs innovation accelerates, creative technology is becoming a vital part of the creative process—shaping not only how ideas are formed but how experiences are brought to life.\n\n💡 The Field Is Broad, and Needs Clarity\nCreative technology includes a wide range of roles and specializations. Defining these more clearly can help the field mature and improve how we work together across disciplines.',
@@ -124,25 +135,68 @@ const HeroPage: React.FC = () => {
   const [casesLoading, setCasesLoading] = useState(false);
   const [selectedCase, setSelectedCase] = useState<CaseStudy | null>(null);
 
+  // Handle hash navigation on page load (e.g., /#newsletter)
+  useEffect(() => {
+    const scrollToHash = () => {
+      const hash = window.location.hash;
+      if (hash) {
+        const element = document.querySelector(hash);
+        if (element) {
+          // Scroll to element with offset for fixed headers
+          setTimeout(() => {
+            element.scrollIntoView({ behavior: 'smooth', block: 'start' });
+          }, 300);
+        } else {
+          // If element not found yet, try again
+          setTimeout(scrollToHash, 100);
+        }
+      }
+    };
+
+    // Initial scroll on mount
+    scrollToHash();
+
+    // Also listen for hash changes
+    const handleHashChange = () => {
+      scrollToHash();
+    };
+
+    window.addEventListener('hashchange', handleHashChange);
+    return () => window.removeEventListener('hashchange', handleHashChange);
+  }, []);
+
+  // Keyboard navigation for members
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (!selectedMember) return;
+      
+      const currentIndex = members.findIndex(m => m.name === selectedMember.name);
+      
+      if (e.key === 'ArrowLeft') {
+        e.preventDefault();
+        const prevIndex = (currentIndex - 1 + members.length) % members.length;
+        setSelectedMember(members[prevIndex]);
+      } else if (e.key === 'ArrowRight') {
+        e.preventDefault();
+        const nextIndex = (currentIndex + 1) % members.length;
+        setSelectedMember(members[nextIndex]);
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [selectedMember]);
+
   // Fetch case studies from webhook
   useEffect(() => {
     const fetchCases = async () => {
       try {
         setCasesLoading(true);
         const webhookUrl = getWebhookUrl('cases');
-        const username = import.meta.env.VITE_N8N_BASIC_AUTH_USERNAME;
-        const password = import.meta.env.VITE_N8N_BASIC_AUTH_PASSWORD;
 
-        if (!username || !password) {
-          setCasesLoading(false);
-          return;
-        }
-
-        const basicAuth = btoa(`${username}:${password}`);
         const response = await fetch(webhookUrl, {
           method: 'GET',
           headers: {
-            'Authorization': `Basic ${basicAuth}`,
             'Content-Type': 'application/json'
           },
           signal: AbortSignal.timeout(15000)
@@ -253,28 +307,32 @@ const HeroPage: React.FC = () => {
   }, []);
 
   const members: Member[] = [
-    { name: 'Dwayne', image: 'https://cdn.leonardo.ai/users/0bf3594c-4370-4dd3-bfe3-6ab88b8bee22/generations/1f0cc5d6-ffad-6620-98ef-eaff95ce3d9d/gemini-image-2_Transform_the_person_from_the_attached_photo_into_a_smooth_stylized_3D_cartoon_c-0.jpg', role: 'Lead Creative Technologist', bio: 'Passionate about bridging the gap between creativity and technology. Specializes in interactive experiences and emerging tech.' },
-    { name: 'Adina', image: 'https://cdn.leonardo.ai/users/0bf3594c-4370-4dd3-bfe3-6ab88b8bee22/generations/1f0d0844-6761-6690-972f-7328f1f796b2/gemini-image-2_Transform_the_person_from_the_attached_photo_into_a_smooth_stylized_3D_cartoon_c-0.jpg', role: 'Creative Technologist', bio: 'Creative Technologist with a background in fashion, working at the intersection of digital storytelling and computational design. I explore emerging tools and workflows across 3D, hardware, and code, transforming concepts into functional prototypes. My work explores how technology can forge narratives that challenge traditional perspectives.' },
-    { name: 'Deniz', image: 'https://cdn.leonardo.ai/users/0bf3594c-4370-4dd3-bfe3-6ab88b8bee22/generations/1f0d0842-6982-6110-a569-25e91729e045/gemini-image-2_Transform_the_person_from_the_attached_photo_into_a_smooth_stylized_3D_cartoon_c-0.jpg', role: 'Creative Technologist', bio: 'Rotterdam-based creative technologist and interdisciplinary media artist, shaping future-facing experiences through her role at Dentsu Creative Amsterdam and her independent studio, Warpglaze. Her work investigates how emerging technologies and data shape, and are shaped by human and ecological systems, using algorithmic tools to explore themes like nature, speculative futures, biomimicry, and post-anthropocentrism. She explores how technology can sense, respond, or evolve through generative visuals, sound, and interactive systems that reflect on the interconnectedness of living and artificial worlds. Her practice moves between digital and ecological spaces, challenging linear narratives and inviting multi-sensory engagement. Alongside her artistic and industry practices, Deniz teaches at Breda University of Applied Sciences, where she shares her research-driven approach to emerging media and creative technology. Her work has been exhibited internationally, including at the Luxembourg AI Pavilion, NDSM Fuse, Ars Electronica, IMPAKT, Dutch Design Week, The HMM, and DGTL Festival.' },
-    { name: 'Florido', image: 'https://cdn.leonardo.ai/users/0bf3594c-4370-4dd3-bfe3-6ab88b8bee22/generations/1f0d0851-85de-65c0-b989-86760e8ff604/gemini-image-2_Transform_the_person_from_the_attached_photo_into_a_smooth_stylized_3D_cartoon_c-0.jpg', role: 'Creative Technologist', bio: 'Specializes in immersive experiences and spatial computing.' },
-    { name: 'Karoline', image: 'https://cdn.leonardo.ai/users/0bf3594c-4370-4dd3-bfe3-6ab88b8bee22/generations/1f0cc5f0-c164-61b0-b158-fd3192a0b178/gemini-image-2_Transform_the_person_from_the_attached_photo_into_a_smooth_stylized_3D_cartoon_c-0.jpg', role: 'Creative Technologist', bio: `Karoline Winzer is a creative technologist working at the intersection of physical and digital spaces. Inspired by interconnected systems in nature, music, and biology, she blends real-time software, physical computing, and interactive technologies to build experiences that connect people to each other and to their environments. She is currently a creative technologist at 2Heads, where she builds innovative, story-led solutions for live experiential events.` },
-    { name: 'Pax', image: 'https://cdn.leonardo.ai/users/0bf3594c-4370-4dd3-bfe3-6ab88b8bee22/generations/1f0cc978-88a5-6320-924a-e78626bf0fa7/gemini-image-2_Transform_the_person_from_the_attached_photo_into_a_smooth_stylized_3D_cartoon_c-0.jpg', role: 'Creative Technologist', bio: 'As a creative, I use technology as my medium to shape innovative solutions across multiple design disciplines. I see technology &innovation as core values, that enable brands to express themselves.' },
-    { name: 'Joshua', image: 'https://cdn.leonardo.ai/users/0bf3594c-4370-4dd3-bfe3-6ab88b8bee22/generations/1f0d0846-659b-6160-a7f3-9ebe7914d494/gemini-image-2_Transform_the_person_from_the_attached_photo_into_a_smooth_stylized_3D_cartoon_c-0.jpg', role: 'Creative Technologist', bio: 'Innovating at the intersection of creativity and technology.' },
-    { name: 'Jennifer', image: 'https://cdn.leonardo.ai/users/0bf3594c-4370-4dd3-bfe3-6ab88b8bee22/generations/1f0d0847-3695-69f0-bc11-ee26cb3ec314/gemini-image-2_Transform_the_person_from_the_attached_photo_into_a_smooth_stylized_3D_cartoon_c-0.jpg', role: 'Creative Technologist', bio: 'Passionate about creating impactful digital experiences.' },
-    { name: 'Koen', image: 'https://cdn.leonardo.ai/users/0bf3594c-4370-4dd3-bfe3-6ab88b8bee22/generations/1f0d084a-6fb8-6f90-b541-ce33d6476d8f/gemini-image-2_Transform_the_person_from_the_attached_photo_into_a_smooth_stylized_3D_cartoon_c-0.jpg', role: 'Creative Technologist', bio: `creative technologist focused on developing impactful, innovative solutions that blend technology, design, and functionality. With over a decade of experience rapidly prototyping and exploring emerging technologies, I thrive in multidisciplinary teams, collaborating with designers, developers, and other innovators to turn bold ideas into reality.
+    { name: 'Dwayne', image: 'https://cdn.leonardo.ai/users/0bf3594c-4370-4dd3-bfe3-6ab88b8bee22/generations/1f0cc5d6-ffad-6620-98ef-eaff95ce3d9d/gemini-image-2_Transform_the_person_from_the_attached_photo_into_a_smooth_stylized_3D_cartoon_c-0.jpg', role: 'Lead Creative Technologist - AMS', bio: 'Passionate about bridging the gap between creativity and technology. Specializes in interactive experiences and emerging tech.' },
+    { name: 'Adina', image: 'https://cdn.leonardo.ai/users/0bf3594c-4370-4dd3-bfe3-6ab88b8bee22/generations/1f0d0844-6761-6690-972f-7328f1f796b2/gemini-image-2_Transform_the_person_from_the_attached_photo_into_a_smooth_stylized_3D_cartoon_c-0.jpg', role: 'Creative Technologist -UK', bio: 'Creative Technologist with a background in fashion, working at the intersection of digital storytelling and computational design. I explore emerging tools and workflows across 3D, hardware, and code, transforming concepts into functional prototypes. My work explores how technology can forge narratives that challenge traditional perspectives.' },
+    { name: 'Deniz', image: 'https://cdn.leonardo.ai/users/0bf3594c-4370-4dd3-bfe3-6ab88b8bee22/generations/1f0d0842-6982-6110-a569-25e91729e045/gemini-image-2_Transform_the_person_from_the_attached_photo_into_a_smooth_stylized_3D_cartoon_c-0.jpg', role: 'Creative Technologist - AMS', bio: 'Rotterdam-based creative technologist and interdisciplinary media artist, shaping future-facing experiences through her role at Dentsu Creative Amsterdam and her independent studio, Warpglaze. Her work investigates how emerging technologies and data shape, and are shaped by human and ecological systems, using algorithmic tools to explore themes like nature, speculative futures, biomimicry, and post-anthropocentrism. She explores how technology can sense, respond, or evolve through generative visuals, sound, and interactive systems that reflect on the interconnectedness of living and artificial worlds.' },
+    { name: 'Florido', image: 'https://cdn.leonardo.ai/users/0bf3594c-4370-4dd3-bfe3-6ab88b8bee22/generations/1f0d0851-85de-65c0-b989-86760e8ff604/gemini-image-2_Transform_the_person_from_the_attached_photo_into_a_smooth_stylized_3D_cartoon_c-0.jpg', role: 'Creative Technologist - AMS', bio: 'Creative technologist at TBWA, working at the intersection of brand, design, and automation. I help turn strategic ideas into systems that scale, combining brand thinking with hands-on execution across AI workflows, automation, APIs, and custom tooling. From positioning and visual systems to data-driven experiments and media infrastructure, I focus on building things that actually work.' },
+    { name: 'Karoline', image: 'https://cdn.leonardo.ai/users/0bf3594c-4370-4dd3-bfe3-6ab88b8bee22/generations/1f0cc5f0-c164-61b0-b158-fd3192a0b178/gemini-image-2_Transform_the_person_from_the_attached_photo_into_a_smooth_stylized_3D_cartoon_c-0.jpg', role: 'Creative Technologist - UK', bio: `Karoline Winzer is a creative technologist working at the intersection of physical and digital spaces. Inspired by interconnected systems in nature, music, and biology, she blends real-time software, physical computing, and interactive technologies to build experiences that connect people to each other and to their environments. She is currently a creative technologist at 2Heads, where she builds innovative, story-led solutions for live experiential events.` },
+    { name: 'Pax', image: 'https://cdn.leonardo.ai/users/0bf3594c-4370-4dd3-bfe3-6ab88b8bee22/generations/1f0cc978-88a5-6320-924a-e78626bf0fa7/gemini-image-2_Transform_the_person_from_the_attached_photo_into_a_smooth_stylized_3D_cartoon_c-0.jpg', role: 'Creative Technologist - AMS', bio: 'As a creative, I use technology as my medium to shape innovative solutions across multiple design disciplines. I see technology &innovation as core values, that enable brands to express themselves.' },
+    { name: 'Joshua', image: 'https://cdn.leonardo.ai/users/0bf3594c-4370-4dd3-bfe3-6ab88b8bee22/generations/1f0d0846-659b-6160-a7f3-9ebe7914d494/gemini-image-2_Transform_the_person_from_the_attached_photo_into_a_smooth_stylized_3D_cartoon_c-0.jpg', role: 'Creative Technologist - UK', bio: 'Joshua is a Creative Technologist focused on finding innovative ways to deliver brand and advertising at scale. He combines hands-on research with design expertise to build workflows that help creatives work confidently with Generative AI. This approach defines his practice, A-B Studio, where he bridges strategy and execution to bring clarity to complex systems, taking them from A to B.' },
+    { name: 'Jennifer', image: 'https://cdn.leonardo.ai/users/0bf3594c-4370-4dd3-bfe3-6ab88b8bee22/generations/1f0d0847-3695-69f0-bc11-ee26cb3ec314/gemini-image-2_Transform_the_person_from_the_attached_photo_into_a_smooth_stylized_3D_cartoon_c-0.jpg', role: 'Creative Technologist - AMS', bio: 'Passionate about creating impactful digital experiences.' },
+    { name: 'Koen', image: 'https://cdn.leonardo.ai/users/0bf3594c-4370-4dd3-bfe3-6ab88b8bee22/generations/1f0d084a-6fb8-6f90-b541-ce33d6476d8f/gemini-image-2_Transform_the_person_from_the_attached_photo_into_a_smooth_stylized_3D_cartoon_c-0.jpg', role: 'Creative Technologist - AMS', bio: `creative technologist focused on developing impactful, innovative solutions that blend technology, design, and functionality. With over a decade of experience rapidly prototyping and exploring emerging technologies, I thrive in multidisciplinary teams, collaborating with designers, developers, and other innovators to turn bold ideas into reality.
 From experimenting with graphics programming as a curious teenager to building cutting-edge prototypes for web, mobile, AR / VR, and custom hardware, I've always been driven by curiosity and a passion for pushing technical and creative boundaries.` },
-    { name: 'John', image: 'https://cdn.leonardo.ai/users/0bf3594c-4370-4dd3-bfe3-6ab88b8bee22/generations/1f0d0861-a190-6dd0-9325-6f2380bd7a6b/gemini-image-2_Transform_the_person_from_the_attached_photo_into_a_smooth_stylized_3D_cartoon_c-0.jpg', role: 'Creative Technologist', bio: 'Bringing creative vision to life through technology.' },
-    { name: 'Martin', image: 'https://cdn.leonardo.ai/users/0bf3594c-4370-4dd3-bfe3-6ab88b8bee22/generations/1f0d0862-1d8b-6250-917a-d52f548bd1d6/gemini-image-2_Transform_the_person_from_the_attached_photo_into_a_smooth_stylized_3D_cartoon_c-0.jpg', role: 'Creative Technologist', bio: 'Inventive and passionate creative technologist whose work sits at the exciting crossroads of art, design, and technology. With curiosity and a multidisciplinary mindset, Martin blends creativity with technical precision to craft compelling digital experiences and interactive installations.' },
-    { name: 'Rui', image: 'https://cdn.leonardo.ai/users/0bf3594c-4370-4dd3-bfe3-6ab88b8bee22/generations/1f0d0862-7e80-6ec0-b1e7-fc362c7ab00a/gemini-image-2_Transform_the_person_from_the_attached_photo_into_a_smooth_stylized_3D_cartoon_c-0.jpg', role: 'Creative Technologist', bio: 'Passionate about creative coding and interactive design.' },
-    { name: 'Olivia', image: 'https://cdn.leonardo.ai/users/0bf3594c-4370-4dd3-bfe3-6ab88b8bee22/generations/1f0d0863-5e28-6c80-95e4-c59212235f6b/gemini-image-2_Transform_the_person_from_the_attached_photo_into_a_smooth_stylized_3D_cartoon_c-0.jpg', role: 'Creative Technologist', bio: 'Specializes in user experience and creative storytelling.' },
-    { name: 'Edwin', image: 'https://cdn.leonardo.ai/users/0bf3594c-4370-4dd3-bfe3-6ab88b8bee22/generations/1f0d0868-b294-6c60-945a-f3b9e8457fbc/gemini-image-2_Transform_the_person_from_the_attached_photo_into_a_smooth_stylized_3D_cartoon_c-0.jpg', role: 'Creative Technologist', bio: 'Expert in real-time graphics and immersive media.' },
-    { name: 'Rohit', image: 'https://cdn.leonardo.ai/users/0bf3594c-4370-4dd3-bfe3-6ab88b8bee22/generations/1f0d0869-165d-6350-9de3-5837c81f848c/gemini-image-2_Transform_the_person_from_the_attached_photo_into_a_smooth_stylized_3D_cartoon_c-0.jpg', role: 'Creative Technologist', bio: 'Innovating at the intersection of art and technology.' },
-    { name: 'Scy', image: 'https://cdn.leonardo.ai/users/0bf3594c-4370-4dd3-bfe3-6ab88b8bee22/generations/1f0d0869-8b32-6e00-8f79-79dffa4149bd/gemini-image-2_Transform_the_person_from_the_attached_photo_into_a_smooth_stylized_3D_cartoon_c-0.jpg', role: 'Creative Technologist', bio: 'Passionate creative technologist with expertise in interactive design, web development, and digital experiences.' },
-    { name: 'Tom', image: 'https://cdn.leonardo.ai/users/0bf3594c-4370-4dd3-bfe3-6ab88b8bee22/generations/1f0d0869-f72c-67a0-8c84-8bb2da4e14f2/gemini-image-2_Transform_the_person_from_the_attached_photo_into_a_smooth_stylized_3D_cartoon_c-0.jpg', role: 'Creative Technologist', bio: 'Dedicated to crafting memorable digital experiences.' },
-    { name: 'Fernando', image: 'https://cdn.leonardo.ai/users/0bf3594c-4370-4dd3-bfe3-6ab88b8bee22/generations/1f0d0873-b3b2-66a0-a4e8-554462dbf234/gemini-image-2_Transform_the_person_from_the_attached_photo_into_a_smooth_stylized_3D_cartoon_c-0.jpg', role: 'Creative Technologist', bio: 'Passionate about innovative digital experiences.' },
-    { name: 'Christos', image: 'https://cdn.leonardo.ai/users/0bf3594c-4370-4dd3-bfe3-6ab88b8bee22/generations/1f0d0874-2828-6de0-8cf9-86dd7b3665ce/gemini-image-2_Transform_the_person_from_the_attached_photo_into_a_smooth_stylized_3D_cartoon_c-0.jpg', role: 'Creative Technologist', bio: 'As a Creative Technologist, I\'ve gone from playing EDM festivals to creating art installations, from building custom hardware to designing the next generation of AI apps. I just love this field, man.' },
-    { name: 'Erin', image: 'https://cdn.leonardo.ai/users/0bf3594c-4370-4dd3-bfe3-6ab88b8bee22/generations/1f0d4312-5225-6b60-893a-23e509e0935d/gemini-image-2_Transform_the_person_from_the_attached_photo_into_a_smooth_stylized_3D_cartoon_c-0.jpg', role: 'Creative Technologist', bio: 'Expert in creative technology and digital innovation.' },
-    { name: 'Robin Hunter', image: 'https://cdn.leonardo.ai/users/0bf3594c-4370-4dd3-bfe3-6ab88b8bee22/generations/1f0d5cb6-3452-6a80-9d3a-27ff6b84bf07/gemini-image-2_A_cinematic_portrait_photograph_of_Transform_the_person_from_the_attached_photo_-0.jpg', role: 'Creative Technologist', bio: 'Robin studied Creative Computing at Goldsmiths and has been working as a Creative Technologist for the last decade. He has built all kinds of things from esoteric trend websites to eye controlled keyboards for people with MND. He currently works at Burberry exploring how new technologies can bring a heritage brand to life in new ways.' }
+    { name: 'John', image: 'https://cdn.leonardo.ai/users/0bf3594c-4370-4dd3-bfe3-6ab88b8bee22/generations/1f0d0861-a190-6dd0-9325-6f2380bd7a6b/gemini-image-2_Transform_the_person_from_the_attached_photo_into_a_smooth_stylized_3D_cartoon_c-0.jpg', role: 'Creative Technologist - UK', bio: 'John Nussey is a designer, technologist, and entrepreneur whose work lies at the intersection of electronics, materials, and human experience. He is co-founder and director of ONN Studio, where for over a decade he has led projects combining physical computing, sensor systems, and crafted interfaces across domains from product innovation to installations.' },
+    { name: 'Martin', image: 'https://cdn.leonardo.ai/users/0bf3594c-4370-4dd3-bfe3-6ab88b8bee22/generations/1f0d0862-1d8b-6250-917a-d52f548bd1d6/gemini-image-2_Transform_the_person_from_the_attached_photo_into_a_smooth_stylized_3D_cartoon_c-0.jpg', role: 'Creative Technologist - AMS', bio: 'Inventive and passionate creative technologist whose work sits at the exciting crossroads of art, design, and technology. With curiosity and a multidisciplinary mindset, Martin blends creativity with technical precision to craft compelling digital experiences and interactive installations.' },
+    { name: 'Rui', image: 'https://cdn.leonardo.ai/users/0bf3594c-4370-4dd3-bfe3-6ab88b8bee22/generations/1f0d0862-7e80-6ec0-b1e7-fc362c7ab00a/gemini-image-2_Transform_the_person_from_the_attached_photo_into_a_smooth_stylized_3D_cartoon_c-0.jpg', role: 'Creative Technologist - PT', bio: `{
+  "system-message": "You are Rui, a compulsive researcher and creative technologist, with background in copywriting, strategy and academic research. Currently, you lead a team of AI generalists who work every day to find new ways of expressing creativity through technology. You think in systems, you are always in beta, and you nail pitch decks. Avoid verbosity."
+}` },
+    { name: 'Olivia', image: 'https://cdn.leonardo.ai/users/0bf3594c-4370-4dd3-bfe3-6ab88b8bee22/generations/1f0d0863-5e28-6c80-95e4-c59212235f6b/gemini-image-2_Transform_the_person_from_the_attached_photo_into_a_smooth_stylized_3D_cartoon_c-0.jpg', role: 'Creative Technologist - UK', bio: 'Olivia is a creative technologist, digital artist and educator working at the intersection of emerging tech and culture. Her work is rooted in the multi-sensory, using real-time reactive technologies to shape and create immersive spaces, inviting audiences to surrender to the moment, connect more deeply with themselves and one another.' },
+    { name: 'Edwin', image: 'https://cdn.leonardo.ai/users/0bf3594c-4370-4dd3-bfe3-6ab88b8bee22/generations/1f0d0868-b294-6c60-945a-f3b9e8457fbc/gemini-image-2_Transform_the_person_from_the_attached_photo_into_a_smooth_stylized_3D_cartoon_c-0.jpg', role: 'Creative Technologist - AMS', bio: `Edwin Nikkels operates at the intersection of storytelling, design, and emerging technology. With over twenty years of experience across film, television, games, interactive media, and advertising, his work is rooted in narrative craft while constantly evolving alongside new creative tools.
+As a creative technologist and educator, Edwin focuses on making complex technologies-especially generative AI and immersive media-accessible, playful, and meaningful. He believes technology should expand human creativity rather than replace it, and much of his work centers on reducing fear around AI by turning it into a hands-on, collaborative experience.` },
+    { name: 'Rohit', image: 'https://cdn.leonardo.ai/users/0bf3594c-4370-4dd3-bfe3-6ab88b8bee22/generations/1f0d0869-165d-6350-9de3-5837c81f848c/gemini-image-2_Transform_the_person_from_the_attached_photo_into_a_smooth_stylized_3D_cartoon_c-0.jpg', role: 'Creative Technologist - ES', bio: 'Rohit Gupta is an engineer, designer, and researcher whose work lies at the intersection of strategy, emerging technologies, and prototyping. He runs Studio-021, where he helps clients bring ideas to life in domains like innovation, art, AI, marketing, and fabrication.' },
+    { name: 'Scy', image: 'https://cdn.leonardo.ai/users/0bf3594c-4370-4dd3-bfe3-6ab88b8bee22/generations/1f0d0869-8b32-6e00-8f79-79dffa4149bd/gemini-image-2_Transform_the_person_from_the_attached_photo_into_a_smooth_stylized_3D_cartoon_c-0.jpg', role: 'Creative Technologist - AMS', bio: 'Passionate creative technologist with expertise in interactive design, web development, and digital experiences.' },
+    { name: 'Tom', image: 'https://cdn.leonardo.ai/users/0bf3594c-4370-4dd3-bfe3-6ab88b8bee22/generations/1f0d8f40-f643-6290-a707-37753de6301e/gemini-image-2_a_stunning_illustration_of_Transform_the_person_from_the_attached_photo_into_a_s-0.jpg', role: 'Creative Technologist - DE', bio: 'Hamburg-based Creative Technologist who sees himself as half creative, half nerd, right at home where design, technology, and innovation meet. I started out designing graphical user interfaces but have spent the past ten years exploring the technical side of human–machine interaction. Today, I combine my design and technical skills to create digital brand experiences for people, brands, and businesses.' },
+    { name: 'Fernando', image: 'https://cdn.leonardo.ai/users/0bf3594c-4370-4dd3-bfe3-6ab88b8bee22/generations/1f0d0873-b3b2-66a0-a4e8-554462dbf234/gemini-image-2_Transform_the_person_from_the_attached_photo_into_a_smooth_stylized_3D_cartoon_c-0.jpg', role: 'Creative Technologist - AMS', bio: 'Passionate about innovative digital experiences.' },
+    { name: 'Christos', image: 'https://cdn.leonardo.ai/users/0bf3594c-4370-4dd3-bfe3-6ab88b8bee22/generations/1f0d0874-2828-6de0-8cf9-86dd7b3665ce/gemini-image-2_Transform_the_person_from_the_attached_photo_into_a_smooth_stylized_3D_cartoon_c-0.jpg', role: 'Creative Technologist - AMS', bio: 'As a Creative Technologist, I\'ve gone from playing EDM festivals to creating art installations, from building custom hardware to designing the next generation of AI apps. I just love this field, man.' },
+    { name: 'Erin', image: 'https://cdn.leonardo.ai/users/0bf3594c-4370-4dd3-bfe3-6ab88b8bee22/generations/1f0d4312-5225-6b60-893a-23e509e0935d/gemini-image-2_Transform_the_person_from_the_attached_photo_into_a_smooth_stylized_3D_cartoon_c-0.jpg', role: 'Creative Technologist - UK', bio: 'Leading AI innovation within creative agencies, helping brands reshape workflows and ideas through rapid prototyping, showing teams that technology is not a barrier but the future of their best work, turning half formed concepts into playful interactive demos for clients and pitches.' },
+    { name: 'Robin Hunter', image: 'https://cdn.leonardo.ai/users/0bf3594c-4370-4dd3-bfe3-6ab88b8bee22/generations/1f0d5cb6-3452-6a80-9d3a-27ff6b84bf07/gemini-image-2_A_cinematic_portrait_photograph_of_Transform_the_person_from_the_attached_photo_-0.jpg', role: 'Creative Technologist - UK', bio: 'Robin studied Creative Computing at Goldsmiths and has been working as a Creative Technologist for the last decade. He has built all kinds of things from esoteric trend websites to eye controlled keyboards for people with MND. He currently works at Burberry exploring how new technologies can bring a heritage brand to life in new ways.' },
+    { name: 'Job', image: 'https://cdn.leonardo.ai/users/0bf3594c-4370-4dd3-bfe3-6ab88b8bee22/generations/1f0d8d86-69da-6b70-a7de-33cbf308cd24/gemini-image-2_a_stunning_illustration_of_Transform_the_person_from_the_attached_photo_into_a_s-0.jpg', role: 'Creative Technologist - AMS', bio: 'Creative Technologist, elevating brand and loyalty concepts through intelligent tools and creative workflows' }
   ];
 
   return (
@@ -326,7 +384,7 @@ From experimenting with graphics programming as a curious teenager to building c
           {/* Bottom Stats/Info */}
           <div className="flex gap-12 mt-20 pt-8 border-t border-zinc-800">
             <div>
-              <span className="block text-3xl font-primary font-medium">24</span>
+              <span className="block text-3xl font-primary font-medium">25</span>
               <span className="text-xs font-secondary text-zinc-500 tracking-wide uppercase">Members</span>
             </div>
             <div>
@@ -381,14 +439,9 @@ From experimenting with graphics programming as a curious teenager to building c
             Our Mission
           </span>
           <h2 className="text-3xl md:text-5xl lg:text-7xl font-primary font-medium leading-tight text-white mb-8">
-            "To establish Creative Technology as a pioneering discipline through partnerships, experimentation, and demonstration—empowering practitioners to shape what's next."
+            "To establish Creative Technology as a pioneering discipline through partnerships, experimentation, and demonstration—empowering practitioners to shape{'\u00A0'}what's{'\u00A0'}next."
           </h2>
-          <button
-            onClick={() => navigate('/mission')}
-            className="mt-8 px-8 py-4 border border-zinc-700 text-white font-secondary text-sm tracking-wide hover:border-zinc-500 hover:bg-white/5 transition-all"
-          >
-            Read More About Us
-          </button>
+         
         </div>
       </section>
 
@@ -437,19 +490,9 @@ From experimenting with graphics programming as a curious teenager to building c
                   <h3 className="text-4xl md:text-5xl font-primary font-medium text-white mb-6">
                     {selectedMember.name}
                   </h3>
-                  <p className="text-zinc-400 font-secondary text-lg leading-relaxed mb-8">
+                  <p className="text-zinc-400 font-secondary text-lg leading-relaxed">
                     {selectedMember.bio}
                   </p>
-                  <button
-                    onClick={() => {
-                      setSelectedMember(null);
-                      navigate('/members');
-                    }}
-                    className="self-start text-sm font-secondary text-zinc-400 hover:text-white transition-colors flex items-center gap-2"
-                  >
-                    View Full Profile
-                    <span>→</span>
-                  </button>
                 </div>
               </div>
             </div>
@@ -461,7 +504,13 @@ From experimenting with graphics programming as a curious teenager to building c
               <div 
                 key={member.name}
                 className="group relative aspect-square overflow-hidden bg-zinc-900 cursor-pointer"
-                onClick={() => setSelectedMember(member)}
+                onClick={() => {
+                  setSelectedMember(member);
+                  const element = document.getElementById('members');
+                  if (element) {
+                    element.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                  }
+                }}
               >
                 <img 
                   src={member.image} 
@@ -491,7 +540,7 @@ From experimenting with graphics programming as a curious teenager to building c
                 Our Partners
               </span>
               <h2 className="text-4xl md:text-5xl lg:text-6xl font-primary font-medium text-white">
-                Trusted By
+                Who support our mission
               </h2>
             </div>
            
@@ -500,14 +549,18 @@ From experimenting with graphics programming as a curious teenager to building c
           {/* Partners Grid */}
           <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-8">
             {[
-              { name: 'Leonardo AI', image: '/sponsors/Leonardo-AI.png' },
-              { name: 'Luma Labs', image: '/sponsors/Lumalabs.png' },
-              { name: 'Universe Studio', image: 'https://media.licdn.com/dms/image/v2/D4E0BAQEZsLFh44YUmg/company-logo_200_200/company-logo_200_200/0/1737543260484/universestudio_logo?e=2147483647&v=beta&t=pRjz_r3U2hi7cC6yR4xp8YgW3TWrjqtc1hCC_i_zxDc' },
-              { name: 'Solaya', image: '/collaborations/solaya/icon_solaya.png' },
+              { name: 'Leonardo AI', image: '/sponsors/Leonardo-AI.png', url: 'https://leonardo.ai' },
+              { name: 'Luma Labs', image: '/sponsors/Lumalabs.png', url: 'https://lumalabs.ai' },
+              { name: 'Kiri Engine', image: '/sponsors/KIRI.png', url: 'https://www.kiriengine.app/' },
+              { name: 'Universe Studio', image: 'https://media.licdn.com/dms/image/v2/D4E0BAQEZsLFh44YUmg/company-logo_200_200/company-logo_200_200/0/1737543260484/universestudio_logo?e=2147483647&v=beta&t=pRjz_r3U2hi7cC6yR4xp8YgW3TWrjqtc1hCC_i_zxDc', url: 'https://universestudio.xyz/' },
+              { name: 'Solaya', image: '/collaborations/solaya/icon_solaya.png', url: 'https://www.solaya.ai/' },
             ].map((partner) => (
-              <div 
+              <a 
                 key={partner.name}
-                className="group flex flex-col items-center justify-center p-6 bg-zinc-900/50 hover:bg-zinc-800/50 transition-all duration-300"
+                href={partner.url}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="group flex flex-col items-center justify-center p-6 bg-zinc-900/50 hover:bg-zinc-800/50 transition-all duration-300 cursor-pointer"
               >
                 <div className="flex items-center justify-center h-20 mb-4">
                   <img 
@@ -519,7 +572,7 @@ From experimenting with graphics programming as a curious teenager to building c
                 <span className="text-zinc-400 group-hover:text-white font-secondary text-sm text-center transition-colors duration-300">
                   {partner.name}
                 </span>
-              </div>
+              </a>
             ))}
           </div>
 
@@ -606,25 +659,6 @@ From experimenting with graphics programming as a curious teenager to building c
                     </div>
                   )}
 
-                  {selectedCase.url ? (
-                    <a
-                      href={selectedCase.url}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="self-start text-sm font-secondary text-zinc-400 hover:text-white transition-colors flex items-center gap-2"
-                    >
-                      View Project
-                      <span>→</span>
-                    </a>
-                  ) : (
-                    <button
-                      onClick={() => navigate('/contact')}
-                      className="self-start text-sm font-secondary text-zinc-400 hover:text-white transition-colors flex items-center gap-2"
-                    >
-                      Want to collaborate?
-                      <span>→</span>
-                    </button>
-                  )}
                 </div>
               </div>
             </div>
