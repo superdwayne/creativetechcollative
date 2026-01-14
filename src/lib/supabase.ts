@@ -1,6 +1,13 @@
 import { createClient } from '@supabase/supabase-js';
 import type { NetworkProfile, ProfileFormData } from '@/types/network-profile';
-import type { Company, CompanyCreateData, CompanyUpdateData } from '@/types/job-matching';
+import type {
+  Company,
+  CompanyCreateData,
+  CompanyUpdateData,
+  JobSubmission,
+  JobSubmissionCreateData,
+  JobStatus,
+} from '@/types/job-matching';
 import { getWebhookUrl } from '@/utils/webhookUtils';
 
 const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
@@ -713,5 +720,179 @@ export async function updateCompany(
   } catch (error: any) {
     console.error('Error updating company:', error);
     return { success: false, error: error.message || 'Failed to update company' };
+  }
+}
+
+// =============================================================================
+// JOB SUBMISSION FUNCTIONS
+// =============================================================================
+
+/**
+ * Helper function to convert database row to JobSubmission interface
+ */
+function rowToJobSubmission(row: any): JobSubmission {
+  return {
+    id: row.id,
+    companyId: row.company_id,
+    title: row.title,
+    description: row.description,
+    requirements: row.requirements,
+    preferredSkills: row.preferred_skills,
+    focusAreas: row.focus_areas,
+    budgetRange: row.budget_range,
+    projectType: row.project_type,
+    remotePreference: row.remote_preference,
+    location: row.location,
+    timeline: row.timeline,
+    status: row.status,
+    adminNotes: row.admin_notes,
+    createdAt: row.created_at,
+    updatedAt: row.updated_at,
+  };
+}
+
+/**
+ * Create a new job submission for a company
+ */
+export async function createJobSubmission(
+  companyId: string,
+  data: JobSubmissionCreateData
+): Promise<{ success: boolean; jobSubmission?: JobSubmission; error?: string }> {
+  if (!supabase) {
+    return { success: false, error: 'Database not configured' };
+  }
+
+  try {
+    const jobData = {
+      company_id: companyId,
+      title: data.title,
+      description: data.description,
+      requirements: data.requirements || null,
+      preferred_skills: data.preferredSkills || null,
+      focus_areas: data.focusAreas || null,
+      budget_range: data.budgetRange || null,
+      project_type: data.projectType,
+      remote_preference: data.remotePreference,
+      location: data.location || null,
+      timeline: data.timeline || null,
+    };
+
+    const { data: row, error } = await supabase
+      .from('job_submissions')
+      .insert(jobData)
+      .select()
+      .single();
+
+    if (error) throw error;
+
+    return { success: true, jobSubmission: rowToJobSubmission(row) };
+  } catch (error: any) {
+    console.error('Error creating job submission:', error);
+    return { success: false, error: error.message || 'Failed to create job submission' };
+  }
+}
+
+/**
+ * Get all job submissions for a company
+ */
+export async function getJobSubmissionsByCompany(
+  companyId: string
+): Promise<JobSubmission[]> {
+  if (!supabase) return [];
+
+  try {
+    const { data, error } = await supabase
+      .from('job_submissions')
+      .select('*')
+      .eq('company_id', companyId)
+      .order('created_at', { ascending: false });
+
+    if (error || !data) return [];
+
+    return data.map(rowToJobSubmission);
+  } catch (error) {
+    console.error('Error fetching job submissions by company:', error);
+    return [];
+  }
+}
+
+/**
+ * Get a single job submission by ID
+ */
+export async function getJobSubmissionById(id: string): Promise<JobSubmission | null> {
+  if (!supabase) return null;
+
+  try {
+    const { data, error } = await supabase
+      .from('job_submissions')
+      .select('*')
+      .eq('id', id)
+      .single();
+
+    if (error || !data) return null;
+
+    return rowToJobSubmission(data);
+  } catch (error) {
+    console.error('Error fetching job submission by ID:', error);
+    return null;
+  }
+}
+
+/**
+ * Update job submission status and optional admin notes
+ */
+export async function updateJobSubmissionStatus(
+  id: string,
+  status: JobStatus,
+  adminNotes?: string
+): Promise<{ success: boolean; jobSubmission?: JobSubmission; error?: string }> {
+  if (!supabase) {
+    return { success: false, error: 'Database not configured' };
+  }
+
+  try {
+    const updateData: Record<string, any> = {
+      status,
+    };
+
+    if (adminNotes !== undefined) {
+      updateData.admin_notes = adminNotes;
+    }
+
+    const { data: row, error } = await supabase
+      .from('job_submissions')
+      .update(updateData)
+      .eq('id', id)
+      .select()
+      .single();
+
+    if (error) throw error;
+
+    return { success: true, jobSubmission: rowToJobSubmission(row) };
+  } catch (error: any) {
+    console.error('Error updating job submission status:', error);
+    return { success: false, error: error.message || 'Failed to update job submission status' };
+  }
+}
+
+/**
+ * Get all pending job submissions for admin review
+ */
+export async function getAllPendingJobSubmissions(): Promise<JobSubmission[]> {
+  if (!supabase) return [];
+
+  try {
+    const { data, error } = await supabase
+      .from('job_submissions')
+      .select('*')
+      .eq('status', 'pending')
+      .order('created_at', { ascending: true });
+
+    if (error || !data) return [];
+
+    return data.map(rowToJobSubmission);
+  } catch (error) {
+    console.error('Error fetching pending job submissions:', error);
+    return [];
   }
 }

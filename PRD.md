@@ -150,13 +150,13 @@ The matching engine will be API-first (no UI initially), with an admin review wo
 **Description:** As a developer, I need CRUD functions for job submission management.
 
 **Acceptance Criteria:**
-- [ ] Add `createJobSubmission(companyId, data)` function
-- [ ] Add `getJobSubmissionsByCompany(companyId)` function - list company's jobs
-- [ ] Add `getJobSubmissionById(id)` function - fetch single job
-- [ ] Add `updateJobSubmissionStatus(id, status, adminNotes?)` function
-- [ ] Add `getAllPendingJobSubmissions()` function - for admin review
-- [ ] All functions include proper error handling and typing
-- [ ] Typecheck passes
+- [x] Add `createJobSubmission(companyId, data)` function
+- [x] Add `getJobSubmissionsByCompany(companyId)` function - list company's jobs
+- [x] Add `getJobSubmissionById(id)` function - fetch single job
+- [x] Add `updateJobSubmissionStatus(id, status, adminNotes?)` function
+- [x] Add `getAllPendingJobSubmissions()` function - for admin review
+- [x] All functions include proper error handling and typing
+- [x] Typecheck passes
 
 ---
 

@@ -8,7 +8,7 @@
 - [x] US-005: Add embedding column to network_profiles
 - [x] US-006: Create TypeScript types for new tables
 - [x] US-007: Create Supabase client functions for companies
-- [ ] US-008: Create Supabase client functions for job submissions
+- [x] US-008: Create Supabase client functions for job submissions
 - [ ] US-009: Create Supabase client functions for job matches
 - [ ] US-010: Create profile embedding generation utility
 - [ ] US-011: Create job spec embedding generation utility
@@ -125,4 +125,23 @@
   - Use snake_case for DB columns, camelCase for TypeScript properties
   - Handle partial updates by checking `!== undefined` before adding to update object
   - Types are imported from `@/types/job-matching` (Company, CompanyCreateData, CompanyUpdateData)
+---
+
+## Iteration 8 - US-008: Create Supabase client functions for job submissions
+- What was implemented: Added CRUD functions for job submissions following the company functions pattern
+- Files changed:
+  - src/lib/supabase.ts (modified) - added job submission functions
+- Functions added:
+  - `rowToJobSubmission(row)` - helper to convert DB row to JobSubmission interface
+  - `createJobSubmission(companyId, data)` - creates job submission linked to company
+  - `getJobSubmissionsByCompany(companyId)` - fetches all jobs for a company, ordered by created_at desc
+  - `getJobSubmissionById(id)` - fetches single job submission
+  - `updateJobSubmissionStatus(id, status, adminNotes?)` - updates status with optional admin notes
+  - `getAllPendingJobSubmissions()` - fetches pending jobs for admin review, ordered by created_at asc
+- Learnings for future iterations:
+  - Follow existing pattern: helper function to convert row → interface
+  - Return `{ success, data?, error? }` for mutation functions, direct data/null for reads
+  - Use `|| null` for optional fields when inserting to database
+  - Order matters: ascending for admin queues (oldest first), descending for user lists (newest first)
+  - Import types from `@/types/job-matching` (JobSubmission, JobSubmissionCreateData, JobStatus)
 ---
