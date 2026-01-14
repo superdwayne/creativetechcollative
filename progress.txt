@@ -17,7 +17,7 @@
 - [x] US-014: Create batch profile enrichment API endpoint
 - [x] US-015: Create vector similarity search function
 - [x] US-016: Create Claude match ranking utility
-- [ ] US-017: Create main matching engine function
+- [x] US-017: Create main matching engine function
 - [ ] US-018: Create job matching API endpoint
 - [ ] US-019: Create job submission API endpoint
 - [ ] US-020: Create admin match review API endpoint
@@ -309,4 +309,28 @@
   - Claude model string: `anthropic('claude-sonnet-4-20250514')` for balanced cost/quality
   - Zod schemas can include `.describe()` for better AI understanding of field purposes
   - Use `process.env.ANTHROPIC_API_KEY` for API key configuration
+---
+
+## Iteration 17 - US-017: Create main matching engine function
+- What was implemented: Created the core matching engine that orchestrates the full job matching pipeline
+- Files changed:
+  - src/lib/matching-engine.ts (new) - main matching engine function
+- Functions added:
+  - `runJobMatching(jobId)` - main function that runs the complete matching pipeline
+  - `MatchingResult` interface - typed result for the matching operation
+- Features:
+  - Fetches job submission from database
+  - Generates embedding for job spec using `generateJobEmbedding()`
+  - Performs vector similarity search with `findSimilarProfiles()` (top 20 candidates, 0.3 threshold)
+  - Sends top 10 candidates to Claude for detailed analysis via `rankMatchesWithClaude()`
+  - Creates job_matches records in database with `createJobMatches()`
+  - Updates job status to 'matched' via `updateJobSubmissionStatus()`
+  - Returns array of created matches plus metadata (candidateCounts, overallAnalysis)
+  - Includes error handling at each pipeline step with specific error messages
+- Learnings for future iterations:
+  - Import existing utilities from their modules: embeddings.ts, claude-ranking.ts, supabase.ts
+  - Use configurable constants for limits (VECTOR_SEARCH_LIMIT=20, CLAUDE_ANALYSIS_LIMIT=10, SIMILARITY_THRESHOLD=0.3)
+  - Return detailed result metadata (vectorCandidatesCount, claudeAnalyzedCount) for debugging/logging
+  - Handle edge cases: no candidates found, status update failure (non-blocking)
+  - Use console.log with module prefix `[MatchingEngine]` for debugging
 ---

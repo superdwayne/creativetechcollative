@@ -274,15 +274,15 @@ The matching engine will be API-first (no UI initially), with an admin review wo
 **Description:** As a developer, I need the core matching engine that orchestrates the full matching pipeline.
 
 **Acceptance Criteria:**
-- [ ] Create `runJobMatching(jobId)` function
-- [ ] Fetches job submission from database
-- [ ] Generates embedding for job spec
-- [ ] Performs vector similarity search (top 20 candidates)
-- [ ] Calls Claude ranking for detailed analysis (top 10)
-- [ ] Creates job_matches records in database
-- [ ] Updates job status to 'matched'
-- [ ] Returns array of created matches
-- [ ] Typecheck passes
+- [x] Create `runJobMatching(jobId)` function
+- [x] Fetches job submission from database
+- [x] Generates embedding for job spec
+- [x] Performs vector similarity search (top 20 candidates)
+- [x] Calls Claude ranking for detailed analysis (top 10)
+- [x] Creates job_matches records in database
+- [x] Updates job status to 'matched'
+- [x] Returns array of created matches
+- [x] Typecheck passes
 
 ---
 
