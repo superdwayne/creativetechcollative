@@ -362,13 +362,13 @@ The matching engine will be API-first (no UI initially), with an admin review wo
 **Description:** As a developer, I need an API endpoint for admins to list and filter all job submissions.
 
 **Acceptance Criteria:**
-- [ ] Create `/api/admin/jobs.ts` edge function
-- [ ] Returns paginated list of job submissions
-- [ ] Supports filtering by status (pending, reviewed, matched, closed)
-- [ ] Includes company name and match count for each job
-- [ ] Supports sorting by created_at, status
-- [ ] Requires admin authentication
-- [ ] Typecheck passes
+- [x] Create `/api/admin/jobs.ts` edge function
+- [x] Returns paginated list of job submissions
+- [x] Supports filtering by status (pending, reviewed, matched, closed)
+- [x] Includes company name and match count for each job
+- [x] Supports sorting by created_at, status
+- [x] Requires admin authentication
+- [x] Typecheck passes
 
 ---
 
