@@ -4,7 +4,7 @@
 - [x] US-001: Enable pgvector extension in Supabase
 - [x] US-002: Create companies table schema
 - [x] US-003: Create job_submissions table schema
-- [ ] US-004: Create job_matches table schema
+- [x] US-004: Create job_matches table schema
 - [ ] US-005: Add embedding column to network_profiles
 - [ ] US-006: Create TypeScript types for new tables
 - [ ] US-007: Create Supabase client functions for companies
@@ -66,4 +66,17 @@
   - Use IN clause in RLS for clarity when checking against a subquery result
   - VARCHAR(50) is sufficient for status/type enum-like fields
   - TEXT[] for array columns like preferred_skills and focus_areas
+---
+
+## Iteration 4 - US-004: Create job_matches table schema
+- What was implemented: Created SQL migration for job_matches table to store AI-generated matches between jobs and profiles
+- Files changed:
+  - supabase/migrations/006_create_job_matches.sql (new)
+- Learnings for future iterations:
+  - Use CHECK constraint with range for numeric scores (e.g., match_score >= 0 AND match_score <= 100)
+  - UNIQUE constraint can be defined using CONSTRAINT name UNIQUE (col1, col2) syntax
+  - RLS policies can allow multiple access patterns (companies see approved matches, members see their own matches)
+  - Use BOOLEAN DEFAULT NULL for three-state fields (null=pending, true/false for decided)
+  - JSONB for flexible structured data like skill_matches
+  - Add COMMENT ON TABLE and COMMENT ON COLUMN for schema documentation
 ---

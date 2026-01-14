@@ -85,7 +85,7 @@ The matching engine will be API-first (no UI initially), with an admin review wo
 **Description:** As a developer, I need a job_matches table to store AI-generated matches between jobs and members.
 
 **Acceptance Criteria:**
-- [ ] Create `job_matches` table with columns:
+- [x] Create `job_matches` table with columns:
   - `id` (UUID, primary key)
   - `job_id` (UUID, FK to job_submissions.id, not null)
   - `profile_id` (UUID, FK to network_profiles.id, not null)
@@ -97,11 +97,11 @@ The matching engine will be API-first (no UI initially), with an admin review wo
   - `member_notified` (BOOLEAN, default false)
   - `member_response` (VARCHAR 50, nullable) - interested/not-interested/no-response
   - `created_at` (TIMESTAMP, default now())
-- [ ] Add unique constraint on (job_id, profile_id)
-- [ ] Add indexes on job_id, profile_id, match_score, admin_approved
-- [ ] Add RLS policies: admins full access, companies see approved matches for own jobs
-- [ ] Migration runs successfully
-- [ ] Typecheck passes
+- [x] Add unique constraint on (job_id, profile_id)
+- [x] Add indexes on job_id, profile_id, match_score, admin_approved
+- [x] Add RLS policies: admins full access, companies see approved matches for own jobs
+- [x] Migration runs successfully
+- [x] Typecheck passes
 
 ---
 
