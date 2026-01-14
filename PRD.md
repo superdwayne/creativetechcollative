@@ -376,13 +376,13 @@ The matching engine will be API-first (no UI initially), with an admin review wo
 **Description:** As a developer, I need an API endpoint for admins to view matches for a specific job.
 
 **Acceptance Criteria:**
-- [ ] Create `/api/admin/matches.ts` edge function
-- [ ] Accepts jobId query parameter
-- [ ] Returns all matches for the job with full profile details
-- [ ] Includes match_score, match_reasoning, admin_approved status
-- [ ] Orders by match_score descending
-- [ ] Requires admin authentication
-- [ ] Typecheck passes
+- [x] Create `/api/admin/matches.ts` edge function
+- [x] Accepts jobId query parameter
+- [x] Returns all matches for the job with full profile details
+- [x] Includes match_score, match_reasoning, admin_approved status
+- [x] Orders by match_score descending
+- [x] Requires admin authentication
+- [x] Typecheck passes
 
 ---
 

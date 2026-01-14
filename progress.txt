@@ -23,8 +23,8 @@
 - [x] US-020: Create admin match review API endpoint
 - [x] US-021: Create company registration API endpoint
 - [x] US-022: Create webhook for member match notification
-- [ ] US-023: Create admin jobs list API endpoint
-- [ ] US-024: Create admin matches list API endpoint
+- [x] US-023: Create admin jobs list API endpoint
+- [x] US-024: Create admin matches list API endpoint
 - [ ] US-025: Add environment variables documentation
 
 ## Learnings
@@ -449,4 +449,45 @@
   - Split complex operations into small helper functions for better testability
   - Use process.env (not import.meta.env) for code that runs in Edge Functions
   - Webhook uses Basic Auth: Buffer.from(`${username}:${password}`).toString('base64')
+---
+
+## Iteration 23 - US-023: Create admin jobs list API endpoint
+- What was implemented: Created Vercel Edge Function for admins to list, filter, and paginate all job submissions with company info and match counts
+- Files changed:
+  - api/admin/jobs.ts (new) - admin jobs list endpoint
+- Features:
+  - GET `/api/admin/jobs` with query parameters for filtering and pagination
+  - Query params: status (pending/reviewed/matched/closed/rejected), sortBy (created_at/status), sortOrder (asc/desc), page, limit
+  - Returns paginated response with jobs array and pagination metadata (page, limit, total, totalPages)
+  - Each job includes companyName (from companies table) and matchCount (from job_matches table)
+  - Validates query params using Zod schema with coercion for numeric params
+  - Requires admin authentication via ADMIN_USER_IDS env var
+- Learnings for future iterations:
+  - Admin endpoints can live in api/admin/ subdirectory for organization
+  - Use `z.coerce.number()` to convert string query params to numbers
+  - Supabase `.select('*', { count: 'exact' })` returns total count for pagination
+  - Use `.range(offset, offset + limit - 1)` for pagination (inclusive range)
+  - Fetch related data (companies, match counts) in separate queries and join with Map
+  - Use `[...new Set(array)]` to get unique values (e.g., unique company IDs)
+---
+
+## Iteration 24 - US-024: Create admin matches list API endpoint
+- What was implemented: Created Vercel Edge Function for admins to view all matches for a specific job with full profile details
+- Files changed:
+  - api/admin/matches.ts (new) - admin matches list endpoint
+- Features:
+  - GET `/api/admin/matches?jobId={uuid}` returns all matches for a job
+  - Returns matches ordered by match_score descending (best matches first)
+  - Each match includes full profile details (name, email, bio, skills, focusAreas, availability, URLs)
+  - Includes match_score, match_reasoning, skillMatches, admin_approved, member_notified, member_response
+  - Validates jobId as UUID using Zod schema
+  - Returns 404 if job doesn't exist
+  - Requires admin authentication via ADMIN_USER_IDS env var
+- Learnings for future iterations:
+  - Follow api/admin/jobs.ts pattern for admin-only endpoints
+  - Use two-step query: fetch matches first, then fetch related profiles using `.in()` for IDs
+  - Create Map lookup for joining related data efficiently
+  - Provide sensible defaults for missing profile data (e.g., Unknown for fullName)
+  - Response interfaces should include nested objects (MatchWithProfile contains ProfileDetails)
+  - Use `Omit<T, 'field'>` TypeScript utility when combining partial data
 ---
