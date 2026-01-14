@@ -319,13 +319,13 @@ The matching engine will be API-first (no UI initially), with an admin review wo
 **Description:** As a developer, I need an API endpoint for admins to approve/reject matches.
 
 **Acceptance Criteria:**
-- [ ] Create `/api/review-match.ts` edge function
-- [ ] Accepts matchId, approved (boolean), adminNotes (optional)
-- [ ] Updates job_match record with approval status
-- [ ] If approved, optionally triggers member notification
-- [ ] Returns updated match record
-- [ ] Requires admin authentication
-- [ ] Typecheck passes
+- [x] Create `/api/review-match.ts` edge function
+- [x] Accepts matchId, approved (boolean), adminNotes (optional)
+- [x] Updates job_match record with approval status
+- [x] If approved, optionally triggers member notification
+- [x] Returns updated match record
+- [x] Requires admin authentication
+- [x] Typecheck passes
 
 ---
 

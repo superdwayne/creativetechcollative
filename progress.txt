@@ -20,7 +20,7 @@
 - [x] US-017: Create main matching engine function
 - [x] US-018: Create job matching API endpoint
 - [x] US-019: Create job submission API endpoint
-- [ ] US-020: Create admin match review API endpoint
+- [x] US-020: Create admin match review API endpoint
 - [ ] US-021: Create company registration API endpoint
 - [ ] US-022: Create webhook for member match notification
 - [ ] US-023: Create admin jobs list API endpoint
@@ -380,4 +380,26 @@
   - Check if user has a company before allowing job submission (one company per user)
   - Return 403 when user lacks company registration
   - Send webhook notifications asynchronously (don't throw on failure)
+---
+
+## Iteration 20 - US-020: Create admin match review API endpoint
+- What was implemented: Created Vercel Edge Function for admins to approve/reject job matches with member notification
+- Files changed:
+  - api/review-match.ts (new) - admin match review endpoint
+- Features:
+  - POST `/api/review-match` accepts matchId, approved (boolean), adminNotes (optional)
+  - Validates matchId exists in job_matches table
+  - Updates admin_approved field on match record
+  - Updates admin_notes on related job_submissions table if provided
+  - If approved, sends webhook notification to member via n8n
+  - Updates member_notified flag after sending notification
+  - Fetches profile, job, and company details for notification payload
+  - Returns updated match record in camelCase format
+  - Requires admin authentication via ADMIN_USER_IDS env var
+- Learnings for future iterations:
+  - Admin-only endpoints check `isAdmin(userId)` using ADMIN_USER_IDS env var
+  - For match approval flow: update match → fetch related data → send notification → update notified flag
+  - Use webhook endpoint `/match-approved` for member notifications (follows existing pattern)
+  - Non-blocking notifications: don't throw on notification failure
+  - Can update related tables (job_submissions.admin_notes) as part of the review action
 ---
