@@ -10,8 +10,8 @@
 - [x] US-007: Create Supabase client functions for companies
 - [x] US-008: Create Supabase client functions for job submissions
 - [x] US-009: Create Supabase client functions for job matches
-- [ ] US-010: Create profile embedding generation utility
-- [ ] US-011: Create job spec embedding generation utility
+- [x] US-010: Create profile embedding generation utility
+- [x] US-011: Create job spec embedding generation utility
 - [ ] US-012: Create portfolio content scraping utility
 - [ ] US-013: Create profile enrichment function
 - [ ] US-014: Create batch profile enrichment API endpoint
@@ -164,4 +164,35 @@
   - Two-step queries needed when filtering on related table (company_id → jobs → matches)
   - Order by match_score descending to show best matches first
   - Handle empty arrays gracefully in bulk operations (return early with empty result)
+---
+
+## Iteration 10 - US-010: Create profile embedding generation utility
+- What was implemented: Created utility function for generating vector embeddings from network profile data using OpenAI's text-embedding-3-small model
+- Files changed:
+  - src/lib/embeddings.ts (new) - embedding generation utility
+- Functions added:
+  - `buildProfileEmbeddingText(profile)` - combines profile data (bio, skills, focus areas, projects, enrichedContent) into embedding text
+  - `generateProfileEmbedding(profile)` - generates 1536-dimensional embedding vector using OpenAI API with retry logic
+- Learnings for future iterations:
+  - Use Vercel AI SDK's `embed` function from 'ai' package: `import { embed } from 'ai'`
+  - Use `openai.embedding('text-embedding-3-small')` for the embedding model (not `openai()` for chat models)
+  - FOCUS_AREA_LABELS mapping converts internal values ('immersive-experiences') to human-readable text for better embedding quality
+  - Retry logic uses exponential backoff: BASE_DELAY * Math.pow(2, attempt - 1)
+  - Don't retry on validation/API key errors - only on transient failures
+  - Include enrichedContent in embedding text to incorporate scraped portfolio data
+---
+
+## Iteration 11 - US-011: Create job spec embedding generation utility
+- What was implemented: Added utility function for generating vector embeddings from job submission data using OpenAI's text-embedding-3-small model
+- Files changed:
+  - src/lib/embeddings.ts (modified) - added job embedding functions
+- Functions added:
+  - `buildJobEmbeddingText(job)` - combines job data (title, description, requirements, preferred_skills, focus_areas, project_type, remote_preference, location, timeline) into embedding text
+  - `generateJobEmbedding(jobSubmission)` - generates 1536-dimensional embedding vector using OpenAI API with same retry logic as profile embeddings
+- Learnings for future iterations:
+  - Reuse same FOCUS_AREA_LABELS mapping for human-readable focus area labels in job embeddings
+  - Cast `area as FocusArea` when focus_areas is a string array (job) vs typed FocusArea array (profile)
+  - Include project_type and remote_preference in embedding text for better matching context
+  - Same retry logic pattern: MAX_RETRIES=3, BASE_RETRY_DELAY=1000ms, exponential backoff
+  - Import JobSubmission type from '@/types/job-matching'
 ---

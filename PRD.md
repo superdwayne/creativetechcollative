@@ -191,12 +191,12 @@ The matching engine will be API-first (no UI initially), with an admin review wo
 **Description:** As a developer, I need a utility function to generate embeddings from job specifications.
 
 **Acceptance Criteria:**
-- [ ] Create `generateJobEmbedding(jobSubmission)` function using OpenAI embeddings API
-- [ ] Function combines: title, description, requirements, preferred_skills, focus_areas
-- [ ] Use same model as profile embeddings (text-embedding-3-small)
-- [ ] Include proper error handling and retry logic
-- [ ] Function returns embedding vector array
-- [ ] Typecheck passes
+- [x] Create `generateJobEmbedding(jobSubmission)` function using OpenAI embeddings API
+- [x] Function combines: title, description, requirements, preferred_skills, focus_areas
+- [x] Use same model as profile embeddings (text-embedding-3-small)
+- [x] Include proper error handling and retry logic
+- [x] Function returns embedding vector array
+- [x] Typecheck passes
 
 ---
 

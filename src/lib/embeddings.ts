@@ -1,6 +1,7 @@
 import { embed } from 'ai';
 import { openai } from '@ai-sdk/openai';
 import type { NetworkProfile, FocusArea, FOCUS_AREAS } from '@/types/network-profile';
+import type { JobSubmission } from '@/types/job-matching';
 
 // Focus area labels for human-readable embedding text
 const FOCUS_AREA_LABELS: Record<FocusArea, string> = {
@@ -131,5 +132,118 @@ export async function generateProfileEmbedding(
 
   throw new Error(
     `Failed to generate embedding after ${MAX_RETRIES} attempts: ${lastError?.message}`
+  );
+}
+
+// =============================================================================
+// JOB SUBMISSION EMBEDDINGS
+// =============================================================================
+
+/**
+ * Combines job submission data into a single text string optimized for embedding generation.
+ * Includes title, description, requirements, preferred skills, and focus areas.
+ */
+export function buildJobEmbeddingText(job: JobSubmission): string {
+  const parts: string[] = [];
+
+  // Add job title
+  parts.push(`Job Title: ${job.title}`);
+
+  // Add job description (main content)
+  parts.push(`Description: ${job.description}`);
+
+  // Add requirements
+  if (job.requirements) {
+    parts.push(`Requirements: ${job.requirements}`);
+  }
+
+  // Add preferred skills
+  if (job.preferredSkills && job.preferredSkills.length > 0) {
+    parts.push(`Preferred Skills: ${job.preferredSkills.join(', ')}`);
+  }
+
+  // Add focus areas with human-readable labels
+  if (job.focusAreas && job.focusAreas.length > 0) {
+    const focusLabels = job.focusAreas
+      .map((area) => FOCUS_AREA_LABELS[area as FocusArea] || area)
+      .join(', ');
+    parts.push(`Focus Areas: ${focusLabels}`);
+  }
+
+  // Add project type and remote preference for context
+  parts.push(`Project Type: ${job.projectType}`);
+  parts.push(`Remote Preference: ${job.remotePreference}`);
+
+  // Add location if specified
+  if (job.location) {
+    parts.push(`Location: ${job.location}`);
+  }
+
+  // Add timeline if specified
+  if (job.timeline) {
+    parts.push(`Timeline: ${job.timeline}`);
+  }
+
+  return parts.join('\n\n');
+}
+
+/**
+ * Generates an embedding vector for a job submission using OpenAI's text-embedding-3-small model.
+ *
+ * @param job - The job submission to generate an embedding for
+ * @returns The embedding vector as an array of numbers (1536 dimensions)
+ * @throws Error if embedding generation fails after retries
+ *
+ * @example
+ * ```typescript
+ * const job = await getJobSubmissionById(jobId);
+ * const embedding = await generateJobEmbedding(job);
+ * // embedding is number[] with 1536 dimensions
+ * ```
+ */
+export async function generateJobEmbedding(
+  job: JobSubmission
+): Promise<number[]> {
+  const text = buildJobEmbeddingText(job);
+
+  // Validate we have content to embed
+  if (!text || text.trim().length === 0) {
+    throw new Error('Job submission has no content to generate embedding from');
+  }
+
+  let lastError: Error | null = null;
+
+  for (let attempt = 1; attempt <= MAX_RETRIES; attempt++) {
+    try {
+      const { embedding } = await embed({
+        model: openai.embedding('text-embedding-3-small'),
+        value: text,
+      });
+
+      return embedding;
+    } catch (error) {
+      lastError = error instanceof Error ? error : new Error(String(error));
+
+      // Don't retry on validation errors
+      if (lastError.message.includes('invalid') || lastError.message.includes('API key')) {
+        throw lastError;
+      }
+
+      // Log retry attempt
+      console.warn(
+        `Job embedding generation attempt ${attempt}/${MAX_RETRIES} failed:`,
+        lastError.message
+      );
+
+      // Wait before retry with exponential backoff
+      if (attempt < MAX_RETRIES) {
+        const delay = BASE_RETRY_DELAY * Math.pow(2, attempt - 1);
+        await new Promise((resolve) => setTimeout(resolve, delay));
+      }
+    }
+  }
+
+  throw new Error(
+    `Failed to generate job embedding after ${MAX_RETRIES} attempts: ${lastError?.message}`
   );
 }
