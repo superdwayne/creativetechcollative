@@ -109,12 +109,12 @@ The matching engine will be API-first (no UI initially), with an admin review wo
 **Description:** As a developer, I need to store vector embeddings for each member profile to enable semantic search.
 
 **Acceptance Criteria:**
-- [ ] Add `embedding` column to network_profiles (vector(1536) for OpenAI embeddings)
-- [ ] Add `embedding_updated_at` timestamp column
-- [ ] Add `enriched_content` TEXT column for storing scraped/processed portfolio content
-- [ ] Create index for vector similarity search (ivfflat or hnsw)
-- [ ] Migration runs successfully without affecting existing data
-- [ ] Typecheck passes
+- [x] Add `embedding` column to network_profiles (vector(1536) for OpenAI embeddings)
+- [x] Add `embedding_updated_at` timestamp column
+- [x] Add `enriched_content` TEXT column for storing scraped/processed portfolio content
+- [x] Create index for vector similarity search (ivfflat or hnsw)
+- [x] Migration runs successfully without affecting existing data
+- [x] Typecheck passes
 
 ---
 

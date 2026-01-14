@@ -5,7 +5,7 @@
 - [x] US-002: Create companies table schema
 - [x] US-003: Create job_submissions table schema
 - [x] US-004: Create job_matches table schema
-- [ ] US-005: Add embedding column to network_profiles
+- [x] US-005: Add embedding column to network_profiles
 - [ ] US-006: Create TypeScript types for new tables
 - [ ] US-007: Create Supabase client functions for companies
 - [ ] US-008: Create Supabase client functions for job submissions
@@ -79,4 +79,17 @@
   - Use BOOLEAN DEFAULT NULL for three-state fields (null=pending, true/false for decided)
   - JSONB for flexible structured data like skill_matches
   - Add COMMENT ON TABLE and COMMENT ON COLUMN for schema documentation
+---
+
+## Iteration 5 - US-005: Add embedding column to network_profiles
+- What was implemented: Created SQL migration to add vector embedding columns to network_profiles for semantic search
+- Files changed:
+  - supabase/migrations/007_add_profile_embeddings.sql (new)
+- Learnings for future iterations:
+  - Use `ALTER TABLE ... ADD COLUMN IF NOT EXISTS` for idempotent migrations
+  - OpenAI text-embedding-3-small uses 1536 dimensions
+  - HNSW index (Hierarchical Navigable Small World) preferred over IVFFlat for better query performance
+  - Use `vector_cosine_ops` operator class for cosine similarity with HNSW index
+  - Use `TIMESTAMP WITH TIME ZONE` for timestamp columns (consistent with existing schema)
+  - Migration file naming: 007_add_profile_embeddings.sql follows existing NNN_description pattern
 ---
