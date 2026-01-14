@@ -56,7 +56,7 @@ The matching engine will be API-first (no UI initially), with an admin review wo
 **Description:** As a developer, I need a job_submissions table to store job specifications submitted by companies.
 
 **Acceptance Criteria:**
-- [ ] Create `job_submissions` table with columns:
+- [x] Create `job_submissions` table with columns:
   - `id` (UUID, primary key)
   - `company_id` (UUID, FK to companies.id, not null)
   - `title` (VARCHAR 255, not null) - job title
@@ -73,11 +73,11 @@ The matching engine will be API-first (no UI initially), with an admin review wo
   - `admin_notes` (TEXT, nullable) - internal notes
   - `created_at` (TIMESTAMP, default now())
   - `updated_at` (TIMESTAMP, default now())
-- [ ] Add indexes on company_id, status, created_at
-- [ ] Add RLS policies: companies see own submissions, admins see all
-- [ ] Add trigger to update updated_at on changes
-- [ ] Migration runs successfully
-- [ ] Typecheck passes
+- [x] Add indexes on company_id, status, created_at
+- [x] Add RLS policies: companies see own submissions, admins see all
+- [x] Add trigger to update updated_at on changes
+- [x] Migration runs successfully
+- [x] Typecheck passes
 
 ---
 

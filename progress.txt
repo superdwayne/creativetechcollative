@@ -3,7 +3,7 @@
 ## Implementation Status
 - [x] US-001: Enable pgvector extension in Supabase
 - [x] US-002: Create companies table schema
-- [ ] US-003: Create job_submissions table schema
+- [x] US-003: Create job_submissions table schema
 - [ ] US-004: Create job_matches table schema
 - [ ] US-005: Add embedding column to network_profiles
 - [ ] US-006: Create TypeScript types for new tables
@@ -54,4 +54,16 @@
   - Admin access handled via service role key (not RLS policy)
   - CHECK constraints can be used for ENUM-like validation (e.g., company_size)
   - Use UNIQUE constraint on user_id to ensure one company per user
+---
+
+## Iteration 3 - US-003: Create job_submissions table schema
+- What was implemented: Created SQL migration for job_submissions table with all columns, CHECK constraints for enum-like fields, indexes, RLS policies, and updated_at trigger
+- Files changed:
+  - supabase/migrations/005_create_job_submissions.sql (new)
+- Learnings for future iterations:
+  - Use ON DELETE CASCADE for FK references when child records should be deleted with parent
+  - RLS policies can use subqueries to check ownership through related tables (e.g., via company_id → companies → user_id)
+  - Use IN clause in RLS for clarity when checking against a subquery result
+  - VARCHAR(50) is sufficient for status/type enum-like fields
+  - TEXT[] for array columns like preferred_skills and focus_areas
 ---
