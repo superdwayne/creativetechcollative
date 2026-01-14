@@ -233,13 +233,13 @@ The matching engine will be API-first (no UI initially), with an admin review wo
 **Description:** As a developer, I need an API endpoint to trigger enrichment for all profiles (admin use).
 
 **Acceptance Criteria:**
-- [ ] Create `/api/enrich-profiles.ts` edge function
-- [ ] Accepts optional `profileIds[]` param (or enriches all if not provided)
-- [ ] Only processes profiles where embedding is null or outdated
-- [ ] Implements batching to avoid rate limits (max 10 concurrent)
-- [ ] Returns progress/status JSON
-- [ ] Requires admin authentication
-- [ ] Typecheck passes
+- [x] Create `/api/enrich-profiles.ts` edge function
+- [x] Accepts optional `profileIds[]` param (or enriches all if not provided)
+- [x] Only processes profiles where embedding is null or outdated
+- [x] Implements batching to avoid rate limits (max 10 concurrent)
+- [x] Returns progress/status JSON
+- [x] Requires admin authentication
+- [x] Typecheck passes
 
 ---
 
