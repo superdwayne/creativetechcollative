@@ -1,0 +1,44 @@
+# Progress Log
+
+## Implementation Status
+- [x] US-001: Enable pgvector extension in Supabase
+- [ ] US-002: Create companies table schema
+- [ ] US-003: Create job_submissions table schema
+- [ ] US-004: Create job_matches table schema
+- [ ] US-005: Add embedding column to network_profiles
+- [ ] US-006: Create TypeScript types for new tables
+- [ ] US-007: Create Supabase client functions for companies
+- [ ] US-008: Create Supabase client functions for job submissions
+- [ ] US-009: Create Supabase client functions for job matches
+- [ ] US-010: Create profile embedding generation utility
+- [ ] US-011: Create job spec embedding generation utility
+- [ ] US-012: Create portfolio content scraping utility
+- [ ] US-013: Create profile enrichment function
+- [ ] US-014: Create batch profile enrichment API endpoint
+- [ ] US-015: Create vector similarity search function
+- [ ] US-016: Create Claude match ranking utility
+- [ ] US-017: Create main matching engine function
+- [ ] US-018: Create job matching API endpoint
+- [ ] US-019: Create job submission API endpoint
+- [ ] US-020: Create admin match review API endpoint
+- [ ] US-021: Create company registration API endpoint
+- [ ] US-022: Create webhook for member match notification
+- [ ] US-023: Create admin jobs list API endpoint
+- [ ] US-024: Create admin matches list API endpoint
+- [ ] US-025: Add environment variables documentation
+
+## Learnings
+(Patterns discovered during implementation)
+
+---
+
+## Iteration 1 - US-001: Enable pgvector extension
+- What was implemented: Created SQL migration to enable pgvector extension for vector embeddings
+- Files changed:
+  - supabase/migrations/003_enable_pgvector.sql (new)
+- Learnings for future iterations:
+  - Migration files follow pattern: NNN_description.sql (e.g., 003_enable_pgvector.sql)
+  - Existing migrations: 001_create_network_profiles.sql, 002_add_profile_approval.sql
+  - Typecheck command: `npx tsc --noEmit` (no yarn or npm typecheck script)
+  - pgvector extension provides the `vector` data type for embeddings
+---
