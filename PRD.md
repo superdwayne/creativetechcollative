@@ -178,12 +178,12 @@ The matching engine will be API-first (no UI initially), with an admin review wo
 **Description:** As a developer, I need a utility function to generate embeddings from member profile data.
 
 **Acceptance Criteria:**
-- [ ] Create `generateProfileEmbedding(profile)` function using OpenAI embeddings API
-- [ ] Function combines: bio, skills, focus areas, project descriptions into embedding text
-- [ ] Use text-embedding-3-small model (1536 dimensions, cost-effective)
-- [ ] Include proper error handling and retry logic
-- [ ] Function returns embedding vector array
-- [ ] Typecheck passes
+- [x] Create `generateProfileEmbedding(profile)` function using OpenAI embeddings API
+- [x] Function combines: bio, skills, focus areas, project descriptions into embedding text
+- [x] Use text-embedding-3-small model (1536 dimensions, cost-effective)
+- [x] Include proper error handling and retry logic
+- [x] Function returns embedding vector array
+- [x] Typecheck passes
 
 ---
 
