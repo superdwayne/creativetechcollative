@@ -32,7 +32,7 @@ The matching engine will be API-first (no UI initially), with an admin review wo
 **Description:** As a developer, I need a companies table to store registered company accounts that can submit job specs.
 
 **Acceptance Criteria:**
-- [ ] Create `companies` table with columns:
+- [x] Create `companies` table with columns:
   - `id` (UUID, primary key)
   - `user_id` (UUID, FK to auth.users, unique, not null)
   - `company_name` (VARCHAR 255, not null)
@@ -45,10 +45,10 @@ The matching engine will be API-first (no UI initially), with an admin review wo
   - `verified` (BOOLEAN, default false) - admin verification status
   - `created_at` (TIMESTAMP, default now())
   - `updated_at` (TIMESTAMP, default now())
-- [ ] Add appropriate indexes on user_id, verified, created_at
-- [ ] Add RLS policies: companies can read/update own record, admins can read all
-- [ ] Migration runs successfully
-- [ ] Typecheck passes
+- [x] Add appropriate indexes on user_id, verified, created_at
+- [x] Add RLS policies: companies can read/update own record, admins can read all
+- [x] Migration runs successfully
+- [x] Typecheck passes
 
 ---
 

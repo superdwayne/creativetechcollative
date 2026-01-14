@@ -2,7 +2,7 @@
 
 ## Implementation Status
 - [x] US-001: Enable pgvector extension in Supabase
-- [ ] US-002: Create companies table schema
+- [x] US-002: Create companies table schema
 - [ ] US-003: Create job_submissions table schema
 - [ ] US-004: Create job_matches table schema
 - [ ] US-005: Add embedding column to network_profiles
@@ -41,4 +41,17 @@
   - Existing migrations: 001_create_network_profiles.sql, 002_add_profile_approval.sql
   - Typecheck command: `npx tsc --noEmit` (no yarn or npm typecheck script)
   - pgvector extension provides the `vector` data type for embeddings
+---
+
+## Iteration 2 - US-002: Create companies table schema
+- What was implemented: Created SQL migration for companies table with all required columns, indexes, and RLS policies
+- Files changed:
+  - supabase/migrations/004_create_companies.sql (new)
+- Learnings for future iterations:
+  - Reuse `update_updated_at_column()` function from 001 migration for triggers
+  - RLS policies use `auth.uid()` to check current user
+  - Use `TO authenticated` in policies to restrict to logged-in users
+  - Admin access handled via service role key (not RLS policy)
+  - CHECK constraints can be used for ENUM-like validation (e.g., company_size)
+  - Use UNIQUE constraint on user_id to ensure one company per user
 ---
