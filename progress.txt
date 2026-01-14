@@ -19,7 +19,7 @@
 - [x] US-016: Create Claude match ranking utility
 - [x] US-017: Create main matching engine function
 - [x] US-018: Create job matching API endpoint
-- [ ] US-019: Create job submission API endpoint
+- [x] US-019: Create job submission API endpoint
 - [ ] US-020: Create admin match review API endpoint
 - [ ] US-021: Create company registration API endpoint
 - [ ] US-022: Create webhook for member match notification
@@ -358,4 +358,26 @@
   - Validate job status before matching to prevent re-matching already matched jobs
   - Use `supabase.rpc()` to call PostgreSQL functions like `find_similar_profiles`
   - Format embedding as string `[${embedding.join(',')}]` for pgvector RPC calls
+---
+
+## Iteration 19 - US-019: Create job submission API endpoint
+- What was implemented: Created Vercel Edge Function API endpoint for companies to submit job specifications
+- Files changed:
+  - api/submit-job.ts (new) - job submission API endpoint
+- Features:
+  - POST `/api/submit-job` accepts job specification fields in request body
+  - Validates required fields using Zod schema (title, description, project_type, remote_preference)
+  - Fetches company by authenticated user's ID (user must have registered company)
+  - Creates job_submission record linked to company with status 'pending'
+  - Sends webhook notification to admin via n8n (follows profile-approval pattern)
+  - Returns created job record with all fields in camelCase format
+  - Requires Bearer token authentication
+  - Proper error handling for validation, auth, and database errors
+- Learnings for future iterations:
+  - Follow existing patterns: Zod for validation, Bearer token auth, webhook notifications
+  - Use `process.env` (not `import.meta.env`) in Edge Functions
+  - For webhook base64 encoding in Edge Functions, use `Buffer.from().toString('base64')` instead of `btoa()`
+  - Check if user has a company before allowing job submission (one company per user)
+  - Return 403 when user lacks company registration
+  - Send webhook notifications asynchronously (don't throw on failure)
 ---

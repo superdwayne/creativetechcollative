@@ -304,14 +304,14 @@ The matching engine will be API-first (no UI initially), with an admin review wo
 **Description:** As a developer, I need an API endpoint for companies to submit new job specs.
 
 **Acceptance Criteria:**
-- [ ] Create `/api/submit-job.ts` edge function
-- [ ] Accepts job specification fields in request body
-- [ ] Validates required fields (title, description, project_type, remote_preference)
-- [ ] Creates job_submission record linked to company
-- [ ] Sends notification webhook to admin (like profile approval flow)
-- [ ] Returns created job record
-- [ ] Requires authenticated company user
-- [ ] Typecheck passes
+- [x] Create `/api/submit-job.ts` edge function
+- [x] Accepts job specification fields in request body
+- [x] Validates required fields (title, description, project_type, remote_preference)
+- [x] Creates job_submission record linked to company
+- [x] Sends notification webhook to admin (like profile approval flow)
+- [x] Returns created job record
+- [x] Requires authenticated company user
+- [x] Typecheck passes
 
 ---
 
