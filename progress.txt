@@ -6,7 +6,7 @@
 - [x] US-003: Create job_submissions table schema
 - [x] US-004: Create job_matches table schema
 - [x] US-005: Add embedding column to network_profiles
-- [ ] US-006: Create TypeScript types for new tables
+- [x] US-006: Create TypeScript types for new tables
 - [ ] US-007: Create Supabase client functions for companies
 - [ ] US-008: Create Supabase client functions for job submissions
 - [ ] US-009: Create Supabase client functions for job matches
@@ -92,4 +92,19 @@
   - Use `vector_cosine_ops` operator class for cosine similarity with HNSW index
   - Use `TIMESTAMP WITH TIME ZONE` for timestamp columns (consistent with existing schema)
   - Migration file naming: 007_add_profile_embeddings.sql follows existing NNN_description pattern
+---
+
+## Iteration 6 - US-006: Create TypeScript types for new tables
+- What was implemented: Created TypeScript interfaces and union types for Company, JobSubmission, JobMatch tables, and updated NetworkProfile with embedding fields
+- Files changed:
+  - src/types/job-matching.ts (new) - contains all job matching types
+  - src/types/network-profile.ts (modified) - added embedding fields to NetworkProfile interface
+- Learnings for future iterations:
+  - TypeScript types file location: `src/types/` directory
+  - Use camelCase for TypeScript properties (e.g., companyName vs company_name in DB)
+  - Include both interface types AND create/update data types for flexibility
+  - Union types (e.g., `type JobStatus = 'pending' | 'reviewed'...`) map to CHECK constraints
+  - Add `| null` for nullable DB columns alongside `?` for optional access
+  - Include constant arrays (e.g., COMPANY_SIZES) for UI dropdowns
+  - Existing pattern: FocusArea, AvailabilityStatus types in network-profile.ts
 ---

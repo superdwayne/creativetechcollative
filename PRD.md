@@ -122,13 +122,13 @@ The matching engine will be API-first (no UI initially), with an admin review wo
 **Description:** As a developer, I need TypeScript interfaces for the new database tables to ensure type safety.
 
 **Acceptance Criteria:**
-- [ ] Create `Company` interface matching companies table schema
-- [ ] Create `JobSubmission` interface matching job_submissions table schema
-- [ ] Create `JobMatch` interface matching job_matches table schema
-- [ ] Update `NetworkProfile` interface to include embedding fields
-- [ ] Create union types for status/enum fields (JobStatus, ProjectType, RemotePreference, etc.)
-- [ ] Export all types from appropriate location
-- [ ] Typecheck passes
+- [x] Create `Company` interface matching companies table schema
+- [x] Create `JobSubmission` interface matching job_submissions table schema
+- [x] Create `JobMatch` interface matching job_matches table schema
+- [x] Update `NetworkProfile` interface to include embedding fields
+- [x] Create union types for status/enum fields (JobStatus, ProjectType, RemotePreference, etc.)
+- [x] Export all types from appropriate location
+- [x] Typecheck passes
 
 ---
 
