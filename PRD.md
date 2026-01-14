@@ -204,13 +204,13 @@ The matching engine will be API-first (no UI initially), with an admin review wo
 **Description:** As a developer, I need a utility to scrape and extract relevant content from member portfolio URLs.
 
 **Acceptance Criteria:**
-- [ ] Create `scrapePortfolioContent(urls[])` function
-- [ ] Accepts portfolio_url, linkedin_url, and other_social_links
-- [ ] Uses web scraping to extract text content (project descriptions, about sections)
-- [ ] Handles rate limiting and timeouts gracefully
-- [ ] Returns cleaned, concatenated text for embedding
-- [ ] Respects robots.txt and includes reasonable delays
-- [ ] Typecheck passes
+- [x] Create `scrapePortfolioContent(urls[])` function
+- [x] Accepts portfolio_url, linkedin_url, and other_social_links
+- [x] Uses web scraping to extract text content (project descriptions, about sections)
+- [x] Handles rate limiting and timeouts gracefully
+- [x] Returns cleaned, concatenated text for embedding
+- [x] Respects robots.txt and includes reasonable delays
+- [x] Typecheck passes
 
 ---
 

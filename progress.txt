@@ -12,7 +12,7 @@
 - [x] US-009: Create Supabase client functions for job matches
 - [x] US-010: Create profile embedding generation utility
 - [x] US-011: Create job spec embedding generation utility
-- [ ] US-012: Create portfolio content scraping utility
+- [x] US-012: Create portfolio content scraping utility
 - [ ] US-013: Create profile enrichment function
 - [ ] US-014: Create batch profile enrichment API endpoint
 - [ ] US-015: Create vector similarity search function
@@ -195,4 +195,29 @@
   - Include project_type and remote_preference in embedding text for better matching context
   - Same retry logic pattern: MAX_RETRIES=3, BASE_RETRY_DELAY=1000ms, exponential backoff
   - Import JobSubmission type from '@/types/job-matching'
+---
+
+## Iteration 12 - US-012: Create portfolio content scraping utility
+- What was implemented: Created utility function to scrape and extract text content from member portfolio URLs for embedding enrichment
+- Files changed:
+  - src/lib/scraper.ts (new) - portfolio content scraping utility
+- Functions added:
+  - `scrapePortfolioContent(urls[])` - main function that accepts array of URLs, returns combined scraped content
+  - `scrapeUrl(url)` - scrapes single URL with timeout handling
+  - `extractTextFromHtml(html)` - extracts meaningful text from HTML (paragraphs, headings, main content)
+  - `cleanContent(text)` - normalizes and deduplicates extracted text
+- Features:
+  - 10 second timeout per URL
+  - 500ms delay between requests for rate limiting
+  - Max 10,000 characters per URL to prevent memory issues
+  - Skips LinkedIn URLs (requires authentication)
+  - Removes nav, header, footer, sidebar content
+  - Custom User-Agent identifies the bot
+- Learnings for future iterations:
+  - Use AbortController with setTimeout for fetch timeouts
+  - LinkedIn and similar authenticated sites cannot be scraped directly
+  - Extract from semantic HTML elements (article, main, section, p, h1-h6, li)
+  - Filter content by minimum length (20 chars) to avoid noise
+  - Sequential processing with sleep() for rate limiting
+  - Return both individual results and combined content for flexibility
 ---
