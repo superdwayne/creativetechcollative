@@ -348,13 +348,13 @@ The matching engine will be API-first (no UI initially), with an admin review wo
 **Description:** As a developer, I need a function to notify members when they've been matched to a job.
 
 **Acceptance Criteria:**
-- [ ] Create `notifyMemberOfMatch(matchId)` function
-- [ ] Fetches match, job, and profile details
-- [ ] Sends webhook to n8n with match details (similar to approval notification)
-- [ ] Updates member_notified flag on match record
-- [ ] Includes job title, company name, match reasoning in payload
-- [ ] Returns success/failure status
-- [ ] Typecheck passes
+- [x] Create `notifyMemberOfMatch(matchId)` function
+- [x] Fetches match, job, and profile details
+- [x] Sends webhook to n8n with match details (similar to approval notification)
+- [x] Updates member_notified flag on match record
+- [x] Includes job title, company name, match reasoning in payload
+- [x] Returns success/failure status
+- [x] Typecheck passes
 
 ---
 

@@ -22,7 +22,7 @@
 - [x] US-019: Create job submission API endpoint
 - [x] US-020: Create admin match review API endpoint
 - [x] US-021: Create company registration API endpoint
-- [ ] US-022: Create webhook for member match notification
+- [x] US-022: Create webhook for member match notification
 - [ ] US-023: Create admin jobs list API endpoint
 - [ ] US-024: Create admin matches list API endpoint
 - [ ] US-025: Add environment variables documentation
@@ -422,4 +422,31 @@
   - Company registration webhook uses `/company-registration` endpoint path
   - Follow existing patterns: Zod validation, Buffer.from().toString('base64') for auth, rowToX() helper for response mapping
   - companyWebsite validation: use `.optional().or(z.literal(''))` to allow empty string as valid input
+---
+
+## Iteration 22 - US-022: Create webhook for member match notification
+- What was implemented: Created reusable utility function to notify members when they've been matched to a job opportunity
+- Files changed:
+  - src/lib/member-notification.ts (new) - member match notification utility
+- Functions added:
+  - `notifyMemberOfMatch(matchId, supabaseClient?)` - main function that orchestrates the full notification flow
+  - `fetchMatchDetails(supabase, matchId)` - fetches match record with match_reasoning
+  - `fetchProfileDetails(supabase, profileId)` - fetches member's name and email
+  - `fetchJobDetails(supabase, jobId)` - fetches job title and company_id
+  - `fetchCompanyDetails(supabase, companyId)` - fetches company name
+  - `sendWebhookNotification(...)` - sends webhook to n8n with match details
+  - `updateMemberNotifiedFlag(supabase, matchId)` - updates member_notified to true
+  - `NotificationResult` interface - typed return value with success, matchId, memberNotified, error
+- Features:
+  - Accepts optional SupabaseClient parameter (creates one with service role key if not provided)
+  - Webhook payload includes: type, matchId, member (name, email), job (title), company (name), matchReasoning, timestamp
+  - Uses `/match-approved` webhook endpoint (consistent with review-match.ts)
+  - Graceful error handling with detailed error messages
+  - Returns structured result for callers to handle success/failure
+- Learnings for future iterations:
+  - Create reusable utility functions in src/lib/ for operations used across multiple endpoints
+  - Accept optional Supabase client param to allow callers to share their client instance
+  - Split complex operations into small helper functions for better testability
+  - Use process.env (not import.meta.env) for code that runs in Edge Functions
+  - Webhook uses Basic Auth: Buffer.from(`${username}:${password}`).toString('base64')
 ---
