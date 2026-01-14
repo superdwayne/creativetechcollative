@@ -18,7 +18,7 @@
 - [x] US-015: Create vector similarity search function
 - [x] US-016: Create Claude match ranking utility
 - [x] US-017: Create main matching engine function
-- [ ] US-018: Create job matching API endpoint
+- [x] US-018: Create job matching API endpoint
 - [ ] US-019: Create job submission API endpoint
 - [ ] US-020: Create admin match review API endpoint
 - [ ] US-021: Create company registration API endpoint
@@ -333,4 +333,29 @@
   - Return detailed result metadata (vectorCandidatesCount, claudeAnalyzedCount) for debugging/logging
   - Handle edge cases: no candidates found, status update failure (non-blocking)
   - Use console.log with module prefix `[MatchingEngine]` for debugging
+---
+
+## Iteration 18 - US-018: Create job matching API endpoint
+- What was implemented: Created Vercel Edge Function API endpoint to trigger job matching with authentication and authorization
+- Files changed:
+  - api/match-job.ts (new) - job matching API endpoint
+- Features:
+  - POST `/api/match-job` accepts `jobId` in request body
+  - Validates job exists and is in 'pending' or 'reviewed' status
+  - Requires authentication (Bearer token)
+  - Authorization: allows admin (via ADMIN_USER_IDS) OR company that owns the job
+  - `isJobOwner()` - checks if user owns the company that submitted the job
+  - Inline implementation of matching pipeline for Edge Function context (avoids module import issues)
+  - Calls OpenAI API for job embedding generation
+  - Calls `find_similar_profiles` RPC for vector similarity search
+  - Calls Claude API for candidate ranking with structured JSON output
+  - Creates job_matches records and updates job status to 'matched'
+  - Returns matches with scores, reasoning, and metadata
+- Learnings for future iterations:
+  - Edge Functions can't use module imports from src/lib - need inline implementation
+  - Parse Claude's JSON response by extracting JSON with regex (may be wrapped in markdown code blocks)
+  - Authorization can check both admin status AND resource ownership for flexible access control
+  - Validate job status before matching to prevent re-matching already matched jobs
+  - Use `supabase.rpc()` to call PostgreSQL functions like `find_similar_profiles`
+  - Format embedding as string `[${embedding.join(',')}]` for pgvector RPC calls
 ---

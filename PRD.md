@@ -290,13 +290,13 @@ The matching engine will be API-first (no UI initially), with an admin review wo
 **Description:** As a developer, I need an API endpoint to trigger matching for a job submission.
 
 **Acceptance Criteria:**
-- [ ] Create `/api/match-job.ts` edge function
-- [ ] Accepts `jobId` in request body
-- [ ] Validates job exists and is in 'pending' or 'reviewed' status
-- [ ] Calls runJobMatching function
-- [ ] Returns matches with scores and reasoning
-- [ ] Requires authentication (admin or owning company)
-- [ ] Typecheck passes
+- [x] Create `/api/match-job.ts` edge function
+- [x] Accepts `jobId` in request body
+- [x] Validates job exists and is in 'pending' or 'reviewed' status
+- [x] Calls runJobMatching function
+- [x] Returns matches with scores and reasoning
+- [x] Requires authentication (admin or owning company)
+- [x] Typecheck passes
 
 ---
 
