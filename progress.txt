@@ -13,7 +13,7 @@
 - [x] US-010: Create profile embedding generation utility
 - [x] US-011: Create job spec embedding generation utility
 - [x] US-012: Create portfolio content scraping utility
-- [ ] US-013: Create profile enrichment function
+- [x] US-013: Create profile enrichment function
 - [ ] US-014: Create batch profile enrichment API endpoint
 - [ ] US-015: Create vector similarity search function
 - [ ] US-016: Create Claude match ranking utility
@@ -220,4 +220,27 @@
   - Filter content by minimum length (20 chars) to avoid noise
   - Sequential processing with sleep() for rate limiting
   - Return both individual results and combined content for flexibility
+---
+
+## Iteration 13 - US-013: Create profile enrichment function
+- What was implemented: Created utility function that orchestrates profile enrichment by scraping portfolio URLs and generating embeddings
+- Files changed:
+  - src/lib/profile-enrichment.ts (new) - profile enrichment orchestration utility
+- Functions added:
+  - `enrichProfile(profileId)` - main function that fetches profile, scrapes URLs, generates embedding, and saves to DB
+  - `fetchProfileById(profileId)` - helper to fetch profile with all embedding fields
+  - `updateProfileEnrichment(profileId, enrichedContent, embedding)` - helper to update profile with enrichment data
+- Features:
+  - Fetches profile from database by ID
+  - Collects all URLs (portfolioUrl, linkedinUrl, otherSocialLinks) for scraping
+  - Scrapes portfolio content (gracefully handles failures)
+  - Generates embedding from profile + scraped content
+  - Saves enriched_content, embedding, and embedding_updated_at to database
+  - Returns detailed result with success/failure status
+- Learnings for future iterations:
+  - Supabase vector columns need to be formatted as string: `[${embedding.join(',')}]`
+  - Gracefully handle scraping failures - can still generate embedding from base profile
+  - Include embedding_updated_at timestamp when saving embeddings
+  - Spread profile object with enrichedContent to pass to embedding generator
+  - EnrichProfileResult interface for typed return values
 ---

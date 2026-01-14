@@ -218,14 +218,14 @@ The matching engine will be API-first (no UI initially), with an admin review wo
 **Description:** As a developer, I need a function that enriches a profile with scraped content and generates its embedding.
 
 **Acceptance Criteria:**
-- [ ] Create `enrichProfile(profileId)` function
-- [ ] Fetches profile from database
-- [ ] Calls scrapePortfolioContent for profile URLs
-- [ ] Stores enriched_content in profile record
-- [ ] Generates embedding from profile + enriched content
-- [ ] Updates embedding and embedding_updated_at in database
-- [ ] Returns success/failure status
-- [ ] Typecheck passes
+- [x] Create `enrichProfile(profileId)` function
+- [x] Fetches profile from database
+- [x] Calls scrapePortfolioContent for profile URLs
+- [x] Stores enriched_content in profile record
+- [x] Generates embedding from profile + enriched content
+- [x] Updates embedding and embedding_updated_at in database
+- [x] Returns success/failure status
+- [x] Typecheck passes
 
 ---
 
