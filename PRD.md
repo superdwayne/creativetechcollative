@@ -136,13 +136,13 @@ The matching engine will be API-first (no UI initially), with an admin review wo
 **Description:** As a developer, I need CRUD functions for company management in the Supabase client library.
 
 **Acceptance Criteria:**
-- [ ] Add `createCompany(data)` function - creates company linked to auth user
-- [ ] Add `getCompanyByUserId(userId)` function - fetch company by auth user
-- [ ] Add `updateCompany(id, data)` function - update company details
-- [ ] Add `getCompanyById(id)` function - fetch single company
-- [ ] All functions include proper error handling
-- [ ] All functions are properly typed
-- [ ] Typecheck passes
+- [x] Add `createCompany(data)` function - creates company linked to auth user
+- [x] Add `getCompanyByUserId(userId)` function - fetch company by auth user
+- [x] Add `updateCompany(id, data)` function - update company details
+- [x] Add `getCompanyById(id)` function - fetch single company
+- [x] All functions include proper error handling
+- [x] All functions are properly typed
+- [x] Typecheck passes
 
 ---
 

@@ -7,7 +7,7 @@
 - [x] US-004: Create job_matches table schema
 - [x] US-005: Add embedding column to network_profiles
 - [x] US-006: Create TypeScript types for new tables
-- [ ] US-007: Create Supabase client functions for companies
+- [x] US-007: Create Supabase client functions for companies
 - [ ] US-008: Create Supabase client functions for job submissions
 - [ ] US-009: Create Supabase client functions for job matches
 - [ ] US-010: Create profile embedding generation utility
@@ -107,4 +107,22 @@
   - Add `| null` for nullable DB columns alongside `?` for optional access
   - Include constant arrays (e.g., COMPANY_SIZES) for UI dropdowns
   - Existing pattern: FocusArea, AvailabilityStatus types in network-profile.ts
+---
+
+## Iteration 7 - US-007: Create Supabase client functions for companies
+- What was implemented: Company CRUD functions were already implemented in src/lib/supabase.ts
+- Files changed:
+  - src/lib/supabase.ts (already contained implementation)
+- Functions verified:
+  - `createCompany(data, userId)` - creates company with proper error handling
+  - `getCompanyByUserId(userId)` - fetches company by auth user ID
+  - `getCompanyById(companyId)` - fetches company by company ID
+  - `updateCompany(companyId, data)` - updates company with partial data support
+  - `rowToCompany(row)` - helper to convert DB row to Company interface
+- Learnings for future iterations:
+  - Follow existing pattern in supabase.ts: return `{ success, data?, error? }` objects
+  - Use helper function (e.g., `rowToCompany`) for DB-to-TypeScript mapping
+  - Use snake_case for DB columns, camelCase for TypeScript properties
+  - Handle partial updates by checking `!== undefined` before adding to update object
+  - Types are imported from `@/types/job-matching` (Company, CompanyCreateData, CompanyUpdateData)
 ---
