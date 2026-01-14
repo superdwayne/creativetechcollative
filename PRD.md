@@ -247,12 +247,12 @@ The matching engine will be API-first (no UI initially), with an admin review wo
 **Description:** As a developer, I need a function to find similar profiles using vector search.
 
 **Acceptance Criteria:**
-- [ ] Create `findSimilarProfiles(embedding, limit, threshold?)` function
-- [ ] Uses pgvector cosine similarity operator (<=>)
-- [ ] Only searches approved profiles with available availability status
-- [ ] Returns profiles ordered by similarity with scores
-- [ ] Accepts optional minimum similarity threshold
-- [ ] Typecheck passes
+- [x] Create `findSimilarProfiles(embedding, limit, threshold?)` function
+- [x] Uses pgvector cosine similarity operator (<=>)
+- [x] Only searches approved profiles with available availability status
+- [x] Returns profiles ordered by similarity with scores
+- [x] Accepts optional minimum similarity threshold
+- [x] Typecheck passes
 
 ---
 

@@ -1085,3 +1085,79 @@ export async function getApprovedMatchesForCompany(
     return [];
   }
 }
+
+// =============================================================================
+// VECTOR SIMILARITY SEARCH FUNCTIONS
+// =============================================================================
+
+/**
+ * Profile with similarity score returned from vector search
+ */
+export interface ProfileWithSimilarity extends NetworkProfile {
+  similarityScore: number;
+}
+
+/**
+ * Find similar profiles using vector similarity search (pgvector cosine similarity)
+ * Only returns approved profiles that are available for work or collaborations
+ *
+ * @param embedding - The query embedding vector (1536 dimensions)
+ * @param limit - Maximum number of results to return (default: 10)
+ * @param threshold - Minimum similarity score (0-1, default: 0 = no threshold)
+ * @returns Array of profiles with similarity scores, ordered by similarity descending
+ */
+export async function findSimilarProfiles(
+  embedding: number[],
+  limit: number = 10,
+  threshold: number = 0
+): Promise<ProfileWithSimilarity[]> {
+  if (!supabase) return [];
+
+  try {
+    // Call the database function for vector similarity search
+    const { data, error } = await supabase.rpc('find_similar_profiles', {
+      query_embedding: `[${embedding.join(',')}]`,
+      match_limit: limit,
+      similarity_threshold: threshold,
+    });
+
+    if (error) {
+      console.error('Error in vector similarity search:', error);
+      return [];
+    }
+
+    if (!data) return [];
+
+    // Map database rows to ProfileWithSimilarity interface
+    return data.map((row: any): ProfileWithSimilarity => ({
+      id: row.id,
+      userId: row.user_id,
+      fullName: row.full_name,
+      location: row.location,
+      email: row.email,
+      portfolioUrl: row.portfolio_url,
+      linkedinUrl: row.linkedin_url,
+      otherSocialLinks: row.other_social_links,
+      bio: row.bio,
+      focusAreas: row.focus_areas,
+      skills: row.skills,
+      projects: row.projects,
+      availability: row.availability,
+      isCtcMember: row.is_ctc_member,
+      profilePictureUrl: row.profile_picture_url,
+      approved: row.approved,
+      approvedAt: row.approved_at,
+      approvedBy: row.approved_by,
+      createdAt: row.created_at,
+      updatedAt: row.updated_at,
+      slug: row.slug,
+      embedding: row.embedding,
+      embeddingUpdatedAt: row.embedding_updated_at,
+      enrichedContent: row.enriched_content,
+      similarityScore: row.similarity_score,
+    }));
+  } catch (error) {
+    console.error('Error finding similar profiles:', error);
+    return [];
+  }
+}

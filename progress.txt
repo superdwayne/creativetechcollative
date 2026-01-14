@@ -14,8 +14,8 @@
 - [x] US-011: Create job spec embedding generation utility
 - [x] US-012: Create portfolio content scraping utility
 - [x] US-013: Create profile enrichment function
-- [ ] US-014: Create batch profile enrichment API endpoint
-- [ ] US-015: Create vector similarity search function
+- [x] US-014: Create batch profile enrichment API endpoint
+- [x] US-015: Create vector similarity search function
 - [ ] US-016: Create Claude match ranking utility
 - [ ] US-017: Create main matching engine function
 - [ ] US-018: Create job matching API endpoint
@@ -243,4 +243,43 @@
   - Include embedding_updated_at timestamp when saving embeddings
   - Spread profile object with enrichedContent to pass to embedding generator
   - EnrichProfileResult interface for typed return values
+---
+
+## Iteration 14 - US-014: Create batch profile enrichment API endpoint
+- What was implemented: Created Vercel Edge Function for batch profile enrichment with admin auth, batching, and progress reporting
+- Files changed:
+  - api/enrich-profiles.ts (new) - batch profile enrichment endpoint
+- Functions/features:
+  - POST `/api/enrich-profiles` accepts optional `profileIds[]` array
+  - Checks `ADMIN_USER_IDS` env var for admin authentication
+  - `getProfilesToEnrich()` - finds profiles where embedding is null or outdated (embedding_updated_at < updated_at)
+  - `enrichSingleProfile()` - fetches profile, builds embedding text, calls OpenAI API, saves to DB
+  - `processProfilesInBatches()` - processes profiles in batches of MAX_CONCURRENT (10) with 500ms delay
+  - Returns EnrichmentProgress JSON with total, processed, successful, failed, and per-profile results
+- Learnings for future iterations:
+  - Use `process.env` in Edge Functions (not `import.meta.env`)
+  - Use `SUPABASE_SERVICE_ROLE_KEY` for admin operations that bypass RLS
+  - Admin check uses `ADMIN_USER_IDS` env var (comma-separated UUIDs)
+  - Verify auth token via `supabase.auth.getUser(accessToken)`
+  - Edge Functions pattern: `export const config = { runtime: 'edge' }; export default async function handler(req: Request)`
+  - For embeddings: format as `[${embedding.join(',')}]` string for pgvector
+  - Check `embedding_updated_at < updated_at` to determine if profile needs re-enrichment
+---
+
+## Iteration 15 - US-015: Create vector similarity search function
+- What was implemented: Created SQL database function and TypeScript wrapper for vector similarity search using pgvector
+- Files changed:
+  - supabase/migrations/008_create_similarity_search_function.sql (new) - PostgreSQL function for cosine similarity search
+  - src/lib/supabase.ts (modified) - added findSimilarProfiles() function and ProfileWithSimilarity interface
+- Functions added:
+  - SQL: `find_similar_profiles(query_embedding, match_limit, similarity_threshold)` - returns profiles with similarity scores
+  - TypeScript: `findSimilarProfiles(embedding, limit, threshold?)` - calls the database function via Supabase RPC
+  - TypeScript: `ProfileWithSimilarity` interface - extends NetworkProfile with similarityScore field
+- Learnings for future iterations:
+  - pgvector doesn't work directly with Supabase JS client - need to create SQL functions and call via `.rpc()`
+  - Cosine similarity in pgvector: `<=>` returns distance (0-2), convert to similarity with `1 - distance`
+  - SQL function uses `SECURITY DEFINER` to run with function owner permissions
+  - Format embedding vectors as string `[${embedding.join(',')}]` when passing to RPC
+  - Filter availability to 'open-to-work' or 'open-to-collaborations' using `IN ('open-to-work', 'open-to-collaborations')`
+  - Order by distance ASC (lower = more similar) to get best matches first
 ---
