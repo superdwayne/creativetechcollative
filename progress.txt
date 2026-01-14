@@ -21,7 +21,7 @@
 - [x] US-018: Create job matching API endpoint
 - [x] US-019: Create job submission API endpoint
 - [x] US-020: Create admin match review API endpoint
-- [ ] US-021: Create company registration API endpoint
+- [x] US-021: Create company registration API endpoint
 - [ ] US-022: Create webhook for member match notification
 - [ ] US-023: Create admin jobs list API endpoint
 - [ ] US-024: Create admin matches list API endpoint
@@ -402,4 +402,24 @@
   - Use webhook endpoint `/match-approved` for member notifications (follows existing pattern)
   - Non-blocking notifications: don't throw on notification failure
   - Can update related tables (job_submissions.admin_notes) as part of the review action
+---
+
+## Iteration 21 - US-021: Create company registration API endpoint
+- What was implemented: Created Vercel Edge Function API endpoint for company registration with validation, authentication, and admin notification
+- Files changed:
+  - api/register-company.ts (new) - company registration endpoint
+- Features:
+  - POST `/api/register-company` accepts company details (name, website, contact info, size, industry)
+  - Validates request body using Zod schema
+  - Requires Bearer token authentication
+  - Checks if user already has a company (returns 409 if exists with PGRST116 error handling)
+  - Creates company record with verified=false
+  - Sends webhook notification to admin via n8n for verification
+  - Returns created company record in camelCase format
+- Learnings for future iterations:
+  - Supabase `.single()` returns error code 'PGRST116' when no rows found - check this explicitly when expecting zero rows
+  - Use 409 Conflict status code when resource already exists
+  - Company registration webhook uses `/company-registration` endpoint path
+  - Follow existing patterns: Zod validation, Buffer.from().toString('base64') for auth, rowToX() helper for response mapping
+  - companyWebsite validation: use `.optional().or(z.literal(''))` to allow empty string as valid input
 ---

@@ -333,14 +333,14 @@ The matching engine will be API-first (no UI initially), with an admin review wo
 **Description:** As a developer, I need an API endpoint for company account registration.
 
 **Acceptance Criteria:**
-- [ ] Create `/api/register-company.ts` edge function
-- [ ] Accepts company details (name, website, contact info, size, industry)
-- [ ] Links to authenticated user account
-- [ ] Creates company record with verified=false
-- [ ] Sends notification to admin for verification
-- [ ] Returns created company record
-- [ ] Requires authentication, rejects if user already has company
-- [ ] Typecheck passes
+- [x] Create `/api/register-company.ts` edge function
+- [x] Accepts company details (name, website, contact info, size, industry)
+- [x] Links to authenticated user account
+- [x] Creates company record with verified=false
+- [x] Sends notification to admin for verification
+- [x] Returns created company record
+- [x] Requires authentication, rejects if user already has company
+- [x] Typecheck passes
 
 ---
 
