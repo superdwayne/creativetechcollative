@@ -260,13 +260,13 @@ The matching engine will be API-first (no UI initially), with an admin review wo
 **Description:** As a developer, I need a utility that uses Claude to analyze and rank candidate matches.
 
 **Acceptance Criteria:**
-- [ ] Create `rankMatchesWithClaude(job, candidates[])` function
-- [ ] Sends job spec and top N candidates (from vector search) to Claude
-- [ ] Claude analyzes fit based on job requirements vs candidate profiles
-- [ ] Returns ranked list with match_score (0-100) and match_reasoning for each
-- [ ] Includes skill_matches extraction in response
-- [ ] Uses structured output for consistent parsing
-- [ ] Typecheck passes
+- [x] Create `rankMatchesWithClaude(job, candidates[])` function
+- [x] Sends job spec and top N candidates (from vector search) to Claude
+- [x] Claude analyzes fit based on job requirements vs candidate profiles
+- [x] Returns ranked list with match_score (0-100) and match_reasoning for each
+- [x] Includes skill_matches extraction in response
+- [x] Uses structured output for consistent parsing
+- [x] Typecheck passes
 
 ---
 

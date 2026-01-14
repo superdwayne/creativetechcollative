@@ -16,7 +16,7 @@
 - [x] US-013: Create profile enrichment function
 - [x] US-014: Create batch profile enrichment API endpoint
 - [x] US-015: Create vector similarity search function
-- [ ] US-016: Create Claude match ranking utility
+- [x] US-016: Create Claude match ranking utility
 - [ ] US-017: Create main matching engine function
 - [ ] US-018: Create job matching API endpoint
 - [ ] US-019: Create job submission API endpoint
@@ -282,4 +282,31 @@
   - Format embedding vectors as string `[${embedding.join(',')}]` when passing to RPC
   - Filter availability to 'open-to-work' or 'open-to-collaborations' using `IN ('open-to-work', 'open-to-collaborations')`
   - Order by distance ASC (lower = more similar) to get best matches first
+---
+
+## Iteration 16 - US-016: Create Claude match ranking utility
+- What was implemented: Created utility function for ranking candidate matches using Claude AI with structured output
+- Files changed:
+  - src/lib/claude-ranking.ts (new) - Claude match ranking utility
+  - package.json (modified) - added @ai-sdk/anthropic dependency
+- Functions added:
+  - `rankMatchesWithClaude(job, candidates[])` - main function that sends job spec and candidates to Claude for analysis
+  - `formatJobForClaude(job)` - formats job submission for Claude's analysis
+  - `formatCandidateForClaude(profile, index)` - formats candidate profile for Claude's analysis
+  - `RankedCandidate` interface - typed result for individual ranked candidates
+  - `RankingResult` interface - typed result for the full ranking operation
+- Features:
+  - Uses Vercel AI SDK's `generateObject` with Zod schemas for structured output
+  - Uses `@ai-sdk/anthropic` with Claude claude-sonnet-4-20250514 model for cost-effective analysis
+  - Returns match scores (0-100), detailed reasoning, and skill matches
+  - Includes skill inference from portfolio content (fromProfile, fromPortfolio flags)
+  - Retry logic with exponential backoff (3 attempts, 1000ms base delay)
+  - Truncates enriched content to 2000 chars to avoid token limits
+- Learnings for future iterations:
+  - Use `@ai-sdk/anthropic` package with `createAnthropic` for Claude integration (follows same pattern as `@ai-sdk/openai`)
+  - Use `generateObject` with Zod schema for structured JSON output from Claude
+  - Install packages with `--legacy-peer-deps` when peer dependency conflicts exist
+  - Claude model string: `anthropic('claude-sonnet-4-20250514')` for balanced cost/quality
+  - Zod schemas can include `.describe()` for better AI understanding of field purposes
+  - Use `process.env.ANTHROPIC_API_KEY` for API key configuration
 ---
