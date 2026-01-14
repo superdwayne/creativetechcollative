@@ -7,6 +7,9 @@ import type {
   JobSubmission,
   JobSubmissionCreateData,
   JobStatus,
+  JobMatch,
+  JobMatchCreateData,
+  MemberResponse,
 } from '@/types/job-matching';
 import { getWebhookUrl } from '@/utils/webhookUtils';
 
@@ -893,6 +896,192 @@ export async function getAllPendingJobSubmissions(): Promise<JobSubmission[]> {
     return data.map(rowToJobSubmission);
   } catch (error) {
     console.error('Error fetching pending job submissions:', error);
+    return [];
+  }
+}
+
+// =============================================================================
+// JOB MATCH FUNCTIONS
+// =============================================================================
+
+/**
+ * Helper function to convert database row to JobMatch interface
+ */
+function rowToJobMatch(row: any): JobMatch {
+  return {
+    id: row.id,
+    jobId: row.job_id,
+    profileId: row.profile_id,
+    matchScore: row.match_score,
+    matchReasoning: row.match_reasoning,
+    skillMatches: row.skill_matches,
+    vectorSimilarity: row.vector_similarity,
+    adminApproved: row.admin_approved,
+    memberNotified: row.member_notified,
+    memberResponse: row.member_response,
+    createdAt: row.created_at,
+  };
+}
+
+/**
+ * Bulk insert job matches for a job submission
+ */
+export async function createJobMatches(
+  jobId: string,
+  matches: JobMatchCreateData[]
+): Promise<{ success: boolean; jobMatches?: JobMatch[]; error?: string }> {
+  if (!supabase) {
+    return { success: false, error: 'Database not configured' };
+  }
+
+  if (matches.length === 0) {
+    return { success: true, jobMatches: [] };
+  }
+
+  try {
+    const matchData = matches.map((match) => ({
+      job_id: jobId,
+      profile_id: match.profileId,
+      match_score: match.matchScore,
+      match_reasoning: match.matchReasoning,
+      skill_matches: match.skillMatches || null,
+      vector_similarity: match.vectorSimilarity || null,
+    }));
+
+    const { data: rows, error } = await supabase
+      .from('job_matches')
+      .insert(matchData)
+      .select();
+
+    if (error) throw error;
+
+    return { success: true, jobMatches: rows.map(rowToJobMatch) };
+  } catch (error: any) {
+    console.error('Error creating job matches:', error);
+    return { success: false, error: error.message || 'Failed to create job matches' };
+  }
+}
+
+/**
+ * Get all matches for a specific job submission
+ */
+export async function getMatchesByJobId(jobId: string): Promise<JobMatch[]> {
+  if (!supabase) return [];
+
+  try {
+    const { data, error } = await supabase
+      .from('job_matches')
+      .select('*')
+      .eq('job_id', jobId)
+      .order('match_score', { ascending: false });
+
+    if (error || !data) return [];
+
+    return data.map(rowToJobMatch);
+  } catch (error) {
+    console.error('Error fetching matches by job ID:', error);
+    return [];
+  }
+}
+
+/**
+ * Update match approval status (admin use)
+ */
+export async function updateMatchApproval(
+  matchId: string,
+  approved: boolean,
+  adminNotes?: string
+): Promise<{ success: boolean; jobMatch?: JobMatch; error?: string }> {
+  if (!supabase) {
+    return { success: false, error: 'Database not configured' };
+  }
+
+  try {
+    // First update the job_matches table
+    const { data: row, error } = await supabase
+      .from('job_matches')
+      .update({ admin_approved: approved })
+      .eq('id', matchId)
+      .select()
+      .single();
+
+    if (error) throw error;
+
+    // If adminNotes provided, update the related job submission
+    if (adminNotes !== undefined && row) {
+      await supabase
+        .from('job_submissions')
+        .update({ admin_notes: adminNotes })
+        .eq('id', row.job_id);
+    }
+
+    return { success: true, jobMatch: rowToJobMatch(row) };
+  } catch (error: any) {
+    console.error('Error updating match approval:', error);
+    return { success: false, error: error.message || 'Failed to update match approval' };
+  }
+}
+
+/**
+ * Update member response for a match
+ */
+export async function updateMemberResponse(
+  matchId: string,
+  response: MemberResponse
+): Promise<{ success: boolean; jobMatch?: JobMatch; error?: string }> {
+  if (!supabase) {
+    return { success: false, error: 'Database not configured' };
+  }
+
+  try {
+    const { data: row, error } = await supabase
+      .from('job_matches')
+      .update({ member_response: response })
+      .eq('id', matchId)
+      .select()
+      .single();
+
+    if (error) throw error;
+
+    return { success: true, jobMatch: rowToJobMatch(row) };
+  } catch (error: any) {
+    console.error('Error updating member response:', error);
+    return { success: false, error: error.message || 'Failed to update member response' };
+  }
+}
+
+/**
+ * Get all approved matches for a company's job submissions
+ */
+export async function getApprovedMatchesForCompany(
+  companyId: string
+): Promise<JobMatch[]> {
+  if (!supabase) return [];
+
+  try {
+    // First get all job IDs for the company
+    const { data: jobs, error: jobsError } = await supabase
+      .from('job_submissions')
+      .select('id')
+      .eq('company_id', companyId);
+
+    if (jobsError || !jobs || jobs.length === 0) return [];
+
+    const jobIds = jobs.map((job) => job.id);
+
+    // Then get all approved matches for those jobs
+    const { data: matches, error: matchesError } = await supabase
+      .from('job_matches')
+      .select('*')
+      .in('job_id', jobIds)
+      .eq('admin_approved', true)
+      .order('match_score', { ascending: false });
+
+    if (matchesError || !matches) return [];
+
+    return matches.map(rowToJobMatch);
+  } catch (error) {
+    console.error('Error fetching approved matches for company:', error);
     return [];
   }
 }

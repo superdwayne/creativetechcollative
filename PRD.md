@@ -164,13 +164,13 @@ The matching engine will be API-first (no UI initially), with an admin review wo
 **Description:** As a developer, I need functions to create and manage job matches.
 
 **Acceptance Criteria:**
-- [ ] Add `createJobMatches(jobId, matches[])` function - bulk insert matches
-- [ ] Add `getMatchesByJobId(jobId)` function - fetch all matches for a job
-- [ ] Add `updateMatchApproval(matchId, approved, adminNotes?)` function
-- [ ] Add `updateMemberResponse(matchId, response)` function
-- [ ] Add `getApprovedMatchesForCompany(companyId)` function
-- [ ] All functions include proper error handling and typing
-- [ ] Typecheck passes
+- [x] Add `createJobMatches(jobId, matches[])` function - bulk insert matches
+- [x] Add `getMatchesByJobId(jobId)` function - fetch all matches for a job
+- [x] Add `updateMatchApproval(matchId, approved, adminNotes?)` function
+- [x] Add `updateMemberResponse(matchId, response)` function
+- [x] Add `getApprovedMatchesForCompany(companyId)` function
+- [x] All functions include proper error handling and typing
+- [x] Typecheck passes
 
 ---
 

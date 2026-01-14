@@ -9,7 +9,7 @@
 - [x] US-006: Create TypeScript types for new tables
 - [x] US-007: Create Supabase client functions for companies
 - [x] US-008: Create Supabase client functions for job submissions
-- [ ] US-009: Create Supabase client functions for job matches
+- [x] US-009: Create Supabase client functions for job matches
 - [ ] US-010: Create profile embedding generation utility
 - [ ] US-011: Create job spec embedding generation utility
 - [ ] US-012: Create portfolio content scraping utility
@@ -144,4 +144,24 @@
   - Use `|| null` for optional fields when inserting to database
   - Order matters: ascending for admin queues (oldest first), descending for user lists (newest first)
   - Import types from `@/types/job-matching` (JobSubmission, JobSubmissionCreateData, JobStatus)
+---
+
+## Iteration 9 - US-009: Create Supabase client functions for job matches
+- What was implemented: Added CRUD functions for job matches following the existing company/job submission patterns
+- Files changed:
+  - src/lib/supabase.ts (modified) - added job match functions and types import
+- Functions added:
+  - `rowToJobMatch(row)` - helper to convert DB row to JobMatch interface
+  - `createJobMatches(jobId, matches[])` - bulk insert matches for a job, returns array of created matches
+  - `getMatchesByJobId(jobId)` - fetches all matches for a job, ordered by match_score descending
+  - `updateMatchApproval(matchId, approved, adminNotes?)` - updates admin approval status, optionally updates related job's admin_notes
+  - `updateMemberResponse(matchId, response)` - updates member's response to a match
+  - `getApprovedMatchesForCompany(companyId)` - two-step query: first get company's job IDs, then get approved matches for those jobs
+- Learnings for future iterations:
+  - Follow existing pattern: helper function `rowToFoo()` for DB-to-TypeScript mapping
+  - For bulk insert, map array to DB format and use `.insert(matchData).select()`
+  - Use `.in('column', arrayOfValues)` for IN clause queries in Supabase
+  - Two-step queries needed when filtering on related table (company_id → jobs → matches)
+  - Order by match_score descending to show best matches first
+  - Handle empty arrays gracefully in bulk operations (return early with empty result)
 ---
