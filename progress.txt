@@ -25,7 +25,7 @@
 - [x] US-022: Create webhook for member match notification
 - [x] US-023: Create admin jobs list API endpoint
 - [x] US-024: Create admin matches list API endpoint
-- [ ] US-025: Add environment variables documentation
+- [x] US-025: Add environment variables documentation
 
 ## Learnings
 (Patterns discovered during implementation)
@@ -490,4 +490,21 @@
   - Provide sensible defaults for missing profile data (e.g., Unknown for fullName)
   - Response interfaces should include nested objects (MatchWithProfile contains ProfileDetails)
   - Use `Omit<T, 'field'>` TypeScript utility when combining partial data
+---
+
+## Iteration 25 - US-025: Add environment variables documentation
+- What was implemented: Updated .env.example with all required environment variables for the AI-powered job matching engine
+- Files changed:
+  - .env.example (modified) - added new variables with documentation
+- Variables added:
+  - `SUPABASE_SERVICE_ROLE_KEY` - for server-side operations that bypass RLS
+  - `OPENAI_API_KEY` - reorganized under "AI Job Matching Engine" section with model and rate limit info
+  - `ANTHROPIC_API_KEY` - for Claude AI match ranking with model and rate limit info
+  - `ADMIN_USER_IDS` - comma-separated UUIDs for admin access with capability list
+- Learnings for future iterations:
+  - Group related env vars under section headers (===== Section Name =====)
+  - Include rate limits and pricing info for external APIs
+  - Add instructions for where to find values (e.g., "Get from Supabase Dashboard > Settings > API")
+  - Add security warnings for sensitive keys (e.g., "Never expose in client-side code")
+  - Document what each variable is used for and by which parts of the system
 ---

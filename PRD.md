@@ -390,13 +390,13 @@ The matching engine will be API-first (no UI initially), with an admin review wo
 **Description:** As a developer, I need documentation for required environment variables for the matching system.
 
 **Acceptance Criteria:**
-- [ ] Update .env.example with new variables:
+- [x] Update .env.example with new variables:
   - `OPENAI_API_KEY` (for embeddings)
   - `ANTHROPIC_API_KEY` (for Claude matching)
   - `ADMIN_USER_IDS` (comma-separated UUIDs for admin access)
-- [ ] Add comments explaining each variable's purpose
-- [ ] Document any rate limits or quotas to be aware of
-- [ ] Typecheck passes
+- [x] Add comments explaining each variable's purpose
+- [x] Document any rate limits or quotas to be aware of
+- [x] Typecheck passes
 
 ## Non-Goals
 
