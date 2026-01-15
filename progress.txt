@@ -505,3 +505,23 @@
   - `/api/messages/unread-count` returns total unread, `/api/messages/unread-status` returns per-match boolean map
   - Match cards need `relative` class for absolute positioned blue dot
 ---
+
+## Iteration 24 - US-046: Browser verification
+- What was verified:
+  - TypeScript typecheck passes (npx tsc --noEmit)
+  - Vite production build succeeds without errors
+  - Unread message indicators implementation verified:
+    - Member dashboard: red badge next to "Job Matches" header showing total unread count
+    - Company dashboard: red badge next to "Your Job Submissions" header showing total unread count
+    - Blue dot indicator on individual match cards with unread messages
+    - Counts update after viewing conversation (fetchUnreadCount called after fetchConversation marks messages as read)
+    - API endpoints: /api/messages/unread-count.ts and /api/messages/unread-status.ts
+- Files verified:
+  - src/pages/NetworkDashboardPage.tsx - member dashboard unread indicators
+  - src/pages/CompanyDashboardPage.tsx - company dashboard unread indicators
+  - api/messages/unread-count.ts - total unread count endpoint
+  - api/messages/unread-status.ts - per-match unread status endpoint
+- Learnings for future iterations:
+  - US-046 is now fully complete - all acceptance criteria met
+  - Next tasks are in PHASE 2E: Directory & Polish (US-047 onwards)
+---

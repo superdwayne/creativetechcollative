@@ -345,7 +345,7 @@ The platform connects creative technologists with companies seeking talent. The 
 - [x] Individual match cards show blue dot indicator if conversation has unread messages
 - [x] Counts update after viewing conversation
 - [x] Typecheck passes
-- [ ] Verify changes work in browser
+- [x] Verify changes work in browser
 
 ---
 
