@@ -25,6 +25,7 @@ interface MatchDetails {
   jobId: string;
   profileId: string;
   matchReasoning: string;
+  matchScore: number;
 }
 
 /**
@@ -71,7 +72,8 @@ async function sendWebhookNotification(
   memberEmail: string,
   jobTitle: string,
   companyName: string,
-  matchReasoning: string
+  matchReasoning: string,
+  matchScore: number
 ): Promise<boolean> {
   const webhookUrl = getWebhookUrl();
   const username = process.env.VITE_N8N_BASIC_AUTH_USERNAME;
@@ -83,6 +85,10 @@ async function sendWebhookNotification(
   }
 
   const basicAuth = Buffer.from(`${username}:${password}`).toString('base64');
+
+  // Get the base URL for the dashboard link
+  const baseUrl = process.env.VITE_BASE_URL || 'https://creativetechnologists.nl';
+  const dashboardLink = `${baseUrl}/network/dashboard`;
 
   const response = await fetch(webhookUrl, {
     method: 'POST',
@@ -103,7 +109,9 @@ async function sendWebhookNotification(
       company: {
         name: companyName,
       },
+      matchScore,
       matchReasoning,
+      dashboardLink,
       timestamp: new Date().toISOString(),
     }),
   });
@@ -125,7 +133,7 @@ async function fetchMatchDetails(
 ): Promise<MatchDetails | null> {
   const { data, error } = await supabase
     .from('job_matches')
-    .select('id, job_id, profile_id, match_reasoning')
+    .select('id, job_id, profile_id, match_reasoning, match_score')
     .eq('id', matchId)
     .single();
 
@@ -139,6 +147,7 @@ async function fetchMatchDetails(
     jobId: data.job_id,
     profileId: data.profile_id,
     matchReasoning: data.match_reasoning,
+    matchScore: data.match_score,
   };
 }
 
@@ -324,7 +333,8 @@ export async function notifyMemberOfMatch(
       profile.email,
       job.title,
       company.companyName,
-      match.matchReasoning
+      match.matchReasoning,
+      match.matchScore
     );
 
     if (!webhookSent) {

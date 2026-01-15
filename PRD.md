@@ -403,12 +403,12 @@ The platform connects creative technologists with companies seeking talent. The 
 **Description:** As a system, I want to email members when they're matched with a job so they check the platform.
 
 **Acceptance Criteria:**
-- [ ] After admin approves a match, triggers notification
-- [ ] Calls existing n8n webhook or Resend API
-- [ ] Email includes: job title, match score, "Why you matched" summary, link to dashboard
-- [ ] Sets `member_notified = true` on match record after sending
-- [ ] Handles send failures gracefully (logs error, doesn't crash)
-- [ ] Typecheck passes
+- [x] After admin approves a match, triggers notification
+- [x] Calls existing n8n webhook or Resend API
+- [x] Email includes: job title, match score, "Why you matched" summary, link to dashboard
+- [x] Sets `member_notified = true` on match record after sending
+- [x] Handles send failures gracefully (logs error, doesn't crash)
+- [x] Typecheck passes
 
 ---
 

@@ -57,7 +57,8 @@ async function notifyMemberOfMatch(
   memberEmail: string,
   jobTitle: string,
   companyName: string,
-  matchReasoning: string
+  matchReasoning: string,
+  matchScore: number
 ): Promise<void> {
   try {
     const webhookUrl = getWebhookUrl();
@@ -70,6 +71,10 @@ async function notifyMemberOfMatch(
     }
 
     const basicAuth = Buffer.from(`${username}:${password}`).toString('base64');
+
+    // Get the base URL for the dashboard link
+    const baseUrl = process.env.VITE_BASE_URL || 'https://creativetechnologists.nl';
+    const dashboardLink = `${baseUrl}/network/dashboard`;
 
     const response = await fetch(webhookUrl, {
       method: 'POST',
@@ -90,7 +95,9 @@ async function notifyMemberOfMatch(
         company: {
           name: companyName,
         },
+        matchScore,
         matchReasoning,
+        dashboardLink,
         timestamp: new Date().toISOString(),
       }),
     });
@@ -270,7 +277,8 @@ export default async function handler(req: Request) {
             profile.email,
             job.title,
             company.company_name,
-            match.match_reasoning
+            match.match_reasoning,
+            match.match_score
           );
 
           // Update member_notified flag
