@@ -388,14 +388,14 @@ The platform connects creative technologists with companies seeking talent. The 
 **Description:** As a visitor, I want to see rich profile details on public profile pages.
 
 **Acceptance Criteria:**
-- [ ] Profile page shows profile picture prominently
-- [ ] Shows focus areas as colored badges with descriptions on hover
-- [ ] Shows skills as tag pills
-- [ ] Projects section with images and descriptions
-- [ ] External links (portfolio, LinkedIn) open in new tab with icons
-- [ ] Availability status clearly displayed with appropriate color
-- [ ] Typecheck passes
-- [ ] Verify changes work in browser
+- [x] Profile page shows profile picture prominently
+- [x] Shows focus areas as colored badges with descriptions on hover
+- [x] Shows skills as tag pills
+- [x] Projects section with images and descriptions
+- [x] External links (portfolio, LinkedIn) open in new tab with icons
+- [x] Availability status clearly displayed with appropriate color
+- [x] Typecheck passes
+- [x] Verify changes work in browser
 
 ---
 

@@ -66,8 +66,31 @@ const NetworkProfilePage: React.FC = () => {
     }
   };
 
-  const getFocusAreaLabel = (value: string) => {
-    return FOCUS_AREAS.find(f => f.value === value)?.label || value;
+  const getFocusAreaInfo = (value: string) => {
+    const focusArea = FOCUS_AREAS.find(f => f.value === value);
+    return {
+      label: focusArea?.label || value,
+      description: focusArea?.description || ''
+    };
+  };
+
+  const getFocusAreaColor = (value: string) => {
+    switch (value) {
+      case 'immersive-experiences':
+        return 'bg-purple-500/20 text-purple-300 border-purple-500/30';
+      case 'interactive-web':
+        return 'bg-blue-500/20 text-blue-300 border-blue-500/30';
+      case 'generative-design':
+        return 'bg-pink-500/20 text-pink-300 border-pink-500/30';
+      case 'creative-automation':
+        return 'bg-amber-500/20 text-amber-300 border-amber-500/30';
+      case 'physical-computing':
+        return 'bg-emerald-500/20 text-emerald-300 border-emerald-500/30';
+      case 'realtime-visuals':
+        return 'bg-red-500/20 text-red-300 border-red-500/30';
+      default:
+        return 'bg-zinc-500/20 text-zinc-300 border-zinc-500/30';
+    }
   };
 
   if (loading) {
@@ -230,14 +253,21 @@ const NetworkProfilePage: React.FC = () => {
               Focus Areas
             </h2>
             <div className="flex flex-wrap gap-2">
-              {profile.focusAreas.map((area) => (
-                <span
-                  key={area}
-                  className="px-4 py-2 border border-zinc-700 text-zinc-300 text-sm font-secondary"
-                >
-                  {getFocusAreaLabel(area)}
-                </span>
-              ))}
+              {profile.focusAreas.map((area) => {
+                const { label, description } = getFocusAreaInfo(area);
+                return (
+                  <span
+                    key={area}
+                    className={cn(
+                      "px-4 py-2 border text-sm font-secondary cursor-default transition-all hover:scale-105",
+                      getFocusAreaColor(area)
+                    )}
+                    title={description}
+                  >
+                    {label}
+                  </span>
+                );
+              })}
             </div>
           </div>
 
