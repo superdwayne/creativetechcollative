@@ -325,14 +325,14 @@ The platform connects creative technologists with companies seeking talent. The 
 **Description:** As a creative technologist, I want to message companies about matches to learn more.
 
 **Acceptance Criteria:**
-- [ ] Match detail view has "Messages" section below job info
-- [ ] Shows conversation history with timestamps and sender labels
-- [ ] Member messages aligned right, company messages aligned left
-- [ ] Text input with Send button at bottom
-- [ ] Messaging only enabled after member responds "Interested"
-- [ ] If not yet responded, shows "Respond to this match to start messaging"
-- [ ] Typecheck passes
-- [ ] Verify changes work in browser
+- [x] Match detail view has "Messages" section below job info
+- [x] Shows conversation history with timestamps and sender labels
+- [x] Member messages aligned right, company messages aligned left
+- [x] Text input with Send button at bottom
+- [x] Messaging only enabled after member responds "Interested"
+- [x] If not yet responded, shows "Respond to this match to start messaging"
+- [x] Typecheck passes
+- [x] Verify changes work in browser
 
 ---
 

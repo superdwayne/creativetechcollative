@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useCallback } from 'react';
+import React, { useEffect, useState, useCallback, useRef } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import {
   User,
@@ -20,6 +20,8 @@ import {
   ChevronDown,
   ChevronUp,
   Clock,
+  MessageSquare,
+  Send,
 } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import { NetworkProfile, FOCUS_AREAS, AVAILABILITY_OPTIONS } from '@/types/network-profile';
@@ -28,9 +30,19 @@ import { cn } from '@/lib/utils';
 import ImageCube from '../components/ImageCube';
 import { PROJECT_TYPES, REMOTE_PREFERENCES, MemberResponse } from '@/types/job-matching';
 
+interface Message {
+  id: string;
+  matchId: string;
+  senderType: 'company' | 'member';
+  senderId: string;
+  content: string;
+  createdAt: string;
+  readAt: string | null;
+}
+
 const NetworkDashboardPage: React.FC = () => {
   const navigate = useNavigate();
-  const { user, signOut, loading: authLoading } = useAuth();
+  const { user, session, signOut, loading: authLoading } = useAuth();
   const [profile, setProfile] = useState<NetworkProfile | null>(null);
   const [jobMatches, setJobMatches] = useState<JobMatchWithDetails[]>([]);
   const [loading, setLoading] = useState(true);
@@ -39,6 +51,14 @@ const NetworkDashboardPage: React.FC = () => {
   const [error, setError] = useState('');
   const [expandedMatchId, setExpandedMatchId] = useState<string | null>(null);
   const [respondingMatchId, setRespondingMatchId] = useState<string | null>(null);
+
+  // Messaging state
+  const [expandedMessagingMatchId, setExpandedMessagingMatchId] = useState<string | null>(null);
+  const [conversations, setConversations] = useState<Record<string, Message[]>>({});
+  const [loadingConversations, setLoadingConversations] = useState<Record<string, boolean>>({});
+  const [messageInputs, setMessageInputs] = useState<Record<string, string>>({});
+  const [sendingMessages, setSendingMessages] = useState<Record<string, boolean>>({});
+  const messagesEndRef = useRef<Record<string, HTMLDivElement | null>>({});
 
   const fetchData = useCallback(async () => {
     if (!user) return;
@@ -88,6 +108,96 @@ const NetworkDashboardPage: React.FC = () => {
       setRespondingMatchId(null);
     }
   };
+
+  // Fetch conversation for a match
+  const fetchConversation = useCallback(
+    async (matchId: string) => {
+      if (!session) return;
+
+      setLoadingConversations((prev) => ({ ...prev, [matchId]: true }));
+
+      try {
+        const response = await fetch(`/api/messages/conversation?matchId=${matchId}`, {
+          headers: {
+            Authorization: `Bearer ${session.access_token}`,
+          },
+        });
+
+        const data = await response.json();
+
+        if (response.ok && data.success) {
+          setConversations((prev) => ({ ...prev, [matchId]: data.messages }));
+        } else {
+          console.error('Failed to fetch conversation:', data.error);
+        }
+      } catch (error) {
+        console.error('Error fetching conversation:', error);
+      } finally {
+        setLoadingConversations((prev) => ({ ...prev, [matchId]: false }));
+      }
+    },
+    [session]
+  );
+
+  // Load conversation when messaging section is expanded
+  useEffect(() => {
+    if (expandedMessagingMatchId && !conversations[expandedMessagingMatchId]) {
+      fetchConversation(expandedMessagingMatchId);
+    }
+  }, [expandedMessagingMatchId, conversations, fetchConversation]);
+
+  // Auto-scroll to newest messages when conversation changes or messaging opens
+  useEffect(() => {
+    if (expandedMessagingMatchId && messagesEndRef.current[expandedMessagingMatchId]) {
+      messagesEndRef.current[expandedMessagingMatchId]?.scrollIntoView({ behavior: 'smooth' });
+    }
+  }, [expandedMessagingMatchId, conversations]);
+
+  // Send a message
+  const sendMessage = useCallback(
+    async (matchId: string) => {
+      if (!session) return;
+
+      const content = messageInputs[matchId]?.trim();
+      if (!content) return;
+
+      setSendingMessages((prev) => ({ ...prev, [matchId]: true }));
+
+      try {
+        const response = await fetch('/api/messages/send', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            Authorization: `Bearer ${session.access_token}`,
+          },
+          body: JSON.stringify({ matchId, content }),
+        });
+
+        const data = await response.json();
+
+        if (response.ok && data.success) {
+          // Add the new message to the conversation
+          setConversations((prev) => ({
+            ...prev,
+            [matchId]: [...(prev[matchId] || []), data.message],
+          }));
+          // Clear the input
+          setMessageInputs((prev) => ({ ...prev, [matchId]: '' }));
+          // Scroll to the new message
+          setTimeout(() => {
+            messagesEndRef.current[matchId]?.scrollIntoView({ behavior: 'smooth' });
+          }, 100);
+        } else {
+          console.error('Failed to send message:', data.error);
+        }
+      } catch (error) {
+        console.error('Error sending message:', error);
+      } finally {
+        setSendingMessages((prev) => ({ ...prev, [matchId]: false }));
+      }
+    },
+    [session, messageInputs]
+  );
 
   const handleSignOut = async () => {
     await signOut();
@@ -585,6 +695,144 @@ const NetworkDashboardPage: React.FC = () => {
                                   </p>
                                 </div>
                               )}
+
+                              {/* Messaging Section */}
+                              <div className="pt-4 border-t border-zinc-800">
+                                {match.memberResponse === 'interested' ? (
+                                  <>
+                                    {/* Messages Toggle Button */}
+                                    <button
+                                      onClick={(e) => {
+                                        e.stopPropagation();
+                                        setExpandedMessagingMatchId(
+                                          expandedMessagingMatchId === match.id ? null : match.id
+                                        );
+                                      }}
+                                      className={cn(
+                                        'flex items-center gap-2 px-3 py-2 text-sm font-secondary transition-colors rounded-lg',
+                                        expandedMessagingMatchId === match.id
+                                          ? 'bg-pink-500/20 text-pink-400 border border-pink-500/30'
+                                          : 'bg-zinc-800 text-zinc-300 hover:bg-zinc-700 border border-zinc-700'
+                                      )}
+                                    >
+                                      <MessageSquare className="h-4 w-4" />
+                                      {expandedMessagingMatchId === match.id ? 'Hide Messages' : 'Messages'}
+                                    </button>
+
+                                    {/* Messages Section Content */}
+                                    {expandedMessagingMatchId === match.id && (
+                                      <div className="mt-4">
+                                        <div className="flex items-center gap-2 mb-3">
+                                          <MessageSquare className="h-4 w-4 text-pink-400" />
+                                          <span className="text-sm font-secondary text-white">
+                                            Conversation with {match.company.companyName}
+                                          </span>
+                                        </div>
+
+                                        {/* Conversation History */}
+                                        <div className="bg-zinc-900/50 border border-zinc-700 rounded-lg p-3 mb-3 max-h-64 overflow-y-auto">
+                                          {loadingConversations[match.id] ? (
+                                            <div className="flex items-center justify-center py-6">
+                                              <Loader2 className="h-4 w-4 animate-spin text-zinc-500" />
+                                              <span className="ml-2 text-sm text-zinc-400 font-secondary">
+                                                Loading messages...
+                                              </span>
+                                            </div>
+                                          ) : (conversations[match.id] || []).length === 0 ? (
+                                            <div className="text-center py-6">
+                                              <MessageSquare className="h-6 w-6 text-zinc-600 mx-auto mb-2" />
+                                              <p className="text-sm text-zinc-500 font-secondary">
+                                                No messages yet. Start the conversation!
+                                              </p>
+                                            </div>
+                                          ) : (
+                                            <div className="space-y-3">
+                                              {(conversations[match.id] || []).map((msg) => (
+                                                <div
+                                                  key={msg.id}
+                                                  className={cn(
+                                                    'flex flex-col max-w-[85%]',
+                                                    msg.senderType === 'member' ? 'ml-auto items-end' : 'items-start'
+                                                  )}
+                                                >
+                                                  <span className="text-xs text-zinc-500 font-secondary mb-1">
+                                                    {msg.senderType === 'member' ? 'You' : match.company.companyName} ·{' '}
+                                                    {new Date(msg.createdAt).toLocaleString(undefined, {
+                                                      month: 'short',
+                                                      day: 'numeric',
+                                                      hour: '2-digit',
+                                                      minute: '2-digit',
+                                                    })}
+                                                  </span>
+                                                  <div
+                                                    className={cn(
+                                                      'px-3 py-2 rounded-lg text-sm font-secondary',
+                                                      msg.senderType === 'member'
+                                                        ? 'bg-pink-500/20 text-pink-100 border border-pink-500/30'
+                                                        : 'bg-zinc-800 text-zinc-200 border border-zinc-700'
+                                                    )}
+                                                  >
+                                                    {msg.content}
+                                                  </div>
+                                                </div>
+                                              ))}
+                                              <div
+                                                ref={(el) => {
+                                                  messagesEndRef.current[match.id] = el;
+                                                }}
+                                              />
+                                            </div>
+                                          )}
+                                        </div>
+
+                                        {/* Message Input */}
+                                        <div className="flex gap-2">
+                                          <input
+                                            type="text"
+                                            value={messageInputs[match.id] || ''}
+                                            onChange={(e) =>
+                                              setMessageInputs((prev) => ({
+                                                ...prev,
+                                                [match.id]: e.target.value,
+                                              }))
+                                            }
+                                            onKeyDown={(e) => {
+                                              if (e.key === 'Enter' && !e.shiftKey) {
+                                                e.preventDefault();
+                                                sendMessage(match.id);
+                                              }
+                                            }}
+                                            placeholder="Type a message..."
+                                            className="flex-1 px-3 py-2 bg-zinc-900 border border-zinc-700 text-white text-sm font-secondary placeholder:text-zinc-500 focus:outline-none focus:border-zinc-500 rounded-lg"
+                                            disabled={sendingMessages[match.id]}
+                                          />
+                                          <button
+                                            onClick={() => sendMessage(match.id)}
+                                            disabled={
+                                              sendingMessages[match.id] || !messageInputs[match.id]?.trim()
+                                            }
+                                            className="px-4 py-2 bg-pink-500 text-white text-sm font-secondary hover:bg-pink-600 disabled:opacity-50 disabled:cursor-not-allowed transition-colors rounded-lg flex items-center gap-2"
+                                          >
+                                            {sendingMessages[match.id] ? (
+                                              <Loader2 className="h-4 w-4 animate-spin" />
+                                            ) : (
+                                              <Send className="h-4 w-4" />
+                                            )}
+                                            Send
+                                          </button>
+                                        </div>
+                                      </div>
+                                    )}
+                                  </>
+                                ) : (
+                                  <div className="flex items-center gap-2 p-3 bg-zinc-900/50 border border-zinc-700 rounded-lg">
+                                    <MessageSquare className="h-4 w-4 text-zinc-500" />
+                                    <p className="text-sm text-zinc-400 font-secondary">
+                                      Respond to this match to start messaging
+                                    </p>
+                                  </div>
+                                )}
+                              </div>
                             </div>
                           </div>
                         )}

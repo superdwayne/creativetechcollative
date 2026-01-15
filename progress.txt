@@ -449,3 +449,33 @@
   - Enter key handling: check `!e.shiftKey` to allow Shift+Enter for newlines in future
   - Conversation API returns { success: true, messages: Message[], markedAsRead: number }
 ---
+
+## Iteration 22 - US-045: Add messaging UI to member match view
+- What was implemented:
+  - Added Message interface type to NetworkDashboardPage (same as CompanyDashboardPage)
+  - Added session from useAuth() for API authentication
+  - Added messaging state: expandedMessagingMatchId, conversations, loadingConversations, messageInputs, sendingMessages, messagesEndRef
+  - Created fetchConversation callback to fetch messages from /api/messages/conversation endpoint
+  - Created sendMessage callback to send messages via /api/messages/send endpoint
+  - Added useEffect hooks to load conversation when messaging section is expanded and auto-scroll
+  - Added "Messages" section in expanded match view below "Already Responded" section
+  - Messaging only enabled when memberResponse === 'interested'
+  - If not responded as interested, shows disabled message: "Respond to this match to start messaging"
+  - Messages section displays:
+    - Toggle button to show/hide messages
+    - Conversation history with company name header
+    - Loading state with spinner
+    - Empty state prompting to start conversation
+    - Member messages aligned right (pink bg), company messages aligned left (zinc bg)
+    - Timestamps and sender labels
+    - Text input with Enter key support and Send button
+  - Added MessageSquare and Send icons from lucide-react
+- Files changed:
+  - src/pages/NetworkDashboardPage.tsx (added imports, Message interface, messaging state, fetchConversation/sendMessage callbacks, messaging UI in expanded match view)
+  - PRD.md (marked US-045 as complete)
+- Learnings for future iterations:
+  - Member messaging mirrors company messaging pattern but with reversed sender alignment
+  - Conditional rendering based on memberResponse: only enable messaging for 'interested' responses
+  - Same API endpoints work for both member and company - authentication determines sender type
+  - Pattern: disabled messaging section with explanatory text when preconditions not met
+---
