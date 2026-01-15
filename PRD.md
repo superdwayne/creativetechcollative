@@ -122,14 +122,14 @@ The platform connects creative technologists with companies seeking talent. The 
 **Description:** As a company, I want to see all my submitted jobs and their statuses so I can track my requests.
 
 **Acceptance Criteria:**
-- [ ] Company dashboard shows "Your Job Submissions" section
-- [ ] Lists all jobs for the company, sorted by most recent
-- [ ] Each job card shows: title, status badge, submission date, match count (if matched)
-- [ ] Status badges: yellow="Pending Review", blue="Under Review", green="Matched", gray="Closed"
-- [ ] Click job to expand/view details
-- [ ] Empty state: "No job submissions yet. Submit a job spec to find matching creative technologists."
-- [ ] Typecheck passes
-- [ ] Verify changes work in browser
+- [x] Company dashboard shows "Your Job Submissions" section
+- [x] Lists all jobs for the company, sorted by most recent
+- [x] Each job card shows: title, status badge, submission date, match count (if matched)
+- [x] Status badges: yellow="Pending Review", blue="Under Review", green="Matched", gray="Closed"
+- [x] Click job to expand/view details
+- [x] Empty state: "No job submissions yet. Submit a job spec to find matching creative technologists."
+- [x] Typecheck passes
+- [x] Verify changes work in browser
 
 ---
 

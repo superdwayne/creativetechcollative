@@ -148,3 +148,21 @@
   - TagInput component with SUGGESTED_SKILLS for preferred skills
   - Focus areas use button toggle pattern (multi-select)
 ---
+
+## Iteration 9 - US-032: Display company's submitted jobs list
+- What was implemented:
+  - Renamed section header from "Job Submissions" to "Your Job Submissions"
+  - Added match count display on job cards for matched jobs (shows "X matches" with Users icon)
+  - Added prefetch logic to load match counts for all matched jobs on initial data load
+  - Updated empty state message to match PRD exactly
+  - Jobs already sorted by most recent (`ascending: false`)
+  - Status badges already implemented with correct colors (yellow=Pending, blue=Under Review, green=Matched, gray=Closed)
+  - Click to expand/view details already implemented
+- Files changed:
+  - src/pages/CompanyDashboardPage.tsx (renamed section header, added match count display, prefetch logic for matches, updated empty state)
+- Learnings for future iterations:
+  - `getJobSubmissionsByCompany()` returns jobs sorted by most recent by default
+  - `getMatchesByJobId()` returns all matches, filter by `adminApproved === true` for company-visible matches
+  - Match count shown next to status badge: `{jobMatches[job.id].length} matches`
+  - Prefetch pattern: filter matched jobs, Promise.all on getMatchesByJobId calls, build matches map
+---
