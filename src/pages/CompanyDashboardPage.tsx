@@ -105,6 +105,54 @@ const CompanyDashboardPage: React.FC = () => {
   const [sendingMessages, setSendingMessages] = useState<Record<string, boolean>>({});
   const messagesEndRef = useRef<Record<string, HTMLDivElement | null>>({});
 
+  // Unread message state
+  const [totalUnreadCount, setTotalUnreadCount] = useState(0);
+  const [matchUnreadStatus, setMatchUnreadStatus] = useState<Record<string, boolean>>({});
+
+  // Fetch total unread count
+  const fetchUnreadCount = useCallback(async () => {
+    if (!session) return;
+
+    try {
+      const response = await fetch('/api/messages/unread-count', {
+        headers: {
+          Authorization: `Bearer ${session.access_token}`,
+        },
+      });
+      const data = await response.json();
+      if (response.ok) {
+        setTotalUnreadCount(data.count);
+      }
+    } catch (error) {
+      console.error('Error fetching unread count:', error);
+    }
+  }, [session]);
+
+  // Fetch unread status per match
+  const fetchMatchUnreadStatus = useCallback(
+    async (matchIds: string[]) => {
+      if (!session || matchIds.length === 0) return;
+
+      try {
+        const response = await fetch('/api/messages/unread-status', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            Authorization: `Bearer ${session.access_token}`,
+          },
+          body: JSON.stringify({ matchIds }),
+        });
+        const data = await response.json();
+        if (response.ok && data.success) {
+          setMatchUnreadStatus((prev) => ({ ...prev, ...data.unreadStatus }));
+        }
+      } catch (error) {
+        console.error('Error fetching match unread status:', error);
+      }
+    },
+    [session]
+  );
+
   const loadData = useCallback(async () => {
     if (!user) return;
 
@@ -135,17 +183,24 @@ const CompanyDashboardPage: React.FC = () => {
 
         const results = await Promise.all(matchPromises);
         const matchesMap: Record<string, JobMatchWithProfile[]> = {};
+        const allMatchIds: string[] = [];
         results.forEach(({ jobId, matches }) => {
           matchesMap[jobId] = matches;
+          matches.forEach((m) => allMatchIds.push(m.id));
         });
         setJobMatches(matchesMap);
+
+        // Fetch unread status for all matches
+        if (session && allMatchIds.length > 0) {
+          fetchMatchUnreadStatus(allMatchIds);
+        }
       }
     } catch (error) {
       console.error('Error loading data:', error);
     } finally {
       setLoading(false);
     }
-  }, [user, navigate]);
+  }, [user, navigate, session, fetchMatchUnreadStatus]);
 
   useEffect(() => {
     if (!authLoading && !user) {
@@ -157,6 +212,13 @@ const CompanyDashboardPage: React.FC = () => {
       loadData();
     }
   }, [user, authLoading, navigate, loadData]);
+
+  // Fetch unread count when session is available
+  useEffect(() => {
+    if (session) {
+      fetchUnreadCount();
+    }
+  }, [session, fetchUnreadCount]);
 
   // Fetch matches when a job is expanded
   const fetchMatchesForJob = useCallback(
@@ -204,6 +266,12 @@ const CompanyDashboardPage: React.FC = () => {
 
         if (response.ok && data.success) {
           setConversations((prev) => ({ ...prev, [matchId]: data.messages }));
+          // Update unread status for this match (now read)
+          setMatchUnreadStatus((prev) => ({ ...prev, [matchId]: false }));
+          // If messages were marked as read, refresh total unread count
+          if (data.markedAsRead > 0) {
+            fetchUnreadCount();
+          }
         } else {
           console.error('Failed to fetch conversation:', data.error);
         }
@@ -213,7 +281,7 @@ const CompanyDashboardPage: React.FC = () => {
         setLoadingConversations((prev) => ({ ...prev, [matchId]: false }));
       }
     },
-    [session]
+    [session, fetchUnreadCount]
   );
 
   // Load conversation when messaging section is expanded
@@ -473,6 +541,11 @@ const CompanyDashboardPage: React.FC = () => {
             <h2 className="text-xl font-primary flex items-center gap-2">
               <Briefcase className="h-5 w-5 text-zinc-500" />
               Your Job Submissions
+              {totalUnreadCount > 0 && (
+                <span className="px-2 py-0.5 bg-red-500 text-white text-xs font-secondary rounded-full min-w-[20px] text-center">
+                  {totalUnreadCount}
+                </span>
+              )}
             </h2>
             <button
               onClick={() => setShowJobForm(true)}
@@ -663,8 +736,12 @@ const CompanyDashboardPage: React.FC = () => {
                                   {jobMatches[job.id].map((match) => (
                                     <div
                                       key={match.id}
-                                      className="p-4 bg-zinc-800/50 border border-zinc-700"
+                                      className="p-4 bg-zinc-800/50 border border-zinc-700 relative"
                                     >
+                                      {/* Blue dot for unread messages */}
+                                      {matchUnreadStatus[match.id] && (
+                                        <div className="absolute top-3 right-3 w-2.5 h-2.5 bg-blue-500 rounded-full" title="Unread messages" />
+                                      )}
                                       <div className="flex items-start gap-4">
                                         {/* Profile Picture */}
                                         <a

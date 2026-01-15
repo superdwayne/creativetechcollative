@@ -479,3 +479,29 @@
   - Same API endpoints work for both member and company - authentication determines sender type
   - Pattern: disabled messaging section with explanatory text when preconditions not met
 ---
+
+## Iteration 23 - US-046: Show unread message indicators on dashboards
+- What was implemented:
+  - Created `/api/messages/unread-status.ts` endpoint to check unread status per match without marking messages as read
+  - Member dashboard: Added totalUnreadCount and matchUnreadStatus state
+  - Member dashboard: Added fetchUnreadCount callback using `/api/messages/unread-count` endpoint
+  - Member dashboard: Added fetchMatchUnreadStatus callback using new `/api/messages/unread-status` endpoint
+  - Member dashboard: Added red badge with unread count next to "Job Matches" header
+  - Member dashboard: Added blue dot indicator on match cards with unread messages
+  - Company dashboard: Added same unread state and fetch functions
+  - Company dashboard: Added red badge with unread count next to "Your Job Submissions" header
+  - Company dashboard: Added blue dot indicator on match cards with unread messages
+  - Both dashboards: fetchConversation now updates matchUnreadStatus and refreshes totalUnreadCount when messages are marked as read
+- Files created:
+  - api/messages/unread-status.ts (new endpoint to check unread status per match without side effects)
+- Files changed:
+  - src/pages/NetworkDashboardPage.tsx (added unread state, fetch functions, red badge on header, blue dot on match cards)
+  - src/pages/CompanyDashboardPage.tsx (added unread state, fetch functions, red badge on header, blue dot on match cards)
+- Learnings for future iterations:
+  - Red badge styling: `bg-red-500 text-white text-xs font-secondary rounded-full min-w-[20px] text-center`
+  - Blue dot styling: `absolute w-2.5 h-2.5 bg-blue-500 rounded-full` with `title="Unread messages"`
+  - Need separate endpoint to check unread status without marking as read (conversation endpoint has side effects)
+  - Pattern: POST endpoint with matchIds array to batch check unread status
+  - `/api/messages/unread-count` returns total unread, `/api/messages/unread-status` returns per-match boolean map
+  - Match cards need `relative` class for absolute positioned blue dot
+---

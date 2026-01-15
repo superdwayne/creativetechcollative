@@ -340,11 +340,11 @@ The platform connects creative technologists with companies seeking talent. The 
 **Description:** As a user, I want to see when I have unread messages so I know to check conversations.
 
 **Acceptance Criteria:**
-- [ ] Member dashboard shows red badge with unread count next to "Job Matches" header
-- [ ] Company dashboard shows red badge with unread count next to matched jobs
-- [ ] Individual match cards show blue dot indicator if conversation has unread messages
-- [ ] Counts update after viewing conversation
-- [ ] Typecheck passes
+- [x] Member dashboard shows red badge with unread count next to "Job Matches" header
+- [x] Company dashboard shows red badge with unread count next to matched jobs
+- [x] Individual match cards show blue dot indicator if conversation has unread messages
+- [x] Counts update after viewing conversation
+- [x] Typecheck passes
 - [ ] Verify changes work in browser
 
 ---

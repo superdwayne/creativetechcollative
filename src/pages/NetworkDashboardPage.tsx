@@ -60,6 +60,59 @@ const NetworkDashboardPage: React.FC = () => {
   const [sendingMessages, setSendingMessages] = useState<Record<string, boolean>>({});
   const messagesEndRef = useRef<Record<string, HTMLDivElement | null>>({});
 
+  // Unread message state
+  const [totalUnreadCount, setTotalUnreadCount] = useState(0);
+  const [matchUnreadStatus, setMatchUnreadStatus] = useState<Record<string, boolean>>({});
+
+  // Fetch total unread count
+  const fetchUnreadCount = useCallback(async () => {
+    if (!session) return;
+
+    try {
+      const response = await fetch('/api/messages/unread-count', {
+        headers: {
+          Authorization: `Bearer ${session.access_token}`,
+        },
+      });
+      const data = await response.json();
+      if (response.ok) {
+        setTotalUnreadCount(data.count);
+      }
+    } catch (error) {
+      console.error('Error fetching unread count:', error);
+    }
+  }, [session]);
+
+  // Fetch unread status per match
+  const fetchMatchUnreadStatus = useCallback(
+    async (matches: JobMatchWithDetails[]) => {
+      if (!session || matches.length === 0) return;
+
+      // Only check matches where member has responded 'interested'
+      const interestedMatches = matches.filter((m) => m.memberResponse === 'interested');
+      if (interestedMatches.length === 0) return;
+
+      try {
+        const response = await fetch('/api/messages/unread-status', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            Authorization: `Bearer ${session.access_token}`,
+          },
+          body: JSON.stringify({ matchIds: interestedMatches.map((m) => m.id) }),
+        });
+        const data = await response.json();
+        if (response.ok && data.success) {
+          setMatchUnreadStatus(data.unreadStatus);
+        }
+      } catch (error) {
+        console.error('Error fetching match unread status:', error);
+      }
+    },
+    [session]
+  );
+
+
   const fetchData = useCallback(async () => {
     if (!user) return;
 
@@ -71,13 +124,17 @@ const NetworkDashboardPage: React.FC = () => {
       if (profileData) {
         const matches = await getMatchesForMember(profileData.id);
         setJobMatches(matches);
+        // Fetch unread status for matches after getting them
+        if (session) {
+          fetchMatchUnreadStatus(matches);
+        }
       }
     } catch (err) {
       console.error('Error fetching data:', err);
     } finally {
       setLoading(false);
     }
-  }, [user]);
+  }, [user, session, fetchMatchUnreadStatus]);
 
   useEffect(() => {
     if (!authLoading && !user) {
@@ -89,6 +146,13 @@ const NetworkDashboardPage: React.FC = () => {
       fetchData();
     }
   }, [user, authLoading, navigate, fetchData]);
+
+  // Fetch unread count when session is available
+  useEffect(() => {
+    if (session) {
+      fetchUnreadCount();
+    }
+  }, [session, fetchUnreadCount]);
 
   const handleRespondToMatch = async (matchId: string, response: MemberResponse) => {
     setRespondingMatchId(matchId);
@@ -127,6 +191,12 @@ const NetworkDashboardPage: React.FC = () => {
 
         if (response.ok && data.success) {
           setConversations((prev) => ({ ...prev, [matchId]: data.messages }));
+          // Update unread status for this match (now read)
+          setMatchUnreadStatus((prev) => ({ ...prev, [matchId]: false }));
+          // If messages were marked as read, refresh total unread count
+          if (data.markedAsRead > 0) {
+            fetchUnreadCount();
+          }
         } else {
           console.error('Failed to fetch conversation:', data.error);
         }
@@ -136,7 +206,7 @@ const NetworkDashboardPage: React.FC = () => {
         setLoadingConversations((prev) => ({ ...prev, [matchId]: false }));
       }
     },
-    [session]
+    [session, fetchUnreadCount]
   );
 
   // Load conversation when messaging section is expanded
@@ -491,6 +561,11 @@ const NetworkDashboardPage: React.FC = () => {
               <div className="flex items-center gap-2 mb-6">
                 <Sparkles className="h-5 w-5 text-pink-500" />
                 <h3 className="text-lg font-primary text-white">Job Matches</h3>
+                {totalUnreadCount > 0 && (
+                  <span className="ml-1 px-2 py-0.5 bg-red-500 text-white text-xs font-secondary rounded-full min-w-[20px] text-center">
+                    {totalUnreadCount}
+                  </span>
+                )}
                 {jobMatches.length > 0 && (
                   <span className="ml-2 px-2 py-0.5 bg-pink-500/20 text-pink-400 text-xs font-secondary rounded-full">
                     {jobMatches.length} {jobMatches.length === 1 ? 'match' : 'matches'}
@@ -518,7 +593,11 @@ const NetworkDashboardPage: React.FC = () => {
                     const remoteLabel = REMOTE_PREFERENCES.find((r) => r.value === match.job.remotePreference)?.label || match.job.remotePreference;
 
                     return (
-                      <div key={match.id} className="border border-zinc-800 rounded-lg overflow-hidden">
+                      <div key={match.id} className="border border-zinc-800 rounded-lg overflow-hidden relative">
+                        {/* Blue dot for unread messages */}
+                        {matchUnreadStatus[match.id] && (
+                          <div className="absolute top-3 right-12 w-2.5 h-2.5 bg-blue-500 rounded-full" title="Unread messages" />
+                        )}
                         <button
                           onClick={() => setExpandedMatchId(isExpanded ? null : match.id)}
                           className="w-full p-4 flex items-start justify-between text-left hover:bg-zinc-900/50 transition-colors"
