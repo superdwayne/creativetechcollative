@@ -525,3 +525,23 @@
   - US-046 is now fully complete - all acceptance criteria met
   - Next tasks are in PHASE 2E: Directory & Polish (US-047 onwards)
 ---
+
+## Iteration 25 - US-047: Add search to directory page
+- What was implemented:
+  - Added debounced search functionality with 300ms delay
+  - Added URL param sync for search query (`?q=searchterm`) for shareability
+  - Added clear button (X icon) inside search input that appears when text is entered
+  - Search filters by name, location, skills, and bio content (already existed)
+  - URL updates only after debounce completes to avoid excessive history entries
+  - Uses `replace: true` on setSearchParams to avoid cluttering browser history
+  - Search state initializes from URL params on page load
+- Files changed:
+  - src/pages/NetworkDirectoryPage.tsx (added useSearchParams, debounce effect, URL sync effect, clear button)
+- Learnings for future iterations:
+  - Debounce pattern: useEffect with setTimeout and cleanup function to clear timer
+  - URL param sync pattern: separate effect that updates params only when debounced value changes
+  - Use `new URLSearchParams(searchParams)` to create mutable copy for modification
+  - Use `setSearchParams(newParams, { replace: true })` to avoid history spam
+  - Search param convention: use 'q' for search queries
+  - Check `newParams.toString() !== searchParams.toString()` to avoid unnecessary updates
+---

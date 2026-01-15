@@ -357,14 +357,14 @@ The platform connects creative technologists with companies seeking talent. The 
 **Description:** As a visitor, I want to search the directory to find creative technologists by name or keywords.
 
 **Acceptance Criteria:**
-- [ ] Directory page has search input at top
-- [ ] Search filters profiles by name and bio content
-- [ ] Search is debounced (300ms delay)
-- [ ] Results update as user types
-- [ ] Clear button to reset search
-- [ ] URL updates with search param for shareability
-- [ ] Typecheck passes
-- [ ] Verify changes work in browser
+- [x] Directory page has search input at top
+- [x] Search filters profiles by name and bio content
+- [x] Search is debounced (300ms delay)
+- [x] Results update as user types
+- [x] Clear button to reset search
+- [x] URL updates with search param for shareability
+- [x] Typecheck passes
+- [x] Verify changes work in browser
 
 ---
 

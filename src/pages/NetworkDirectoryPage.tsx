@@ -1,5 +1,5 @@
 import React, { useEffect, useState, useMemo } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { Input } from '../components/ui/input';
 import { 
   Search, 
@@ -18,12 +18,38 @@ import { cn } from '@/lib/utils';
 
 const NetworkDirectoryPage: React.FC = () => {
   const navigate = useNavigate();
+  const [searchParams, setSearchParams] = useSearchParams();
   const [profiles, setProfiles] = useState<NetworkProfile[]>([]);
   const [loading, setLoading] = useState(true);
-  const [searchQuery, setSearchQuery] = useState('');
+
+  // Initialize from URL params
+  const [searchQuery, setSearchQuery] = useState(searchParams.get('q') || '');
+  const [debouncedSearchQuery, setDebouncedSearchQuery] = useState(searchParams.get('q') || '');
   const [selectedFocusArea, setSelectedFocusArea] = useState<FocusArea | ''>('');
   const [selectedAvailability, setSelectedAvailability] = useState<AvailabilityStatus | ''>('');
   const [showFilters, setShowFilters] = useState(false);
+
+  // Debounce search query (300ms delay)
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setDebouncedSearchQuery(searchQuery);
+    }, 300);
+    return () => clearTimeout(timer);
+  }, [searchQuery]);
+
+  // Update URL when debounced search query changes
+  useEffect(() => {
+    const newParams = new URLSearchParams(searchParams);
+    if (debouncedSearchQuery) {
+      newParams.set('q', debouncedSearchQuery);
+    } else {
+      newParams.delete('q');
+    }
+    // Only update if params actually changed
+    if (newParams.toString() !== searchParams.toString()) {
+      setSearchParams(newParams, { replace: true });
+    }
+  }, [debouncedSearchQuery, searchParams, setSearchParams]);
 
   useEffect(() => {
     const fetchProfiles = async () => {
@@ -42,24 +68,25 @@ const NetworkDirectoryPage: React.FC = () => {
 
   const filteredProfiles = useMemo(() => {
     return profiles.filter(profile => {
-      const matchesSearch = !searchQuery || 
-        profile.fullName.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        profile.location.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        profile.skills.some(skill => skill.toLowerCase().includes(searchQuery.toLowerCase())) ||
-        profile.bio.toLowerCase().includes(searchQuery.toLowerCase());
+      const matchesSearch = !debouncedSearchQuery ||
+        profile.fullName.toLowerCase().includes(debouncedSearchQuery.toLowerCase()) ||
+        profile.location.toLowerCase().includes(debouncedSearchQuery.toLowerCase()) ||
+        profile.skills.some(skill => skill.toLowerCase().includes(debouncedSearchQuery.toLowerCase())) ||
+        profile.bio.toLowerCase().includes(debouncedSearchQuery.toLowerCase());
 
-      const matchesFocusArea = !selectedFocusArea || 
+      const matchesFocusArea = !selectedFocusArea ||
         profile.focusAreas.includes(selectedFocusArea);
 
-      const matchesAvailability = !selectedAvailability || 
+      const matchesAvailability = !selectedAvailability ||
         profile.availability === selectedAvailability;
 
       return matchesSearch && matchesFocusArea && matchesAvailability;
     });
-  }, [profiles, searchQuery, selectedFocusArea, selectedAvailability]);
+  }, [profiles, debouncedSearchQuery, selectedFocusArea, selectedAvailability]);
 
   const clearFilters = () => {
     setSearchQuery('');
+    setDebouncedSearchQuery('');
     setSelectedFocusArea('');
     setSelectedAvailability('');
   };
@@ -143,8 +170,20 @@ const NetworkDirectoryPage: React.FC = () => {
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
                   placeholder="Search by name, location, or skill..."
-                  className="pl-12 h-14 bg-transparent border-zinc-800 focus:border-zinc-600 font-secondary"
+                  className="pl-12 pr-12 h-14 bg-transparent border-zinc-800 focus:border-zinc-600 font-secondary"
                 />
+                {searchQuery && (
+                  <button
+                    onClick={() => {
+                      setSearchQuery('');
+                      setDebouncedSearchQuery('');
+                    }}
+                    className="absolute right-4 top-1/2 -translate-y-1/2 h-5 w-5 text-zinc-500 hover:text-white transition-colors"
+                    title="Clear search"
+                  >
+                    <X className="h-5 w-5" />
+                  </button>
+                )}
               </div>
               <button
                 onClick={() => setShowFilters(!showFilters)}
