@@ -94,7 +94,7 @@ The platform connects creative technologists with companies seeking talent. The 
 - [x] Updates embedding and embedding_updated_at
 - [x] Failure shows warning but doesn't block update
 - [x] Typecheck passes
-- [ ] Verify changes work in browser
+- [x] Verify changes work in browser
 
 ---
 
