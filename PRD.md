@@ -249,7 +249,7 @@ The platform connects creative technologists with companies seeking talent. The 
 **Description:** As a system, I need a messages table so companies and members can communicate about job matches.
 
 **Acceptance Criteria:**
-- [ ] Create migration for `messages` table with columns:
+- [x] Create migration for `messages` table with columns:
   - `id` (UUID, primary key)
   - `match_id` (UUID, FK to job_matches, not null)
   - `sender_type` (VARCHAR, 'company' or 'member')
@@ -257,10 +257,10 @@ The platform connects creative technologists with companies seeking talent. The 
   - `content` (TEXT, not null)
   - `created_at` (TIMESTAMP, default now())
   - `read_at` (TIMESTAMP, nullable)
-- [ ] Add index on match_id for fast conversation loading
-- [ ] Add RLS: only match participants can read/write messages
-- [ ] Migration runs successfully
-- [ ] Typecheck passes
+- [x] Add index on match_id for fast conversation loading
+- [x] Add RLS: only match participants can read/write messages
+- [x] Migration runs successfully
+- [x] Typecheck passes
 
 ---
 
