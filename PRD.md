@@ -74,13 +74,13 @@ The platform connects creative technologists with companies seeking talent. The 
 **Description:** As a system, I need to automatically enrich profiles when they're created so AI matching has rich context.
 
 **Acceptance Criteria:**
-- [ ] After profile creation succeeds, calls `/api/enrich-profile` endpoint
-- [ ] Shows "Enhancing your profile with AI..." toast during enrichment
-- [ ] Enrichment scrapes portfolio_url and linkedin_url if provided
-- [ ] Generates embedding from bio + skills + enriched content
-- [ ] Failure doesn't block profile creation (graceful degradation)
-- [ ] Typecheck passes
-- [ ] Verify changes work in browser
+- [x] After profile creation succeeds, calls `/api/enrich-profile` endpoint
+- [x] Shows "Enhancing your profile with AI..." toast during enrichment
+- [x] Enrichment scrapes portfolio_url and linkedin_url if provided
+- [x] Generates embedding from bio + skills + enriched content
+- [x] Failure doesn't block profile creation (graceful degradation)
+- [x] Typecheck passes
+- [x] Verify changes work in browser
 
 ---
 

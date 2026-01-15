@@ -54,3 +54,38 @@
   - US-027 is now fully complete - all acceptance criteria met
   - The implementation already includes expandable match details with full job info and response buttons (partly overlaps with US-028)
 ---
+
+## Iteration 4 - US-028: Create match detail view for members
+- What was implemented:
+  - Added company verified badge (blue BadgeCheck icon) next to company name when company.verified is true
+  - Most of US-028 functionality was already implemented in US-027 (expandable detail view, job description, match reasoning, response buttons)
+- Files changed:
+  - src/pages/NetworkDashboardPage.tsx (added verified badge display)
+- Learnings for future iterations:
+  - Company type has `verified` boolean field for company verification status
+  - BadgeCheck icon with blue color (text-blue-400) used for verified badges
+  - Use title attribute for accessibility: `title="Verified Company"`
+  - JobMatchWithDetails type provides access to match.company.verified
+---
+
+## Iteration 5 - US-029: Trigger profile enrichment on creation
+- What was implemented:
+  - Created new API endpoint `/api/enrich-profile.ts` for single profile enrichment
+  - Endpoint validates user owns the profile, generates OpenAI text-embedding-3-small embedding from profile data
+  - Modified `NetworkCreateProfilePage.tsx` to call enrichment endpoint after successful profile creation
+  - Added `isEnriching` and `enrichmentError` state for tracking enrichment status
+  - Added "Enhancing your profile with AI..." message with Sparkles icon during enrichment
+  - Added warning message if enrichment fails (graceful degradation - profile creation still succeeds)
+  - Enrichment runs in background after profile creation succeeds
+- Files created:
+  - api/enrich-profile.ts (new single-profile enrichment endpoint)
+- Files changed:
+  - src/pages/NetworkCreateProfilePage.tsx (added session import, enrichment state, enrichment call in handleSubmit, enrichment status UI)
+- Learnings for future iterations:
+  - Session comes from `useAuth()` hook and provides `access_token` for API authentication
+  - API calls to `/api/*` endpoints use `Authorization: Bearer ${session.access_token}` header
+  - Graceful degradation pattern: try/catch around enrichment, set error state but don't throw
+  - Sparkles icon with `animate-pulse` class for loading states
+  - AlertTriangle icon with amber colors for warnings
+  - Embedding is generated from: name, bio, skills, focus_areas, projects, location, enriched_content
+---
