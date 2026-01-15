@@ -24,6 +24,9 @@ import {
   X,
   CheckCheck,
   Link2,
+  BadgeCheck,
+  Mail,
+  Phone,
 } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import { cn } from '@/lib/utils';
@@ -161,6 +164,22 @@ interface PendingMatchGroup {
   matches: PendingMatch[];
 }
 
+// Company type for admin view
+interface AdminCompany {
+  id: string;
+  userId: string;
+  companyName: string;
+  companyWebsite: string | null;
+  contactName: string;
+  contactEmail: string;
+  contactPhone: string | null;
+  companySize: string | null;
+  industry: string | null;
+  verified: boolean;
+  createdAt: string;
+  updatedAt: string;
+}
+
 const AdminDashboardPage: React.FC = () => {
   const navigate = useNavigate();
   const { user, session, signOut, loading: authLoading } = useAuth();
@@ -203,6 +222,12 @@ const AdminDashboardPage: React.FC = () => {
   const [loadingPendingMatches, setLoadingPendingMatches] = useState(false);
   const [expandedPendingJobId, setExpandedPendingJobId] = useState<string | null>(null);
   const [approvingAllJobId, setApprovingAllJobId] = useState<string | null>(null);
+
+  // Companies state
+  const [companies, setCompanies] = useState<AdminCompany[]>([]);
+  const [loadingCompanies, setLoadingCompanies] = useState(false);
+  const [expandedCompanyId, setExpandedCompanyId] = useState<string | null>(null);
+  const [togglingVerifyId, setTogglingVerifyId] = useState<string | null>(null);
 
   const fetchPendingProfiles = useCallback(async () => {
     if (!session?.access_token) return;
@@ -255,6 +280,76 @@ const AdminDashboardPage: React.FC = () => {
       setLoadingPendingMatches(false);
     }
   }, [session?.access_token]);
+
+  const fetchCompanies = useCallback(async () => {
+    if (!session?.access_token) return;
+
+    setLoadingCompanies(true);
+
+    try {
+      const response = await fetch('/api/admin/companies', {
+        headers: {
+          Authorization: `Bearer ${session.access_token}`,
+        },
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data.error || 'Failed to fetch companies');
+      }
+
+      setCompanies(data.companies);
+    } catch (err) {
+      console.error('Error fetching companies:', err);
+    } finally {
+      setLoadingCompanies(false);
+    }
+  }, [session?.access_token]);
+
+  const toggleCompanyVerification = async (companyId: string, verified: boolean) => {
+    if (!session?.access_token || togglingVerifyId) return;
+
+    setTogglingVerifyId(companyId);
+
+    try {
+      const response = await fetch('/api/admin/companies/verify', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${session.access_token}`,
+        },
+        body: JSON.stringify({ companyId, verified }),
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data.error || 'Failed to update verification');
+      }
+
+      // Update local state
+      setCompanies((prev) =>
+        prev.map((c) => (c.id === companyId ? { ...c, verified } : c))
+      );
+
+      // Show success toast
+      setToast({
+        message: verified ? 'Company verified' : 'Company unverified',
+        type: 'success',
+      });
+      setTimeout(() => setToast(null), 3000);
+    } catch (err) {
+      console.error('Error toggling verification:', err);
+      setToast({
+        message: err instanceof Error ? err.message : 'Failed to update verification',
+        type: 'error',
+      });
+      setTimeout(() => setToast(null), 3000);
+    } finally {
+      setTogglingVerifyId(null);
+    }
+  };
 
   const approveAllMatchesForJob = async (jobId: string, matchIds: string[]) => {
     if (!session?.access_token || approvingAllJobId) return;
@@ -644,8 +739,9 @@ const AdminDashboardPage: React.FC = () => {
       fetchJobs();
       fetchPendingProfiles();
       fetchPendingMatches();
+      fetchCompanies();
     }
-  }, [user, session, authLoading, navigate, fetchJobs, fetchPendingProfiles, fetchPendingMatches]);
+  }, [user, session, authLoading, navigate, fetchJobs, fetchPendingProfiles, fetchPendingMatches, fetchCompanies]);
 
   useEffect(() => {
     if (expandedJobId && !matches[expandedJobId]) {
@@ -1464,6 +1560,216 @@ const AdminDashboardPage: React.FC = () => {
                               <XCircle className="h-4 w-4" />
                               Reject
                             </button>
+                          </div>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+          )}
+        </div>
+
+        {/* Companies Section */}
+        <div className="mb-10">
+          <div className="flex items-center justify-between mb-4">
+            <div className="flex items-center gap-2">
+              <Building2 className="h-5 w-5 text-zinc-500" />
+              <h2 className="text-xl font-primary">Companies</h2>
+              <span className="px-2 py-0.5 bg-zinc-500/20 text-zinc-400 text-xs font-secondary rounded-full">
+                {companies.length}
+              </span>
+            </div>
+            <button
+              onClick={() => fetchCompanies()}
+              disabled={loadingCompanies}
+              className="flex items-center gap-2 px-3 py-2 border border-zinc-800 text-zinc-400 hover:text-white hover:border-zinc-600 font-secondary text-sm transition-colors disabled:opacity-50"
+            >
+              {loadingCompanies ? (
+                <Loader2 className="h-4 w-4 animate-spin" />
+              ) : (
+                <RefreshCw className="h-4 w-4" />
+              )}
+              Refresh
+            </button>
+          </div>
+
+          {loadingCompanies ? (
+            <div className="border border-zinc-800 p-8 flex items-center justify-center">
+              <Loader2 className="h-6 w-6 animate-spin text-zinc-500" />
+            </div>
+          ) : companies.length === 0 ? (
+            <div className="border border-zinc-800 p-8 text-center">
+              <Building2 className="h-12 w-12 text-zinc-700 mx-auto mb-4" />
+              <p className="text-zinc-400 font-secondary">No companies registered yet.</p>
+            </div>
+          ) : (
+            <div className="space-y-3">
+              {companies.map((company) => {
+                const isExpanded = expandedCompanyId === company.id;
+                return (
+                  <div key={company.id} className="border border-zinc-800">
+                    {/* Company Header */}
+                    <button
+                      onClick={() => setExpandedCompanyId(isExpanded ? null : company.id)}
+                      className="w-full p-4 flex items-center justify-between text-left hover:bg-zinc-900/50 transition-colors"
+                    >
+                      <div className="flex items-center gap-4 flex-1">
+                        <div className="w-10 h-10 rounded-full bg-zinc-800 flex items-center justify-center border border-zinc-700">
+                          <Building2 className="h-5 w-5 text-zinc-500" />
+                        </div>
+
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center gap-3 mb-1">
+                            <h3 className="font-primary text-white">{company.companyName}</h3>
+                            {company.verified ? (
+                              <span className="inline-flex items-center gap-1 px-2 py-0.5 bg-blue-500/20 text-blue-400 text-xs font-secondary border border-blue-500/30">
+                                <BadgeCheck className="h-3 w-3" />
+                                Verified
+                              </span>
+                            ) : (
+                              <span className="px-2 py-0.5 bg-zinc-500/20 text-zinc-400 text-xs font-secondary border border-zinc-500/30">
+                                Unverified
+                              </span>
+                            )}
+                          </div>
+                          <div className="flex flex-wrap gap-3 text-sm text-zinc-500 font-secondary">
+                            <span className="flex items-center gap-1">
+                              <Mail className="h-3 w-3" />
+                              {company.contactEmail}
+                            </span>
+                            {company.industry && <span>{company.industry}</span>}
+                            <span className="flex items-center gap-1">
+                              <Calendar className="h-3 w-3" />
+                              {new Date(company.createdAt).toLocaleDateString()}
+                            </span>
+                          </div>
+                        </div>
+                      </div>
+
+                      {isExpanded ? (
+                        <ChevronUp className="h-5 w-5 text-zinc-500 flex-shrink-0" />
+                      ) : (
+                        <ChevronDown className="h-5 w-5 text-zinc-500 flex-shrink-0" />
+                      )}
+                    </button>
+
+                    {/* Expanded Company Details */}
+                    {isExpanded && (
+                      <div className="px-4 pb-4 border-t border-zinc-800">
+                        <div className="pt-4 space-y-4">
+                          {/* Contact Info */}
+                          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                            <div>
+                              <p className="text-xs font-secondary text-zinc-500 uppercase tracking-wide mb-2">
+                                Contact Name
+                              </p>
+                              <p className="text-sm text-zinc-300 font-secondary">
+                                {company.contactName}
+                              </p>
+                            </div>
+                            <div>
+                              <p className="text-xs font-secondary text-zinc-500 uppercase tracking-wide mb-2">
+                                Contact Email
+                              </p>
+                              <p className="text-sm text-zinc-300 font-secondary">
+                                {company.contactEmail}
+                              </p>
+                            </div>
+                            {company.contactPhone && (
+                              <div>
+                                <p className="text-xs font-secondary text-zinc-500 uppercase tracking-wide mb-2">
+                                  Phone
+                                </p>
+                                <p className="text-sm text-zinc-300 font-secondary flex items-center gap-1">
+                                  <Phone className="h-3 w-3" />
+                                  {company.contactPhone}
+                                </p>
+                              </div>
+                            )}
+                            {company.companyWebsite && (
+                              <div>
+                                <p className="text-xs font-secondary text-zinc-500 uppercase tracking-wide mb-2">
+                                  Website
+                                </p>
+                                <a
+                                  href={company.companyWebsite}
+                                  target="_blank"
+                                  rel="noopener noreferrer"
+                                  className="text-sm text-pink-400 hover:text-pink-300 font-secondary flex items-center gap-1"
+                                >
+                                  <Globe className="h-3 w-3" />
+                                  {company.companyWebsite}
+                                  <ExternalLink className="h-3 w-3" />
+                                </a>
+                              </div>
+                            )}
+                          </div>
+
+                          {/* Company Details */}
+                          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                            {company.industry && (
+                              <div>
+                                <p className="text-xs font-secondary text-zinc-500 uppercase tracking-wide mb-2">
+                                  Industry
+                                </p>
+                                <p className="text-sm text-zinc-300 font-secondary">
+                                  {company.industry}
+                                </p>
+                              </div>
+                            )}
+                            {company.companySize && (
+                              <div>
+                                <p className="text-xs font-secondary text-zinc-500 uppercase tracking-wide mb-2">
+                                  Company Size
+                                </p>
+                                <p className="text-sm text-zinc-300 font-secondary capitalize">
+                                  {company.companySize}
+                                </p>
+                              </div>
+                            )}
+                          </div>
+
+                          {/* Verification Toggle */}
+                          <div className="flex gap-3 pt-4 border-t border-zinc-800">
+                            {company.verified ? (
+                              <button
+                                onClick={() => toggleCompanyVerification(company.id, false)}
+                                disabled={togglingVerifyId === company.id}
+                                className="flex items-center gap-2 px-4 py-2 bg-zinc-700 hover:bg-zinc-600 text-white font-secondary text-sm transition-colors disabled:opacity-50"
+                              >
+                                {togglingVerifyId === company.id ? (
+                                  <>
+                                    <Loader2 className="h-4 w-4 animate-spin" />
+                                    Updating...
+                                  </>
+                                ) : (
+                                  <>
+                                    <XCircle className="h-4 w-4" />
+                                    Unverify
+                                  </>
+                                )}
+                              </button>
+                            ) : (
+                              <button
+                                onClick={() => toggleCompanyVerification(company.id, true)}
+                                disabled={togglingVerifyId === company.id}
+                                className="flex items-center gap-2 px-4 py-2 bg-blue-500 hover:bg-blue-600 text-white font-secondary text-sm transition-colors disabled:opacity-50"
+                              >
+                                {togglingVerifyId === company.id ? (
+                                  <>
+                                    <Loader2 className="h-4 w-4 animate-spin" />
+                                    Updating...
+                                  </>
+                                ) : (
+                                  <>
+                                    <BadgeCheck className="h-4 w-4" />
+                                    Verify
+                                  </>
+                                )}
+                              </button>
+                            )}
                           </div>
                         </div>
                       </div>

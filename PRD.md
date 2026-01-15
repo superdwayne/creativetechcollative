@@ -230,14 +230,14 @@ The platform connects creative technologists with companies seeking talent. The 
 **Description:** As an admin, I want to verify companies so members know they're legitimate.
 
 **Acceptance Criteria:**
-- [ ] Admin dashboard has "Companies" section
-- [ ] Lists all registered companies
-- [ ] Each row shows: company name, contact email, industry, verified status, registration date
-- [ ] Verify/Unverify toggle button for each company
-- [ ] Verify sets `verified = true`, Unverify sets `verified = false`
-- [ ] Verified badge appears next to company names throughout platform
-- [ ] Typecheck passes
-- [ ] Verify changes work in browser
+- [x] Admin dashboard has "Companies" section
+- [x] Lists all registered companies
+- [x] Each row shows: company name, contact email, industry, verified status, registration date
+- [x] Verify/Unverify toggle button for each company
+- [x] Verify sets `verified = true`, Unverify sets `verified = false`
+- [x] Verified badge appears next to company names throughout platform
+- [x] Typecheck passes
+- [x] Verify changes work in browser
 
 ---
 

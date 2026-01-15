@@ -301,3 +301,29 @@
   - CheckCheck icon used for bulk approve operations
   - Same toast state pattern reused for new actions
 ---
+
+## Iteration 16 - US-039: Create admin company verification section
+- What was implemented:
+  - Created `/api/admin/companies.ts` endpoint to fetch all registered companies
+  - Created `/api/admin/companies/verify.ts` endpoint to toggle company verification status
+  - Added "Companies" section to AdminDashboardPage after Pending Profiles
+  - Section shows all companies with count badge, sorted by most recent first
+  - Each row displays: company name, verified badge, contact email, industry, registration date
+  - Expandable detail view shows: contact info, phone, website, company size, industry
+  - Verify button (blue) for unverified companies, Unverify button (gray) for verified companies
+  - Toggle updates `verified` field and `updated_at` timestamp
+  - Toast notifications for success/error feedback
+  - Added BadgeCheck, Mail, Phone icons
+- Files created:
+  - api/admin/companies.ts (admin companies list endpoint)
+  - api/admin/companies/verify.ts (company verification toggle endpoint)
+- Files changed:
+  - src/pages/AdminDashboardPage.tsx (added AdminCompany type, companies state, fetchCompanies, toggleCompanyVerification functions, Companies section UI)
+  - PRD.md (marked US-039 as complete)
+- Learnings for future iterations:
+  - Company verification uses simple boolean toggle pattern
+  - BadgeCheck icon with blue colors for verified status badges
+  - Verify button uses blue-500 colors, Unverify uses zinc-700 (gray)
+  - Companies sorted by created_at descending (most recent first)
+  - API pattern: update record and return updated data in single query using .select().single()
+---
