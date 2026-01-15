@@ -9,6 +9,7 @@ import type {
   JobStatus,
   JobMatch,
   JobMatchCreateData,
+  JobMatchWithProfile,
   MemberResponse,
 } from '@/types/job-matching';
 import { getWebhookUrl } from '@/utils/webhookUtils';
@@ -985,6 +986,48 @@ export async function getMatchesByJobId(jobId: string): Promise<JobMatch[]> {
 }
 
 /**
+ * Get all matches for a specific job with profile info (for company view)
+ */
+export async function getMatchesWithProfilesByJobId(jobId: string): Promise<JobMatchWithProfile[]> {
+  if (!supabase) return [];
+
+  try {
+    const { data, error } = await supabase
+      .from('job_matches')
+      .select(`
+        *,
+        network_profiles!inner (
+          id,
+          full_name,
+          profile_picture_url,
+          slug,
+          location,
+          bio
+        )
+      `)
+      .eq('job_id', jobId)
+      .order('match_score', { ascending: false });
+
+    if (error || !data) return [];
+
+    return data.map((row) => ({
+      ...rowToJobMatch(row),
+      profile: {
+        id: row.network_profiles.id,
+        fullName: row.network_profiles.full_name,
+        profilePictureUrl: row.network_profiles.profile_picture_url,
+        slug: row.network_profiles.slug,
+        location: row.network_profiles.location,
+        bio: row.network_profiles.bio,
+      },
+    }));
+  } catch (error) {
+    console.error('Error fetching matches with profiles by job ID:', error);
+    return [];
+  }
+}
+
+/**
  * Update match approval status (admin use)
  */
 export async function updateMatchApproval(
@@ -1082,6 +1125,81 @@ export async function getApprovedMatchesForCompany(
     return matches.map(rowToJobMatch);
   } catch (error) {
     console.error('Error fetching approved matches for company:', error);
+    return [];
+  }
+}
+
+/**
+ * Extended JobMatch with job submission details for member dashboard
+ */
+export interface JobMatchWithDetails extends JobMatch {
+  job: JobSubmission;
+  company: Company;
+}
+
+/**
+ * Get all approved matches for a specific member profile
+ * Includes job and company details for display
+ */
+export async function getMatchesForMember(
+  profileId: string
+): Promise<JobMatchWithDetails[]> {
+  if (!supabase) return [];
+
+  try {
+    // Get all matches where member has been notified (approved matches)
+    const { data: matches, error: matchesError } = await supabase
+      .from('job_matches')
+      .select('*')
+      .eq('profile_id', profileId)
+      .eq('admin_approved', true)
+      .order('created_at', { ascending: false });
+
+    if (matchesError || !matches || matches.length === 0) return [];
+
+    // Get unique job IDs
+    const jobIds = [...new Set(matches.map((m) => m.job_id))];
+
+    // Fetch all jobs
+    const { data: jobs, error: jobsError } = await supabase
+      .from('job_submissions')
+      .select('*')
+      .in('id', jobIds);
+
+    if (jobsError || !jobs) return [];
+
+    // Get unique company IDs from jobs
+    const companyIds = [...new Set(jobs.map((j) => j.company_id))];
+
+    // Fetch all companies
+    const { data: companies, error: companiesError } = await supabase
+      .from('companies')
+      .select('*')
+      .in('id', companyIds);
+
+    if (companiesError || !companies) return [];
+
+    // Build lookup maps
+    const jobsMap = new Map(jobs.map((j) => [j.id, j]));
+    const companiesMap = new Map(companies.map((c) => [c.id, c]));
+
+    // Combine the data
+    return matches
+      .map((match) => {
+        const job = jobsMap.get(match.job_id);
+        if (!job) return null;
+        const company = companiesMap.get(job.company_id);
+        if (!company) return null;
+
+        return {
+          ...rowToJobMatch(match),
+          job: rowToJobSubmission(job),
+          company: rowToCompany(company),
+        };
+      })
+      .filter((m): m is JobMatchWithDetails => m !== null);
+  } catch (error) {
+    console.error('Error fetching matches for member:', error);
     return [];
   }
 }

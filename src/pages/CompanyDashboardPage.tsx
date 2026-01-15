@@ -24,12 +24,12 @@ import {
   Mail,
 } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
-import { getCompanyByUserId, getJobSubmissionsByCompany, getMatchesByJobId } from '@/lib/supabase';
+import { getCompanyByUserId, getJobSubmissionsByCompany, getMatchesWithProfilesByJobId } from '@/lib/supabase';
 import { cn } from '@/lib/utils';
 import {
   Company,
   JobSubmission,
-  JobMatch,
+  JobMatchWithProfile,
   PROJECT_TYPES,
   REMOTE_PREFERENCES,
   ProjectType,
@@ -75,7 +75,7 @@ const CompanyDashboardPage: React.FC = () => {
   const [expandedJobId, setExpandedJobId] = useState<string | null>(null);
 
   // Matches state
-  const [jobMatches, setJobMatches] = useState<Record<string, JobMatch[]>>({});
+  const [jobMatches, setJobMatches] = useState<Record<string, JobMatchWithProfile[]>>({});
   const [loadingMatches, setLoadingMatches] = useState<Record<string, boolean>>({});
 
   // Job form state
@@ -108,13 +108,13 @@ const CompanyDashboardPage: React.FC = () => {
       const matchedJobs = jobsData.filter((job) => job.status === 'matched');
       if (matchedJobs.length > 0) {
         const matchPromises = matchedJobs.map(async (job) => {
-          const matches = await getMatchesByJobId(job.id);
+          const matches = await getMatchesWithProfilesByJobId(job.id);
           const approvedMatches = matches.filter((m) => m.adminApproved === true);
           return { jobId: job.id, matches: approvedMatches };
         });
 
         const results = await Promise.all(matchPromises);
-        const matchesMap: Record<string, JobMatch[]> = {};
+        const matchesMap: Record<string, JobMatchWithProfile[]> = {};
         results.forEach(({ jobId, matches }) => {
           matchesMap[jobId] = matches;
         });
@@ -146,7 +146,7 @@ const CompanyDashboardPage: React.FC = () => {
       setLoadingMatches((prev) => ({ ...prev, [jobId]: true }));
 
       try {
-        const matches = await getMatchesByJobId(jobId);
+        const matches = await getMatchesWithProfilesByJobId(jobId);
         // Only show approved matches to companies
         const approvedMatches = matches.filter((m) => m.adminApproved === true);
         setJobMatches((prev) => ({ ...prev, [jobId]: approvedMatches }));
@@ -514,6 +514,23 @@ const CompanyDashboardPage: React.FC = () => {
                           </div>
                         )}
 
+                        {/* Pending Status Message */}
+                        {job.status === 'pending' && (
+                          <div className="pt-4 border-t border-zinc-800">
+                            <div className="flex items-center gap-3 p-4 bg-yellow-500/10 border border-yellow-500/20 rounded">
+                              <Clock className="h-5 w-5 text-yellow-500 flex-shrink-0" />
+                              <div>
+                                <p className="text-sm font-secondary text-yellow-400">
+                                  Awaiting admin review
+                                </p>
+                                <p className="text-xs font-secondary text-zinc-400 mt-1">
+                                  Our team will review your job submission and match you with suitable creative technologists.
+                                </p>
+                              </div>
+                            </div>
+                          </div>
+                        )}
+
                         {/* Matches Section */}
                         {job.status === 'matched' && (
                           <div className="pt-4 border-t border-zinc-800">
@@ -538,9 +555,52 @@ const CompanyDashboardPage: React.FC = () => {
                                       key={match.id}
                                       className="p-4 bg-zinc-800/50 border border-zinc-700"
                                     >
-                                      <div className="flex items-start justify-between gap-4">
-                                        <div className="flex-1">
-                                          <div className="flex items-center gap-3 mb-2">
+                                      <div className="flex items-start gap-4">
+                                        {/* Profile Picture */}
+                                        <a
+                                          href={`/directory/profile/${match.profile.slug}`}
+                                          target="_blank"
+                                          rel="noopener noreferrer"
+                                          className="flex-shrink-0"
+                                        >
+                                          {match.profile.profilePictureUrl ? (
+                                            <img
+                                              src={match.profile.profilePictureUrl}
+                                              alt={match.profile.fullName}
+                                              className="w-12 h-12 rounded-full object-cover border border-zinc-600 hover:border-zinc-400 transition-colors"
+                                            />
+                                          ) : (
+                                            <div className="w-12 h-12 rounded-full bg-zinc-700 flex items-center justify-center border border-zinc-600 hover:border-zinc-400 transition-colors">
+                                              <Users className="h-5 w-5 text-zinc-400" />
+                                            </div>
+                                          )}
+                                        </a>
+
+                                        {/* Match Info */}
+                                        <div className="flex-1 min-w-0">
+                                          {/* Member Name and View Profile Link */}
+                                          <div className="flex items-center gap-2 mb-2">
+                                            <a
+                                              href={`/directory/profile/${match.profile.slug}`}
+                                              target="_blank"
+                                              rel="noopener noreferrer"
+                                              className="font-primary text-white hover:text-pink-400 transition-colors"
+                                            >
+                                              {match.profile.fullName}
+                                            </a>
+                                            <a
+                                              href={`/directory/profile/${match.profile.slug}`}
+                                              target="_blank"
+                                              rel="noopener noreferrer"
+                                              className="text-zinc-500 hover:text-zinc-300 transition-colors"
+                                              title="View full profile"
+                                            >
+                                              <ExternalLink className="h-3.5 w-3.5" />
+                                            </a>
+                                          </div>
+
+                                          {/* Status Badges */}
+                                          <div className="flex items-center gap-2 mb-2 flex-wrap">
                                             <span className="px-2 py-0.5 bg-pink-500/20 text-pink-400 text-xs font-secondary">
                                               {match.matchScore}% match
                                             </span>
@@ -561,9 +621,13 @@ const CompanyDashboardPage: React.FC = () => {
                                               </span>
                                             )}
                                           </div>
+
+                                          {/* Match Reasoning */}
                                           <p className="text-sm text-zinc-300 font-secondary mb-2">
                                             {match.matchReasoning}
                                           </p>
+
+                                          {/* Skill Matches */}
                                           {match.skillMatches && match.skillMatches.length > 0 && (
                                             <div className="flex flex-wrap gap-1">
                                               {match.skillMatches.map((skill, idx) => (
@@ -577,6 +641,8 @@ const CompanyDashboardPage: React.FC = () => {
                                             </div>
                                           )}
                                         </div>
+
+                                        {/* Connect Soon Badge */}
                                         {match.memberResponse === 'interested' && (
                                           <div className="flex-shrink-0">
                                             <span className="flex items-center gap-1 px-3 py-1.5 bg-green-500/20 text-green-400 text-xs font-secondary">

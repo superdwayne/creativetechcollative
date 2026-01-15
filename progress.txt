@@ -166,3 +166,23 @@
   - Match count shown next to status badge: `{jobMatches[job.id].length} matches`
   - Prefetch pattern: filter matched jobs, Promise.all on getMatchesByJobId calls, build matches map
 ---
+
+## Iteration 10 - US-033: Create job detail view with matches for companies
+- What was implemented:
+  - Created `JobMatchWithProfile` type extending `JobMatch` with profile info (fullName, profilePictureUrl, slug, location, bio)
+  - Created `getMatchesWithProfilesByJobId()` function that joins job_matches with network_profiles
+  - Updated CompanyDashboardPage to use new type and function
+  - Match cards now show: member profile picture (or placeholder), member name with link, match score, reasoning
+  - Profile picture and name are clickable links opening profile in new tab
+  - Added "Awaiting admin review" message with Clock icon for pending jobs
+  - Full job specification was already displayed in expandable detail view
+- Files changed:
+  - src/types/job-matching.ts (added JobMatchWithProfile interface)
+  - src/lib/supabase.ts (added getMatchesWithProfilesByJobId function, added import)
+  - src/pages/CompanyDashboardPage.tsx (updated imports, state type, fetchMatchesForJob, match card UI, added pending status message)
+- Learnings for future iterations:
+  - Supabase joins use `!inner` syntax: `network_profiles!inner (columns)`
+  - Profile picture fallback: show Users icon in circular placeholder when no picture
+  - Link pattern for profiles: `/directory/profile/${match.profile.slug}`
+  - Use `target="_blank" rel="noopener noreferrer"` for external links
+---

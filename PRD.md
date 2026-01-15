@@ -137,14 +137,14 @@ The platform connects creative technologists with companies seeking talent. The 
 **Description:** As a company, I want to view job details and matched candidates so I can see recommendations.
 
 **Acceptance Criteria:**
-- [ ] Clicking job opens detail view (modal or page)
-- [ ] Shows full job specification
-- [ ] If status is 'matched', shows "Matched Candidates" section
-- [ ] Each match shows: member name, profile picture, match score, reasoning summary
-- [ ] Click member to view their full profile (opens in new tab or modal)
-- [ ] If status is 'pending', shows "Awaiting admin review"
-- [ ] Typecheck passes
-- [ ] Verify changes work in browser
+- [x] Clicking job opens detail view (modal or page)
+- [x] Shows full job specification
+- [x] If status is 'matched', shows "Matched Candidates" section
+- [x] Each match shows: member name, profile picture, match score, reasoning summary
+- [x] Click member to view their full profile (opens in new tab or modal)
+- [x] If status is 'pending', shows "Awaiting admin review"
+- [x] Typecheck passes
+- [x] Verify changes work in browser
 
 ---
 

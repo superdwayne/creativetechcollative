@@ -144,6 +144,20 @@ export interface JobMatch {
 }
 
 /**
+ * JobMatch with associated profile info for company view
+ */
+export interface JobMatchWithProfile extends JobMatch {
+  profile: {
+    id: string;
+    fullName: string;
+    profilePictureUrl?: string;
+    slug: string;
+    location?: string;
+    bio?: string;
+  };
+}
+
+/**
  * Data for creating a new job match (batch insert)
  */
 export interface JobMatchCreateData {
