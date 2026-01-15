@@ -377,18 +377,29 @@ const NetworkDashboardPage: React.FC = () => {
             )}
 
             {/* Job Matches Section */}
-            {jobMatches.length > 0 && (
-              <div className="mt-10 pt-8 border-t border-zinc-800">
-                <div className="flex items-center gap-2 mb-6">
-                  <Sparkles className="h-5 w-5 text-pink-500" />
-                  <h3 className="text-lg font-primary text-white">Job Opportunities</h3>
+            <div className="mt-10 pt-8 border-t border-zinc-800">
+              <div className="flex items-center gap-2 mb-6">
+                <Sparkles className="h-5 w-5 text-pink-500" />
+                <h3 className="text-lg font-primary text-white">Job Matches</h3>
+                {jobMatches.length > 0 && (
                   <span className="ml-2 px-2 py-0.5 bg-pink-500/20 text-pink-400 text-xs font-secondary rounded-full">
                     {jobMatches.length} {jobMatches.length === 1 ? 'match' : 'matches'}
                   </span>
+                )}
+              </div>
+
+              {jobMatches.length === 0 ? (
+                <div className="p-6 border border-zinc-800 rounded-lg bg-zinc-900/50 text-center">
+                  <Sparkles className="h-10 w-10 text-zinc-600 mx-auto mb-3" />
+                  <p className="text-sm font-secondary text-zinc-400">
+                    No job matches yet. Companies will see your profile when they post relevant opportunities.
+                  </p>
                 </div>
-                <p className="text-sm font-secondary text-zinc-400 mb-6">
-                  These opportunities have been matched to your profile by our AI. Let us know if you're interested!
-                </p>
+              ) : (
+                <>
+                  <p className="text-sm font-secondary text-zinc-400 mb-6">
+                    These opportunities have been matched to your profile by our AI. Let us know if you're interested!
+                  </p>
 
                 <div className="space-y-4">
                   {jobMatches.map((match) => {
@@ -403,12 +414,12 @@ const NetworkDashboardPage: React.FC = () => {
                           className="w-full p-4 flex items-start justify-between text-left hover:bg-zinc-900/50 transition-colors"
                         >
                           <div className="flex-1">
-                            <div className="flex items-center gap-3 mb-2">
+                            <div className="flex items-center gap-3 mb-2 flex-wrap">
                               <h4 className="font-primary text-white">{match.job.title}</h4>
                               <span className="px-2 py-0.5 bg-pink-500/20 text-pink-400 text-xs font-secondary rounded">
                                 {match.matchScore}% match
                               </span>
-                              {match.memberResponse && (
+                              {match.memberResponse ? (
                                 <span
                                   className={cn(
                                     'px-2 py-0.5 text-xs font-secondary rounded',
@@ -418,6 +429,10 @@ const NetworkDashboardPage: React.FC = () => {
                                   )}
                                 >
                                   {match.memberResponse === 'interested' ? 'Interested' : 'Not Interested'}
+                                </span>
+                              ) : (
+                                <span className="px-2 py-0.5 bg-blue-500/20 text-blue-400 text-xs font-secondary rounded">
+                                  New
                                 </span>
                               )}
                             </div>
@@ -434,6 +449,10 @@ const NetworkDashboardPage: React.FC = () => {
                                   {match.job.location}
                                 </span>
                               )}
+                              <span className="flex items-center gap-1">
+                                <Calendar className="h-3.5 w-3.5" />
+                                {new Date(match.createdAt).toLocaleDateString()}
+                              </span>
                             </div>
                           </div>
                           {isExpanded ? (
@@ -570,8 +589,9 @@ const NetworkDashboardPage: React.FC = () => {
                     );
                   })}
                 </div>
-              </div>
-            )}
+                </>
+              )}
+            </div>
           </>
         )}
 

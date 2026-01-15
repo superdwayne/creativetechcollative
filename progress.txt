@@ -21,3 +21,19 @@
   - Use profile.slug for linking to public profile: `/directory/profile/${profile.slug}`
   - Badge styling pattern: `inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-{color}-500/20 text-{color}-400 text-sm font-medium border border-{color}-500/30`
 ---
+
+## Iteration 2 - US-027: Create member matches dashboard section
+- What was implemented:
+  - Renamed "Job Opportunities" section to "Job Matches" for consistency with PRD
+  - Added empty state with icon and message when no matches exist
+  - Added "New" badge (blue) for matches without member response
+  - Changed from conditional rendering (only show when matches exist) to always showing section with conditional content
+  - Added date matched display using Calendar icon and match.createdAt
+- Files changed:
+  - src/pages/NetworkDashboardPage.tsx (refactored Job Matches section with empty state, added date display, added New badge)
+- Learnings for future iterations:
+  - getMatchesForMember in supabase.ts already filters by admin_approved = true
+  - JobMatchWithDetails type includes match, job, and company data
+  - Badge color scheme: blue-500/20 for "New", green-500/20 for "Interested", zinc-500/20 for "Not Interested"
+  - Date formatting: `new Date(match.createdAt).toLocaleDateString()`
+---

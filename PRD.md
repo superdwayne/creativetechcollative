@@ -45,12 +45,12 @@ The platform connects creative technologists with companies seeking talent. The 
 **Description:** As a creative technologist, I want to see jobs I've been matched with so I can respond to opportunities.
 
 **Acceptance Criteria:**
-- [ ] Member dashboard has "Job Matches" section below profile info
-- [ ] Lists all matches for member's profile where `admin_approved = true`
-- [ ] Each match card shows: job title, company name, match score percentage, date matched
-- [ ] Badge indicates response status (New / Responded)
-- [ ] Empty state: "No job matches yet. Companies will see your profile when they post relevant opportunities."
-- [ ] Typecheck passes
+- [x] Member dashboard has "Job Matches" section below profile info
+- [x] Lists all matches for member's profile where `admin_approved = true`
+- [x] Each match card shows: job title, company name, match score percentage, date matched
+- [x] Badge indicates response status (New / Responded)
+- [x] Empty state: "No job matches yet. Companies will see your profile when they post relevant opportunities."
+- [x] Typecheck passes
 - [ ] Verify changes work in browser
 
 ---
