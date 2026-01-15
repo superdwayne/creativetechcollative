@@ -421,7 +421,7 @@ As a creative technologist and educator, Edwin focuses on making complex technol
       {/* Vertical Text on Left Edge */}
       <div className="hidden lg:block fixed left-8 top-1/2 -translate-y-1/2 -rotate-90 origin-center">
         <span className="text-xs font-secondary tracking-[0.3em] text-zinc-600 uppercase whitespace-nowrap">
-          Amsterdam • London • 2024
+          Amsterdam • London • 2026
         </span>
       </div>
 
@@ -549,11 +549,11 @@ As a creative technologist and educator, Edwin focuses on making complex technol
           {/* Partners Grid */}
           <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-8">
             {[
+              { name: 'Solaya', image: '/collaborations/solaya/icon_solaya.png', url: 'https://www.solaya.ai/' },
+              { name: 'Universe Studio', image: 'https://media.letsgetdigital.com/env-4425/0198bc90-2904-7831-84c0-33c0e2f6c6b0.png?tr=w-1200%2Ch-1200%2Cc-at_max', url: 'https://universestudio.xyz/' },
+              { name: 'Kiri Engine', image: '/sponsors/logo.png', url: 'https://www.kiriengine.app/' },
               { name: 'Leonardo AI', image: '/sponsors/Leonardo-AI.png', url: 'https://leonardo.ai' },
               { name: 'Luma Labs', image: '/sponsors/Lumalabs.png', url: 'https://lumalabs.ai' },
-              { name: 'Kiri Engine', image: '/sponsors/KIRI.png', url: 'https://www.kiriengine.app/' },
-              { name: 'Universe Studio', image: 'https://media.licdn.com/dms/image/v2/D4E0BAQEZsLFh44YUmg/company-logo_200_200/company-logo_200_200/0/1737543260484/universestudio_logo?e=2147483647&v=beta&t=pRjz_r3U2hi7cC6yR4xp8YgW3TWrjqtc1hCC_i_zxDc', url: 'https://universestudio.xyz/' },
-              { name: 'Solaya', image: '/collaborations/solaya/icon_solaya.png', url: 'https://www.solaya.ai/' },
             ].map((partner) => (
               <a 
                 key={partner.name}

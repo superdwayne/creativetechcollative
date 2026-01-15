@@ -310,14 +310,14 @@ The platform connects creative technologists with companies seeking talent. The 
 **Description:** As a company, I want to message matched candidates to discuss the opportunity.
 
 **Acceptance Criteria:**
-- [ ] Match detail view has "Messages" section below candidate info
-- [ ] Shows conversation history with timestamps and sender labels
-- [ ] Company messages aligned right, member messages aligned left
-- [ ] Text input with Send button at bottom
-- [ ] Sending a message immediately adds it to the conversation
-- [ ] Auto-scrolls to newest messages on load and send
-- [ ] Typecheck passes
-- [ ] Verify changes work in browser
+- [x] Match detail view has "Messages" section below candidate info
+- [x] Shows conversation history with timestamps and sender labels
+- [x] Company messages aligned right, member messages aligned left
+- [x] Text input with Send button at bottom
+- [x] Sending a message immediately adds it to the conversation
+- [x] Auto-scrolls to newest messages on load and send
+- [x] Typecheck passes
+- [x] Verify changes work in browser
 
 ---
 

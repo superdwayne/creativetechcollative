@@ -33,7 +33,7 @@ const PartnersPage: React.FC = () => {
           
           <a href="https://www.kiriengine.app/" target="_blank" rel="noopener noreferrer" className="border-r-[0.5px] border-b-[0.5px] border-white p-6 md:p-12 flex items-center justify-center h-32 md:h-48 bg-black hover:bg-zinc-900 transition-colors">
             <img 
-              src="/sponsors/KIRI.png" 
+              src="/sponsors/logo.png" 
               alt="KIRI" 
               className="max-h-12 md:max-h-20 max-w-full object-contain"
             />

@@ -38,45 +38,36 @@ ALTER TABLE job_matches ENABLE ROW LEVEL SECURITY;
 
 -- Admins have full access via service role (bypasses RLS)
 -- Companies can view approved matches for their own jobs
-CREATE POLICY "companies_view_approved_matches"
-  ON job_matches
-  FOR SELECT
-  TO authenticated
-  USING (
-    admin_approved = true AND
-    job_id IN (
-      SELECT js.id FROM job_submissions js
-      JOIN companies c ON js.company_id = c.id
-      WHERE c.user_id = auth.uid()
-    )
-  );
+DO $$ BEGIN
+  CREATE POLICY "companies_view_approved_matches"
+    ON job_matches FOR SELECT TO authenticated
+    USING (
+      admin_approved = true AND
+      job_id IN (
+        SELECT js.id FROM job_submissions js
+        JOIN companies c ON js.company_id = c.id
+        WHERE c.user_id = auth.uid()
+      )
+    );
+EXCEPTION WHEN duplicate_object THEN NULL;
+END $$;
 
 -- Members can view matches where they are the profile
-CREATE POLICY "members_view_own_matches"
-  ON job_matches
-  FOR SELECT
-  TO authenticated
-  USING (
-    profile_id IN (
-      SELECT id FROM network_profiles WHERE user_id = auth.uid()
-    )
-  );
+DO $$ BEGIN
+  CREATE POLICY "members_view_own_matches"
+    ON job_matches FOR SELECT TO authenticated
+    USING (profile_id IN (SELECT id FROM network_profiles WHERE user_id = auth.uid()));
+EXCEPTION WHEN duplicate_object THEN NULL;
+END $$;
 
 -- Members can update their response on their own matches
-CREATE POLICY "members_update_own_response"
-  ON job_matches
-  FOR UPDATE
-  TO authenticated
-  USING (
-    profile_id IN (
-      SELECT id FROM network_profiles WHERE user_id = auth.uid()
-    )
-  )
-  WITH CHECK (
-    profile_id IN (
-      SELECT id FROM network_profiles WHERE user_id = auth.uid()
-    )
-  );
+DO $$ BEGIN
+  CREATE POLICY "members_update_own_response"
+    ON job_matches FOR UPDATE TO authenticated
+    USING (profile_id IN (SELECT id FROM network_profiles WHERE user_id = auth.uid()))
+    WITH CHECK (profile_id IN (SELECT id FROM network_profiles WHERE user_id = auth.uid()));
+EXCEPTION WHEN duplicate_object THEN NULL;
+END $$;
 
 -- Note: Insert and admin operations use service role key (bypasses RLS)
 

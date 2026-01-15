@@ -418,3 +418,34 @@
   - Pattern to check user type: try company first, then member, fallback to count: 0
   - `.is('read_at', null)` for filtering null values in Supabase queries
 ---
+
+## Iteration 21 - US-044: Add messaging UI to company match view
+- What was implemented:
+  - Added Message interface type with id, matchId, senderType, senderId, content, createdAt, readAt fields
+  - Added messaging state: expandedMessagingMatchId, conversations, loadingConversations, messageInputs, sendingMessages, messagesEndRef
+  - Created fetchConversation callback to fetch messages from /api/messages/conversation endpoint
+  - Created sendMessage callback to send messages via /api/messages/send endpoint
+  - Added useEffect to load conversation when messaging section is expanded
+  - Added useEffect to auto-scroll to newest messages when conversation changes or opens
+  - Added "Messages" button on each match card that toggles messaging section
+  - Messages section displays:
+    - Header with MessageSquare icon and conversation title
+    - Conversation history in scrollable container (max 256px height)
+    - Loading state with spinner
+    - Empty state with message prompt
+    - Company messages aligned right (pink bg), member messages aligned left (zinc bg)
+    - Timestamps and sender labels above each message
+    - Text input with Enter key support and Send button
+    - Sending state with disabled input and spinner
+  - Added MessageSquare and Send icons from lucide-react
+- Files changed:
+  - src/pages/CompanyDashboardPage.tsx (added imports, Message interface, messaging state, fetchConversation/sendMessage callbacks, Messages section UI in match cards)
+  - PRD.md (marked US-044 as complete)
+- Learnings for future iterations:
+  - Message alignment pattern: company messages use `ml-auto items-end`, member messages use default `items-start`
+  - Message bubble colors: company=pink-500/20, member=zinc-800
+  - useRef with Record type for managing refs per-item: `useRef<Record<string, HTMLDivElement | null>>({})` with callback ref setter
+  - Auto-scroll pattern: use setTimeout(100ms) after adding message to allow DOM update before scrolling
+  - Enter key handling: check `!e.shiftKey` to allow Shift+Enter for newlines in future
+  - Conversation API returns { success: true, messages: Message[], markedAsRead: number }
+---

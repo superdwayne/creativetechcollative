@@ -221,8 +221,8 @@ const ContactPage: React.FC = () => {
                   <option value="workshop" className="text-white bg-black">
                     Workshop request
                   </option>
-                  <option value="membership" className="text-white bg-black">
-                    Join our community
+                  <option value="join-directory" className="text-white bg-black">
+                    Join the CTC Directory
                   </option>
                   <option value="general" className="text-white bg-black">
                     General inquiries
@@ -248,7 +248,6 @@ const ContactPage: React.FC = () => {
                   required
                 />
               </div>
-              
               {/* Submit Message */}
               {submitMessage && (
                 <div className={`text-sm font-secondary p-4 ${

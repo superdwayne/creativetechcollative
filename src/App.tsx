@@ -23,7 +23,6 @@ import WhitepaperPage from './pages/WhitepaperPage';
 import MembershipFormPage from './pages/MembershipFormPage';
 import Footer from './components/ui/footer';
 import { CookieNotice } from './components/ui/cookie-notice';
-import N8nOnboardingPage from './pages/N8nOnboardingPage';
 import MissionPage from './pages/MissionPage';
 import TeamPage from './pages/TeamPage';
 import TeamPageScattered from './pages/TeamPageScattered';
@@ -35,6 +34,19 @@ import VortexDemo from './pages/VortexDemo';
 import HeroPage from './pages/HeroPage';
 import SplashPage from './pages/SplashPage';
 import NewsletterPage from './pages/NewsletterPage';
+import ArticlesPage from './pages/ArticlesPage';
+import ArticlePage from './pages/ArticlePage';
+import JobsPage from './pages/JobsPage';
+import NetworkDirectoryPage from './pages/NetworkDirectoryPage';
+import NetworkCreateProfilePage from './pages/NetworkCreateProfilePage';
+import NetworkProfilePage from './pages/NetworkProfilePage';
+import NetworkAuthPage from './pages/NetworkAuthPage';
+import NetworkDashboardPage from './pages/NetworkDashboardPage';
+import NetworkEditProfilePage from './pages/NetworkEditProfilePage';
+import CompanyAuthPage from './pages/CompanyAuthPage';
+import CompanyRegisterPage from './pages/CompanyRegisterPage';
+import CompanyDashboardPage from './pages/CompanyDashboardPage';
+import AdminDashboardPage from './pages/AdminDashboardPage';
 
 // Helper function to get appropriate icon for category/tag
 const getCategoryIcon = (name: string): string => {
@@ -317,15 +329,7 @@ function App() {
                 </div>
               } 
             />
-            <Route 
-              path="/n8n-onboarding" 
-              element={
-                <div className="w-full">
-                  <N8nOnboardingPage />
-                </div>
-              } 
-            />
-            <Route 
+                        <Route 
               path="/membership-form" 
               element={
                 <div className="w-full">
@@ -369,11 +373,120 @@ function App() {
                 </div>
               } 
             />
+            {/* Hidden Articles routes - accessible via direct URL */}
+            <Route 
+              path="/articles" 
+              element={
+                <div className="w-full">
+                  <ArticlesPage />
+                </div>
+              } 
+            />
+            <Route 
+              path="/articles/:slug" 
+              element={
+                <div className="w-full">
+                  <ArticlePage />
+                </div>
+              } 
+            />
+            {/* Hidden Jobs route - accessible via direct URL */}
+            <Route 
+              path="/jobs" 
+              element={
+                <div className="w-full">
+                  <JobsPage />
+                </div>
+              } 
+            />
+            {/* Hidden Network routes - accessible via direct URL */}
+            <Route 
+              path="/directory" 
+              element={
+                <div className="w-full">
+                  <NetworkDirectoryPage />
+                </div>
+              } 
+            />
+            <Route 
+              path="/directory/create" 
+              element={
+                <div className="w-full">
+                  <NetworkCreateProfilePage />
+                </div>
+              } 
+            />
+            <Route 
+              path="/directory/profile/:slug" 
+              element={
+                <div className="w-full">
+                  <NetworkProfilePage />
+                </div>
+              } 
+            />
+            <Route 
+              path="/directory/auth" 
+              element={
+                <div className="w-full">
+                  <NetworkAuthPage />
+                </div>
+              } 
+            />
+            <Route 
+              path="/directory/dashboard" 
+              element={
+                <div className="w-full">
+                  <NetworkDashboardPage />
+                </div>
+              } 
+            />
+            <Route
+              path="/directory/edit"
+              element={
+                <div className="w-full">
+                  <NetworkEditProfilePage />
+                </div>
+              }
+            />
+            {/* Company Portal routes */}
+            <Route
+              path="/company/auth"
+              element={
+                <div className="w-full">
+                  <CompanyAuthPage />
+                </div>
+              }
+            />
+            <Route
+              path="/company/register"
+              element={
+                <div className="w-full">
+                  <CompanyRegisterPage />
+                </div>
+              }
+            />
+            <Route
+              path="/company/dashboard"
+              element={
+                <div className="w-full">
+                  <CompanyDashboardPage />
+                </div>
+              }
+            />
+            {/* Admin Portal route */}
+            <Route
+              path="/admin"
+              element={
+                <div className="w-full">
+                  <AdminDashboardPage />
+                </div>
+              }
+            />
           </Routes>
         </div>
         
         {/* Global Footer - only show on contact, terms, and privacy pages */}
-        {(location.pathname === '/contact' || location.pathname === '/terms' || location.pathname === '/privacy' || location.pathname === '/terms-and-conditions' || location.pathname === '/privacy-policy' || location.pathname === '/faq' || location.pathname === '/cases' || location.pathname === '/collaborations' || location.pathname === '/n8n-onboarding' || location.pathname === '/membership-form' || location.pathname === '/team' || location.pathname === '/partners') && (
+        {(location.pathname === '/contact' || location.pathname === '/terms' || location.pathname === '/privacy' || location.pathname === '/terms-and-conditions' || location.pathname === '/privacy-policy' || location.pathname === '/faq' || location.pathname === '/cases' || location.pathname === '/collaborations' || location.pathname === '/membership-form' || location.pathname === '/team' || location.pathname === '/partners') && (
           <div className="w-full">
             <Footer />
           </div>
