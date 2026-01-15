@@ -59,14 +59,14 @@ The platform connects creative technologists with companies seeking talent. The 
 **Description:** As a creative technologist, I want to view match details and respond so companies know my interest level.
 
 **Acceptance Criteria:**
-- [ ] Clicking match card opens detail modal or page
-- [ ] Shows full job description, requirements, and project details
-- [ ] Shows AI-generated match reasoning explaining why you're a fit
-- [ ] Shows company name and verified badge if applicable
-- [ ] Response buttons: "I'm Interested" / "Not Interested"
-- [ ] After response, saves to `member_response` column and shows confirmation
-- [ ] Typecheck passes
-- [ ] Verify changes work in browser
+- [x] Clicking match card opens detail modal or page
+- [x] Shows full job description, requirements, and project details
+- [x] Shows AI-generated match reasoning explaining why you're a fit
+- [x] Shows company name and verified badge if applicable
+- [x] Response buttons: "I'm Interested" / "Not Interested"
+- [x] After response, saves to `member_response` column and shows confirmation
+- [x] Typecheck passes
+- [x] Verify changes work in browser
 
 ---
 

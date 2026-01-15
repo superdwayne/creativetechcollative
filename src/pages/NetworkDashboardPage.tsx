@@ -440,6 +440,9 @@ const NetworkDashboardPage: React.FC = () => {
                               <span className="flex items-center gap-1">
                                 <Building2 className="h-3.5 w-3.5" />
                                 {match.company.companyName}
+                                {match.company.verified && (
+                                  <BadgeCheck className="h-3.5 w-3.5 text-blue-400" title="Verified Company" />
+                                )}
                               </span>
                               <span>{projectTypeLabel}</span>
                               <span>{remoteLabel}</span>
