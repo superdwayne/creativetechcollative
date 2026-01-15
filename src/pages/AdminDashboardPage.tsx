@@ -1,0 +1,1055 @@
+import React, { useState, useEffect, useCallback } from 'react';
+import { useNavigate } from 'react-router-dom';
+import {
+  Loader2,
+  ShieldCheck,
+  Briefcase,
+  Users,
+  LogOut,
+  ChevronDown,
+  ChevronUp,
+  Play,
+  CheckCircle2,
+  XCircle,
+  AlertCircle,
+  Building2,
+  MapPin,
+  ExternalLink,
+  RefreshCw,
+  Filter,
+  UserCircle,
+  Calendar,
+  Linkedin,
+  Globe,
+} from 'lucide-react';
+import { useAuth } from '@/contexts/AuthContext';
+import { cn } from '@/lib/utils';
+import {
+  JobStatus,
+  JOB_STATUSES,
+  PROJECT_TYPES,
+  REMOTE_PREFERENCES,
+} from '@/types/job-matching';
+import { FOCUS_AREAS } from '@/types/network-profile';
+
+// Types for admin API responses
+interface JobSubmissionWithDetails {
+  id: string;
+  companyId: string;
+  companyName: string;
+  title: string;
+  description: string;
+  requirements: string | null;
+  preferredSkills: string[] | null;
+  focusAreas: string[] | null;
+  budgetRange: string | null;
+  projectType: string;
+  remotePreference: string;
+  location: string | null;
+  timeline: string | null;
+  status: string;
+  adminNotes: string | null;
+  createdAt: string;
+  updatedAt: string;
+  matchCount: number;
+}
+
+interface ProfileDetails {
+  id: string;
+  fullName: string;
+  email: string;
+  location: string;
+  bio: string;
+  skills: string[];
+  focusAreas: string[];
+  availability: string;
+  portfolioUrl: string | null;
+  linkedinUrl: string | null;
+  profilePictureUrl: string | null;
+}
+
+interface SkillMatchInfo {
+  skill: string;
+  relevance?: string;
+  fromProfile?: boolean;
+  fromPortfolio?: boolean;
+}
+
+interface MatchWithProfile {
+  id: string;
+  jobId: string;
+  profileId: string;
+  matchScore: number;
+  matchReasoning: string;
+  skillMatches: SkillMatchInfo[] | null;
+  vectorSimilarity: number | null;
+  adminApproved: boolean | null;
+  memberNotified: boolean;
+  memberResponse: string | null;
+  createdAt: string;
+  profile: ProfileDetails;
+}
+
+interface PendingProfile {
+  id: string;
+  userId: string;
+  fullName: string;
+  email: string;
+  location: string;
+  bio: string;
+  skills: string[];
+  focusAreas: string[];
+  availability: string;
+  portfolioUrl: string | null;
+  linkedinUrl: string | null;
+  profilePictureUrl: string | null;
+  projects: Array<{
+    title: string;
+    description: string;
+    url?: string;
+    imageUrl?: string;
+  }>;
+  createdAt: string;
+  slug: string;
+}
+
+const AdminDashboardPage: React.FC = () => {
+  const navigate = useNavigate();
+  const { user, session, signOut, loading: authLoading } = useAuth();
+
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState('');
+  const [jobs, setJobs] = useState<JobSubmissionWithDetails[]>([]);
+  const [pagination, setPagination] = useState({
+    page: 1,
+    limit: 20,
+    total: 0,
+    totalPages: 0,
+  });
+  const [statusFilter, setStatusFilter] = useState<JobStatus | ''>('');
+  const [expandedJobId, setExpandedJobId] = useState<string | null>(null);
+  const [matches, setMatches] = useState<Record<string, MatchWithProfile[]>>({});
+  const [loadingMatches, setLoadingMatches] = useState<Record<string, boolean>>({});
+  const [matchingJobId, setMatchingJobId] = useState<string | null>(null);
+  const [reviewingMatchId, setReviewingMatchId] = useState<string | null>(null);
+
+  // Pending profiles state
+  const [pendingProfiles, setPendingProfiles] = useState<PendingProfile[]>([]);
+  const [loadingProfiles, setLoadingProfiles] = useState(false);
+  const [expandedProfileId, setExpandedProfileId] = useState<string | null>(null);
+
+  const fetchPendingProfiles = useCallback(async () => {
+    if (!session?.access_token) return;
+
+    setLoadingProfiles(true);
+
+    try {
+      const response = await fetch('/api/admin/profiles', {
+        headers: {
+          Authorization: `Bearer ${session.access_token}`,
+        },
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data.error || 'Failed to fetch profiles');
+      }
+
+      setPendingProfiles(data.profiles);
+    } catch (err) {
+      console.error('Error fetching pending profiles:', err);
+    } finally {
+      setLoadingProfiles(false);
+    }
+  }, [session?.access_token]);
+
+  const fetchJobs = useCallback(async () => {
+    if (!session?.access_token) return;
+
+    setLoading(true);
+    setError('');
+
+    try {
+      const params = new URLSearchParams();
+      if (statusFilter) params.set('status', statusFilter);
+      params.set('page', pagination.page.toString());
+      params.set('limit', pagination.limit.toString());
+
+      const response = await fetch(`/api/admin/jobs?${params}`, {
+        headers: {
+          Authorization: `Bearer ${session.access_token}`,
+        },
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        if (response.status === 403) {
+          setError('Admin access required. Please contact support if you believe this is an error.');
+          return;
+        }
+        throw new Error(data.error || 'Failed to fetch jobs');
+      }
+
+      setJobs(data.jobs);
+      setPagination(data.pagination);
+    } catch (err) {
+      console.error('Error fetching jobs:', err);
+      setError(err instanceof Error ? err.message : 'Failed to load jobs');
+    } finally {
+      setLoading(false);
+    }
+  }, [session?.access_token, statusFilter, pagination.page, pagination.limit]);
+
+  const fetchMatchesForJob = useCallback(
+    async (jobId: string) => {
+      if (!session?.access_token || loadingMatches[jobId]) return;
+
+      setLoadingMatches((prev) => ({ ...prev, [jobId]: true }));
+
+      try {
+        const response = await fetch(`/api/admin/matches?jobId=${jobId}`, {
+          headers: {
+            Authorization: `Bearer ${session.access_token}`,
+          },
+        });
+
+        const data = await response.json();
+
+        if (!response.ok) {
+          throw new Error(data.error || 'Failed to fetch matches');
+        }
+
+        setMatches((prev) => ({ ...prev, [jobId]: data.matches }));
+      } catch (err) {
+        console.error('Error fetching matches:', err);
+      } finally {
+        setLoadingMatches((prev) => ({ ...prev, [jobId]: false }));
+      }
+    },
+    [session?.access_token, loadingMatches]
+  );
+
+  const runMatching = async (jobId: string) => {
+    if (!session?.access_token || matchingJobId) return;
+
+    setMatchingJobId(jobId);
+
+    try {
+      const response = await fetch('/api/match-job', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${session.access_token}`,
+        },
+        body: JSON.stringify({ jobId }),
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data.error || 'Failed to run matching');
+      }
+
+      // Refresh jobs and matches
+      await fetchJobs();
+      if (expandedJobId === jobId) {
+        await fetchMatchesForJob(jobId);
+      }
+    } catch (err) {
+      console.error('Error running matching:', err);
+      setError(err instanceof Error ? err.message : 'Matching failed');
+    } finally {
+      setMatchingJobId(null);
+    }
+  };
+
+  const reviewMatch = async (matchId: string, approved: boolean) => {
+    if (!session?.access_token || reviewingMatchId) return;
+
+    setReviewingMatchId(matchId);
+
+    try {
+      const response = await fetch('/api/review-match', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${session.access_token}`,
+        },
+        body: JSON.stringify({ matchId, approved }),
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data.error || 'Failed to review match');
+      }
+
+      // Update local state
+      setMatches((prev) => {
+        const newMatches = { ...prev };
+        for (const jobId of Object.keys(newMatches)) {
+          newMatches[jobId] = newMatches[jobId].map((m) =>
+            m.id === matchId ? { ...m, adminApproved: approved, memberNotified: data.match.memberNotified } : m
+          );
+        }
+        return newMatches;
+      });
+    } catch (err) {
+      console.error('Error reviewing match:', err);
+      setError(err instanceof Error ? err.message : 'Review failed');
+    } finally {
+      setReviewingMatchId(null);
+    }
+  };
+
+  useEffect(() => {
+    if (!authLoading && !user) {
+      navigate('/directory/auth');
+      return;
+    }
+
+    if (user && session) {
+      fetchJobs();
+      fetchPendingProfiles();
+    }
+  }, [user, session, authLoading, navigate, fetchJobs, fetchPendingProfiles]);
+
+  useEffect(() => {
+    if (expandedJobId && !matches[expandedJobId]) {
+      fetchMatchesForJob(expandedJobId);
+    }
+  }, [expandedJobId, matches, fetchMatchesForJob]);
+
+  const handleSignOut = async () => {
+    await signOut();
+    navigate('/');
+  };
+
+  const getStatusBadge = (status: string) => {
+    const statusInfo = JOB_STATUSES.find((s) => s.value === status);
+    const statusColors: Record<string, string> = {
+      pending: 'bg-yellow-500/20 text-yellow-400 border-yellow-500/30',
+      reviewed: 'bg-blue-500/20 text-blue-400 border-blue-500/30',
+      matched: 'bg-green-500/20 text-green-400 border-green-500/30',
+      closed: 'bg-zinc-500/20 text-zinc-400 border-zinc-500/30',
+      rejected: 'bg-red-500/20 text-red-400 border-red-500/30',
+    };
+
+    return (
+      <span
+        className={cn(
+          'px-3 py-1 text-xs font-secondary border',
+          statusColors[status] || statusColors.pending
+        )}
+      >
+        {statusInfo?.label || status}
+      </span>
+    );
+  };
+
+  if (authLoading || loading) {
+    return (
+      <div className="min-h-screen bg-black text-white flex items-center justify-center">
+        <Loader2 className="h-8 w-8 animate-spin text-white" />
+      </div>
+    );
+  }
+
+  if (error && error.includes('Admin access required')) {
+    return (
+      <div className="min-h-screen bg-black text-white flex items-center justify-center">
+        <div className="text-center max-w-md">
+          <ShieldCheck className="h-16 w-16 text-red-500 mx-auto mb-4" />
+          <h1 className="text-2xl font-primary mb-2">Access Denied</h1>
+          <p className="text-zinc-400 font-secondary mb-6">{error}</p>
+          <button
+            onClick={() => navigate('/')}
+            className="px-6 py-3 bg-white text-black font-secondary text-sm tracking-wide hover:bg-zinc-200 transition-colors"
+          >
+            Return Home
+          </button>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="min-h-screen bg-black text-white overflow-hidden">
+      <div className="max-w-7xl mx-auto px-8 md:px-16 py-20 lg:py-24">
+        {/* Header */}
+        <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4 mb-10">
+          <div>
+            <div className="flex items-center gap-2 mb-2">
+              <ShieldCheck className="h-5 w-5 text-pink-500" />
+              <span className="text-xs font-secondary tracking-[0.3em] text-zinc-500 uppercase">
+                CTC Admin Portal
+              </span>
+            </div>
+            <h1 className="text-3xl md:text-4xl font-primary font-medium leading-[0.95] tracking-tight">
+              Job Matching Dashboard
+            </h1>
+          </div>
+          <button
+            onClick={handleSignOut}
+            className="flex items-center gap-2 px-4 py-2 border border-zinc-700 text-zinc-400 hover:text-white hover:border-zinc-500 font-secondary text-sm transition-colors"
+          >
+            <LogOut className="h-4 w-4" />
+            Sign Out
+          </button>
+        </div>
+
+        {/* Error Alert */}
+        {error && !error.includes('Admin access required') && (
+          <div className="mb-6 p-4 border border-red-500/30 bg-red-500/10 flex items-center gap-2">
+            <AlertCircle className="h-5 w-5 text-red-400 flex-shrink-0" />
+            <p className="text-red-400 font-secondary text-sm">{error}</p>
+            <button
+              onClick={() => setError('')}
+              className="ml-auto text-red-400 hover:text-red-300"
+            >
+              <XCircle className="h-4 w-4" />
+            </button>
+          </div>
+        )}
+
+        {/* Stats Cards */}
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
+          <div className="border border-zinc-800 p-4">
+            <p className="text-xs font-secondary text-zinc-500 uppercase tracking-wide mb-1">
+              Total Jobs
+            </p>
+            <p className="text-2xl font-primary">{pagination.total}</p>
+          </div>
+          <div className="border border-zinc-800 p-4">
+            <p className="text-xs font-secondary text-zinc-500 uppercase tracking-wide mb-1">
+              Pending
+            </p>
+            <p className="text-2xl font-primary text-yellow-400">
+              {jobs.filter((j) => j.status === 'pending').length}
+            </p>
+          </div>
+          <div className="border border-zinc-800 p-4">
+            <p className="text-xs font-secondary text-zinc-500 uppercase tracking-wide mb-1">
+              Matched
+            </p>
+            <p className="text-2xl font-primary text-green-400">
+              {jobs.filter((j) => j.status === 'matched').length}
+            </p>
+          </div>
+          <div className="border border-zinc-800 p-4">
+            <p className="text-xs font-secondary text-zinc-500 uppercase tracking-wide mb-1">
+              Total Matches
+            </p>
+            <p className="text-2xl font-primary text-pink-400">
+              {jobs.reduce((acc, j) => acc + j.matchCount, 0)}
+            </p>
+          </div>
+        </div>
+
+        {/* Pending Profiles Section */}
+        <div className="mb-10">
+          <div className="flex items-center justify-between mb-4">
+            <div className="flex items-center gap-2">
+              <UserCircle className="h-5 w-5 text-zinc-500" />
+              <h2 className="text-xl font-primary">Pending Profiles</h2>
+              {pendingProfiles.length > 0 && (
+                <span className="px-2 py-0.5 bg-yellow-500/20 text-yellow-400 text-xs font-secondary rounded-full">
+                  {pendingProfiles.length}
+                </span>
+              )}
+            </div>
+            <button
+              onClick={() => fetchPendingProfiles()}
+              disabled={loadingProfiles}
+              className="flex items-center gap-2 px-3 py-2 border border-zinc-800 text-zinc-400 hover:text-white hover:border-zinc-600 font-secondary text-sm transition-colors disabled:opacity-50"
+            >
+              {loadingProfiles ? (
+                <Loader2 className="h-4 w-4 animate-spin" />
+              ) : (
+                <RefreshCw className="h-4 w-4" />
+              )}
+              Refresh
+            </button>
+          </div>
+
+          {loadingProfiles ? (
+            <div className="border border-zinc-800 p-8 flex items-center justify-center">
+              <Loader2 className="h-6 w-6 animate-spin text-zinc-500" />
+            </div>
+          ) : pendingProfiles.length === 0 ? (
+            <div className="border border-zinc-800 p-8 text-center">
+              <CheckCircle2 className="h-12 w-12 text-green-500 mx-auto mb-4" />
+              <p className="text-zinc-400 font-secondary">
+                No pending profiles to review. All caught up!
+              </p>
+            </div>
+          ) : (
+            <div className="space-y-3">
+              {pendingProfiles.map((profile) => {
+                const isExpanded = expandedProfileId === profile.id;
+                return (
+                  <div key={profile.id} className="border border-zinc-800">
+                    {/* Profile Header */}
+                    <button
+                      onClick={() => setExpandedProfileId(isExpanded ? null : profile.id)}
+                      className="w-full p-4 flex items-center justify-between text-left hover:bg-zinc-900/50 transition-colors"
+                    >
+                      <div className="flex items-center gap-4 flex-1">
+                        {/* Profile Picture */}
+                        {profile.profilePictureUrl ? (
+                          <img
+                            src={profile.profilePictureUrl}
+                            alt={profile.fullName}
+                            className="w-10 h-10 rounded-full object-cover border border-zinc-700"
+                          />
+                        ) : (
+                          <div className="w-10 h-10 rounded-full bg-zinc-800 flex items-center justify-center border border-zinc-700">
+                            <UserCircle className="h-5 w-5 text-zinc-500" />
+                          </div>
+                        )}
+
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center gap-3 mb-1">
+                            <h3 className="font-primary text-white">{profile.fullName}</h3>
+                          </div>
+                          <div className="flex flex-wrap gap-3 text-sm text-zinc-500 font-secondary">
+                            <span>{profile.email}</span>
+                            {profile.location && (
+                              <span className="flex items-center gap-1">
+                                <MapPin className="h-3 w-3" />
+                                {profile.location}
+                              </span>
+                            )}
+                            <span className="flex items-center gap-1">
+                              <Calendar className="h-3 w-3" />
+                              {new Date(profile.createdAt).toLocaleDateString()}
+                            </span>
+                          </div>
+                        </div>
+
+                        {/* Focus Area Tags */}
+                        <div className="hidden md:flex flex-wrap gap-1 max-w-xs">
+                          {profile.focusAreas.slice(0, 3).map((area) => {
+                            const areaInfo = FOCUS_AREAS.find((a) => a.value === area);
+                            return (
+                              <span
+                                key={area}
+                                className="px-2 py-0.5 bg-zinc-800 text-zinc-400 text-xs font-secondary"
+                              >
+                                {areaInfo?.label || area}
+                              </span>
+                            );
+                          })}
+                          {profile.focusAreas.length > 3 && (
+                            <span className="px-2 py-0.5 bg-zinc-800 text-zinc-500 text-xs font-secondary">
+                              +{profile.focusAreas.length - 3}
+                            </span>
+                          )}
+                        </div>
+                      </div>
+
+                      {isExpanded ? (
+                        <ChevronUp className="h-5 w-5 text-zinc-500 flex-shrink-0" />
+                      ) : (
+                        <ChevronDown className="h-5 w-5 text-zinc-500 flex-shrink-0" />
+                      )}
+                    </button>
+
+                    {/* Expanded Profile Details */}
+                    {isExpanded && (
+                      <div className="px-4 pb-4 border-t border-zinc-800">
+                        <div className="pt-4 space-y-4">
+                          {/* Bio */}
+                          <div>
+                            <p className="text-xs font-secondary text-zinc-500 uppercase tracking-wide mb-2">
+                              Bio
+                            </p>
+                            <p className="text-sm text-zinc-300 font-secondary whitespace-pre-wrap">
+                              {profile.bio || 'No bio provided.'}
+                            </p>
+                          </div>
+
+                          {/* Skills */}
+                          {profile.skills.length > 0 && (
+                            <div>
+                              <p className="text-xs font-secondary text-zinc-500 uppercase tracking-wide mb-2">
+                                Skills
+                              </p>
+                              <div className="flex flex-wrap gap-1">
+                                {profile.skills.map((skill) => (
+                                  <span
+                                    key={skill}
+                                    className="px-2 py-0.5 bg-zinc-800 text-zinc-300 text-xs font-secondary"
+                                  >
+                                    {skill}
+                                  </span>
+                                ))}
+                              </div>
+                            </div>
+                          )}
+
+                          {/* Focus Areas (full list) */}
+                          {profile.focusAreas.length > 0 && (
+                            <div>
+                              <p className="text-xs font-secondary text-zinc-500 uppercase tracking-wide mb-2">
+                                Focus Areas
+                              </p>
+                              <div className="flex flex-wrap gap-1">
+                                {profile.focusAreas.map((area) => {
+                                  const areaInfo = FOCUS_AREAS.find((a) => a.value === area);
+                                  return (
+                                    <span
+                                      key={area}
+                                      className="px-2 py-0.5 bg-pink-500/20 text-pink-400 text-xs font-secondary"
+                                    >
+                                      {areaInfo?.label || area}
+                                    </span>
+                                  );
+                                })}
+                              </div>
+                            </div>
+                          )}
+
+                          {/* Links */}
+                          <div className="flex flex-wrap gap-4">
+                            {profile.portfolioUrl && (
+                              <a
+                                href={profile.portfolioUrl}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="flex items-center gap-1 text-sm text-pink-400 hover:text-pink-300 font-secondary"
+                              >
+                                <Globe className="h-4 w-4" />
+                                Portfolio
+                                <ExternalLink className="h-3 w-3" />
+                              </a>
+                            )}
+                            {profile.linkedinUrl && (
+                              <a
+                                href={profile.linkedinUrl}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="flex items-center gap-1 text-sm text-blue-400 hover:text-blue-300 font-secondary"
+                              >
+                                <Linkedin className="h-4 w-4" />
+                                LinkedIn
+                                <ExternalLink className="h-3 w-3" />
+                              </a>
+                            )}
+                          </div>
+
+                          {/* Projects */}
+                          {profile.projects.length > 0 && (
+                            <div>
+                              <p className="text-xs font-secondary text-zinc-500 uppercase tracking-wide mb-2">
+                                Projects ({profile.projects.length})
+                              </p>
+                              <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                                {profile.projects.map((project, idx) => (
+                                  <div
+                                    key={idx}
+                                    className="p-3 bg-zinc-900/50 border border-zinc-800"
+                                  >
+                                    <h4 className="font-primary text-sm text-white mb-1">
+                                      {project.title}
+                                    </h4>
+                                    <p className="text-xs text-zinc-400 font-secondary line-clamp-2">
+                                      {project.description}
+                                    </p>
+                                    {project.url && (
+                                      <a
+                                        href={project.url}
+                                        target="_blank"
+                                        rel="noopener noreferrer"
+                                        className="flex items-center gap-1 text-xs text-pink-400 hover:text-pink-300 mt-2 font-secondary"
+                                      >
+                                        View Project <ExternalLink className="h-3 w-3" />
+                                      </a>
+                                    )}
+                                  </div>
+                                ))}
+                              </div>
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+          )}
+        </div>
+
+        {/* Filter Bar */}
+        <div className="flex items-center gap-4 mb-6">
+          <div className="flex items-center gap-2">
+            <Filter className="h-4 w-4 text-zinc-500" />
+            <span className="text-sm font-secondary text-zinc-400">Filter:</span>
+          </div>
+          <select
+            value={statusFilter}
+            onChange={(e) => {
+              setStatusFilter(e.target.value as JobStatus | '');
+              setPagination((prev) => ({ ...prev, page: 1 }));
+            }}
+            className="px-3 py-2 bg-transparent border border-zinc-800 text-white font-secondary text-sm focus:border-zinc-600 focus:outline-none appearance-none cursor-pointer"
+          >
+            <option value="" className="bg-zinc-900">
+              All Statuses
+            </option>
+            {JOB_STATUSES.map((status) => (
+              <option key={status.value} value={status.value} className="bg-zinc-900">
+                {status.label}
+              </option>
+            ))}
+          </select>
+          <button
+            onClick={() => fetchJobs()}
+            className="flex items-center gap-2 px-3 py-2 border border-zinc-800 text-zinc-400 hover:text-white hover:border-zinc-600 font-secondary text-sm transition-colors"
+          >
+            <RefreshCw className="h-4 w-4" />
+            Refresh
+          </button>
+        </div>
+
+        {/* Jobs List */}
+        <div className="mb-8">
+          <div className="flex items-center gap-2 mb-4">
+            <Briefcase className="h-5 w-5 text-zinc-500" />
+            <h2 className="text-xl font-primary">Job Submissions</h2>
+          </div>
+
+          {jobs.length === 0 ? (
+            <div className="border border-zinc-800 p-8 text-center">
+              <Briefcase className="h-12 w-12 text-zinc-700 mx-auto mb-4" />
+              <p className="text-zinc-400 font-secondary">
+                No job submissions found.
+              </p>
+            </div>
+          ) : (
+            <div className="space-y-4">
+              {jobs.map((job) => {
+                const isExpanded = expandedJobId === job.id;
+                const jobMatches = matches[job.id] || [];
+                const isLoadingMatches = loadingMatches[job.id];
+                const projectTypeLabel =
+                  PROJECT_TYPES.find((p) => p.value === job.projectType)?.label ||
+                  job.projectType;
+                const remoteLabel =
+                  REMOTE_PREFERENCES.find((r) => r.value === job.remotePreference)
+                    ?.label || job.remotePreference;
+
+                return (
+                  <div key={job.id} className="border border-zinc-800">
+                    {/* Job Header */}
+                    <button
+                      onClick={() =>
+                        setExpandedJobId(isExpanded ? null : job.id)
+                      }
+                      className="w-full p-4 flex items-center justify-between text-left hover:bg-zinc-900/50 transition-colors"
+                    >
+                      <div className="flex-1">
+                        <div className="flex items-center gap-3 mb-1">
+                          <h3 className="font-primary text-lg">{job.title}</h3>
+                          {getStatusBadge(job.status)}
+                          {job.matchCount > 0 && (
+                            <span className="flex items-center gap-1 px-2 py-0.5 bg-pink-500/20 text-pink-400 text-xs font-secondary">
+                              <Users className="h-3 w-3" />
+                              {job.matchCount} matches
+                            </span>
+                          )}
+                        </div>
+                        <div className="flex flex-wrap gap-4 text-sm text-zinc-500 font-secondary">
+                          <span className="flex items-center gap-1">
+                            <Building2 className="h-3 w-3" />
+                            {job.companyName}
+                          </span>
+                          <span>{projectTypeLabel}</span>
+                          <span>{remoteLabel}</span>
+                          {job.location && (
+                            <span className="flex items-center gap-1">
+                              <MapPin className="h-3 w-3" />
+                              {job.location}
+                            </span>
+                          )}
+                          <span>
+                            {new Date(job.createdAt).toLocaleDateString()}
+                          </span>
+                        </div>
+                      </div>
+                      {isExpanded ? (
+                        <ChevronUp className="h-5 w-5 text-zinc-500" />
+                      ) : (
+                        <ChevronDown className="h-5 w-5 text-zinc-500" />
+                      )}
+                    </button>
+
+                    {/* Expanded Content */}
+                    {isExpanded && (
+                      <div className="px-4 pb-4 border-t border-zinc-800">
+                        <div className="pt-4 space-y-4">
+                          {/* Job Description */}
+                          <div>
+                            <p className="text-xs font-secondary text-zinc-500 uppercase tracking-wide mb-2">
+                              Description
+                            </p>
+                            <p className="text-sm text-zinc-300 font-secondary whitespace-pre-wrap">
+                              {job.description}
+                            </p>
+                          </div>
+
+                          {job.requirements && (
+                            <div>
+                              <p className="text-xs font-secondary text-zinc-500 uppercase tracking-wide mb-2">
+                                Requirements
+                              </p>
+                              <p className="text-sm text-zinc-300 font-secondary whitespace-pre-wrap">
+                                {job.requirements}
+                              </p>
+                            </div>
+                          )}
+
+                          {/* Action Buttons */}
+                          <div className="flex gap-3 pt-4 border-t border-zinc-800">
+                            {(job.status === 'pending' ||
+                              job.status === 'reviewed') && (
+                              <button
+                                onClick={() => runMatching(job.id)}
+                                disabled={matchingJobId === job.id}
+                                className="flex items-center gap-2 px-4 py-2 bg-pink-500 hover:bg-pink-600 text-white font-secondary text-sm transition-colors disabled:opacity-50"
+                              >
+                                {matchingJobId === job.id ? (
+                                  <>
+                                    <Loader2 className="h-4 w-4 animate-spin" />
+                                    Running...
+                                  </>
+                                ) : (
+                                  <>
+                                    <Play className="h-4 w-4" />
+                                    Run Matching
+                                  </>
+                                )}
+                              </button>
+                            )}
+                            <button
+                              onClick={() => fetchMatchesForJob(job.id)}
+                              disabled={isLoadingMatches}
+                              className="flex items-center gap-2 px-4 py-2 border border-zinc-700 text-zinc-300 hover:border-zinc-500 font-secondary text-sm transition-colors disabled:opacity-50"
+                            >
+                              {isLoadingMatches ? (
+                                <Loader2 className="h-4 w-4 animate-spin" />
+                              ) : (
+                                <RefreshCw className="h-4 w-4" />
+                              )}
+                              Refresh Matches
+                            </button>
+                          </div>
+
+                          {/* Matches Section */}
+                          {isLoadingMatches ? (
+                            <div className="flex items-center justify-center py-8">
+                              <Loader2 className="h-6 w-6 animate-spin text-zinc-500" />
+                            </div>
+                          ) : jobMatches.length > 0 ? (
+                            <div className="pt-4 border-t border-zinc-800">
+                              <div className="flex items-center gap-2 mb-4">
+                                <Users className="h-4 w-4 text-pink-500" />
+                                <h4 className="text-sm font-primary">
+                                  Matched Candidates ({jobMatches.length})
+                                </h4>
+                              </div>
+                              <div className="space-y-3">
+                                {jobMatches.map((match) => (
+                                  <div
+                                    key={match.id}
+                                    className="p-4 bg-zinc-900/50 border border-zinc-800"
+                                  >
+                                    <div className="flex items-start justify-between gap-4">
+                                      <div className="flex-1">
+                                        <div className="flex items-center gap-3 mb-2">
+                                          <span className="font-primary text-white">
+                                            {match.profile.fullName}
+                                          </span>
+                                          <span className="px-2 py-0.5 bg-pink-500/20 text-pink-400 text-xs font-secondary">
+                                            {match.matchScore}% match
+                                          </span>
+                                          {match.adminApproved === true && (
+                                            <span className="px-2 py-0.5 bg-green-500/20 text-green-400 text-xs font-secondary">
+                                              Approved
+                                            </span>
+                                          )}
+                                          {match.adminApproved === false && (
+                                            <span className="px-2 py-0.5 bg-red-500/20 text-red-400 text-xs font-secondary">
+                                              Rejected
+                                            </span>
+                                          )}
+                                          {match.memberNotified && (
+                                            <span className="px-2 py-0.5 bg-blue-500/20 text-blue-400 text-xs font-secondary">
+                                              Notified
+                                            </span>
+                                          )}
+                                          {match.memberResponse && (
+                                            <span
+                                              className={cn(
+                                                'px-2 py-0.5 text-xs font-secondary',
+                                                match.memberResponse ===
+                                                  'interested'
+                                                  ? 'bg-green-500/20 text-green-400'
+                                                  : 'bg-zinc-500/20 text-zinc-400'
+                                              )}
+                                            >
+                                              {match.memberResponse ===
+                                              'interested'
+                                                ? 'Interested'
+                                                : 'Not Interested'}
+                                            </span>
+                                          )}
+                                        </div>
+                                        <div className="flex flex-wrap gap-3 text-sm text-zinc-400 font-secondary mb-2">
+                                          <span>{match.profile.email}</span>
+                                          {match.profile.location && (
+                                            <span className="flex items-center gap-1">
+                                              <MapPin className="h-3 w-3" />
+                                              {match.profile.location}
+                                            </span>
+                                          )}
+                                          {match.profile.portfolioUrl && (
+                                            <a
+                                              href={match.profile.portfolioUrl}
+                                              target="_blank"
+                                              rel="noopener noreferrer"
+                                              className="flex items-center gap-1 text-pink-400 hover:text-pink-300"
+                                            >
+                                              <ExternalLink className="h-3 w-3" />
+                                              Portfolio
+                                            </a>
+                                          )}
+                                        </div>
+                                        <p className="text-sm text-zinc-400 font-secondary mb-2">
+                                          {match.matchReasoning}
+                                        </p>
+                                        {match.skillMatches &&
+                                          match.skillMatches.length > 0 && (
+                                            <div className="flex flex-wrap gap-1">
+                                              {match.skillMatches.map(
+                                                (skill, idx) => (
+                                                  <span
+                                                    key={idx}
+                                                    className="px-2 py-0.5 bg-zinc-800 text-zinc-300 text-xs font-secondary"
+                                                  >
+                                                    {skill.skill}
+                                                  </span>
+                                                )
+                                              )}
+                                            </div>
+                                          )}
+                                      </div>
+
+                                      {/* Approval Buttons */}
+                                      {match.adminApproved === null && (
+                                        <div className="flex gap-2 flex-shrink-0">
+                                          <button
+                                            onClick={() =>
+                                              reviewMatch(match.id, true)
+                                            }
+                                            disabled={
+                                              reviewingMatchId === match.id
+                                            }
+                                            className="flex items-center gap-1 px-3 py-1.5 bg-green-500 hover:bg-green-600 text-white text-xs font-secondary transition-colors disabled:opacity-50"
+                                          >
+                                            {reviewingMatchId === match.id ? (
+                                              <Loader2 className="h-3 w-3 animate-spin" />
+                                            ) : (
+                                              <CheckCircle2 className="h-3 w-3" />
+                                            )}
+                                            Approve
+                                          </button>
+                                          <button
+                                            onClick={() =>
+                                              reviewMatch(match.id, false)
+                                            }
+                                            disabled={
+                                              reviewingMatchId === match.id
+                                            }
+                                            className="flex items-center gap-1 px-3 py-1.5 bg-zinc-700 hover:bg-zinc-600 text-white text-xs font-secondary transition-colors disabled:opacity-50"
+                                          >
+                                            {reviewingMatchId === match.id ? (
+                                              <Loader2 className="h-3 w-3 animate-spin" />
+                                            ) : (
+                                              <XCircle className="h-3 w-3" />
+                                            )}
+                                            Reject
+                                          </button>
+                                        </div>
+                                      )}
+                                    </div>
+                                  </div>
+                                ))}
+                              </div>
+                            </div>
+                          ) : job.matchCount === 0 && job.status !== 'pending' ? (
+                            <div className="pt-4 border-t border-zinc-800 text-center py-6">
+                              <p className="text-zinc-500 font-secondary text-sm">
+                                No matches generated yet. Run matching to find candidates.
+                              </p>
+                            </div>
+                          ) : null}
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+          )}
+        </div>
+
+        {/* Pagination */}
+        {pagination.totalPages > 1 && (
+          <div className="flex items-center justify-center gap-4">
+            <button
+              onClick={() =>
+                setPagination((prev) => ({ ...prev, page: prev.page - 1 }))
+              }
+              disabled={pagination.page === 1}
+              className="px-4 py-2 border border-zinc-700 text-zinc-300 hover:border-zinc-500 font-secondary text-sm transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              Previous
+            </button>
+            <span className="text-sm font-secondary text-zinc-400">
+              Page {pagination.page} of {pagination.totalPages}
+            </span>
+            <button
+              onClick={() =>
+                setPagination((prev) => ({ ...prev, page: prev.page + 1 }))
+              }
+              disabled={pagination.page === pagination.totalPages}
+              className="px-4 py-2 border border-zinc-700 text-zinc-300 hover:border-zinc-500 font-secondary text-sm transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              Next
+            </button>
+          </div>
+        )}
+
+        {/* Vertical Text on Left Edge */}
+        <div className="hidden lg:block fixed left-8 top-1/2 -translate-y-1/2 -rotate-90 origin-center">
+          <span className="text-xs font-secondary tracking-[0.3em] text-zinc-600 uppercase whitespace-nowrap">
+            Amsterdam London 2026
+          </span>
+        </div>
+
+        {/* Vertical Text on Right Edge */}
+        <div className="hidden lg:block fixed right-8 top-1/2 -translate-y-1/2 rotate-90 origin-center">
+          <span className="text-xs font-secondary tracking-[0.3em] text-zinc-600 uppercase whitespace-nowrap">
+            Creative Technology Collective
+          </span>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+export default AdminDashboardPage;

@@ -156,13 +156,13 @@ The platform connects creative technologists with companies seeking talent. The 
 **Description:** As an admin, I want to see pending profiles so I can review and approve them.
 
 **Acceptance Criteria:**
-- [ ] Admin dashboard has "Pending Profiles" section with count badge
-- [ ] Lists all profiles where `approved = false`
-- [ ] Each row shows: name, email, location, focus areas (tags), submission date
-- [ ] Click to expand and see full profile details (bio, skills, projects, portfolio links)
-- [ ] Sorted by oldest first (FIFO review)
-- [ ] Typecheck passes
-- [ ] Verify changes work in browser
+- [x] Admin dashboard has "Pending Profiles" section with count badge
+- [x] Lists all profiles where `approved = false`
+- [x] Each row shows: name, email, location, focus areas (tags), submission date
+- [x] Click to expand and see full profile details (bio, skills, projects, portfolio links)
+- [x] Sorted by oldest first (FIFO review)
+- [x] Typecheck passes
+- [x] Verify changes work in browser
 
 ---
 

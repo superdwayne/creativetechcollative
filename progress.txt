@@ -186,3 +186,26 @@
   - Link pattern for profiles: `/directory/profile/${match.profile.slug}`
   - Use `target="_blank" rel="noopener noreferrer"` for external links
 ---
+
+## Iteration 11 - US-034: Create admin pending profiles section
+- What was implemented:
+  - Created `/api/admin/profiles.ts` endpoint to fetch profiles where `approved = false`
+  - Endpoint returns profiles sorted by `created_at` ascending (FIFO - oldest first)
+  - Added `PendingProfile` interface to AdminDashboardPage
+  - Added state: `pendingProfiles`, `loadingProfiles`, `expandedProfileId`
+  - Added `fetchPendingProfiles` callback to fetch from API
+  - Created "Pending Profiles" section with count badge in yellow
+  - Profile rows show: picture, name, email, location, focus areas (max 3), submission date
+  - Click to expand shows: bio, skills, focus areas (full), portfolio/LinkedIn links, projects
+  - Added Refresh button for pending profiles
+  - Empty state shows green checkmark with "All caught up" message
+- Files created:
+  - api/admin/profiles.ts (admin profiles endpoint)
+- Files changed:
+  - src/pages/AdminDashboardPage.tsx (added icons, PendingProfile type, state, fetchPendingProfiles, Pending Profiles section UI)
+- Learnings for future iterations:
+  - Admin API pattern: verify auth, check isAdmin, use service role key
+  - FIFO review pattern: order by created_at ascending
+  - Profile row pattern: expandable with chevron, compact info on row, full details on expand
+  - Added icons: UserCircle, Calendar, Linkedin, Globe
+---
