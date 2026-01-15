@@ -25,8 +25,18 @@ const NetworkDirectoryPage: React.FC = () => {
   // Initialize from URL params
   const [searchQuery, setSearchQuery] = useState(searchParams.get('q') || '');
   const [debouncedSearchQuery, setDebouncedSearchQuery] = useState(searchParams.get('q') || '');
-  const [selectedFocusArea, setSelectedFocusArea] = useState<FocusArea | ''>('');
-  const [selectedAvailability, setSelectedAvailability] = useState<AvailabilityStatus | ''>('');
+  // Multi-select focus areas - parse comma-separated values from URL
+  const [selectedFocusAreas, setSelectedFocusAreas] = useState<FocusArea[]>(() => {
+    const param = searchParams.get('focus');
+    if (!param) return [];
+    return param.split(',').filter(v => FOCUS_AREAS.some(f => f.value === v)) as FocusArea[];
+  });
+  // Single-select availability - parse from URL
+  const [selectedAvailability, setSelectedAvailability] = useState<AvailabilityStatus | ''>(() => {
+    const param = searchParams.get('availability');
+    if (!param) return '';
+    return AVAILABILITY_OPTIONS.some(o => o.value === param) ? param as AvailabilityStatus : '';
+  });
   const [showFilters, setShowFilters] = useState(false);
 
   // Debounce search query (300ms delay)
@@ -37,19 +47,36 @@ const NetworkDirectoryPage: React.FC = () => {
     return () => clearTimeout(timer);
   }, [searchQuery]);
 
-  // Update URL when debounced search query changes
+  // Update URL when filters change
   useEffect(() => {
     const newParams = new URLSearchParams(searchParams);
+
+    // Search query
     if (debouncedSearchQuery) {
       newParams.set('q', debouncedSearchQuery);
     } else {
       newParams.delete('q');
     }
+
+    // Focus areas (multi-select, comma-separated)
+    if (selectedFocusAreas.length > 0) {
+      newParams.set('focus', selectedFocusAreas.join(','));
+    } else {
+      newParams.delete('focus');
+    }
+
+    // Availability (single-select)
+    if (selectedAvailability) {
+      newParams.set('availability', selectedAvailability);
+    } else {
+      newParams.delete('availability');
+    }
+
     // Only update if params actually changed
     if (newParams.toString() !== searchParams.toString()) {
       setSearchParams(newParams, { replace: true });
     }
-  }, [debouncedSearchQuery, searchParams, setSearchParams]);
+  }, [debouncedSearchQuery, selectedFocusAreas, selectedAvailability, searchParams, setSearchParams]);
 
   useEffect(() => {
     const fetchProfiles = async () => {
@@ -74,24 +101,34 @@ const NetworkDirectoryPage: React.FC = () => {
         profile.skills.some(skill => skill.toLowerCase().includes(debouncedSearchQuery.toLowerCase())) ||
         profile.bio.toLowerCase().includes(debouncedSearchQuery.toLowerCase());
 
-      const matchesFocusArea = !selectedFocusArea ||
-        profile.focusAreas.includes(selectedFocusArea);
+      // Multi-select focus areas: profile must have ALL selected areas (AND logic)
+      const matchesFocusAreas = selectedFocusAreas.length === 0 ||
+        selectedFocusAreas.every(area => profile.focusAreas.includes(area));
 
       const matchesAvailability = !selectedAvailability ||
         profile.availability === selectedAvailability;
 
-      return matchesSearch && matchesFocusArea && matchesAvailability;
+      return matchesSearch && matchesFocusAreas && matchesAvailability;
     });
-  }, [profiles, debouncedSearchQuery, selectedFocusArea, selectedAvailability]);
+  }, [profiles, debouncedSearchQuery, selectedFocusAreas, selectedAvailability]);
 
   const clearFilters = () => {
     setSearchQuery('');
     setDebouncedSearchQuery('');
-    setSelectedFocusArea('');
+    setSelectedFocusAreas([]);
     setSelectedAvailability('');
   };
 
-  const hasActiveFilters = searchQuery || selectedFocusArea || selectedAvailability;
+  const hasActiveFilters = searchQuery || selectedFocusAreas.length > 0 || selectedAvailability;
+
+  // Toggle focus area selection (multi-select)
+  const toggleFocusArea = (area: FocusArea) => {
+    setSelectedFocusAreas(prev =>
+      prev.includes(area)
+        ? prev.filter(a => a !== area)
+        : [...prev, area]
+    );
+  };
 
   const getAvailabilityColor = (status: string) => {
     switch (status) {
@@ -205,24 +242,32 @@ const NetworkDirectoryPage: React.FC = () => {
             {/* Filter Options */}
             {showFilters && (
               <div className="pt-6 border-t border-zinc-800">
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="space-y-6">
+                  {/* Focus Areas - Multi-select */}
                   <div>
-                    <label className="block text-xs font-secondary tracking-wide text-zinc-500 uppercase mb-2">
-                      Focus Area
+                    <label className="block text-xs font-secondary tracking-wide text-zinc-500 uppercase mb-3">
+                      Focus Areas
                     </label>
-                    <select
-                      value={selectedFocusArea}
-                      onChange={(e) => setSelectedFocusArea(e.target.value as FocusArea | '')}
-                      className="w-full h-12 border border-zinc-800 bg-transparent px-4 text-sm text-white font-secondary focus:outline-none focus:border-zinc-600"
-                    >
-                      <option value="">All Focus Areas</option>
+                    <div className="flex flex-wrap gap-2">
                       {FOCUS_AREAS.map(area => (
-                        <option key={area.value} value={area.value}>
+                        <button
+                          key={area.value}
+                          type="button"
+                          onClick={() => toggleFocusArea(area.value)}
+                          className={cn(
+                            "px-3 py-1.5 text-sm font-secondary transition-all",
+                            selectedFocusAreas.includes(area.value)
+                              ? "bg-white text-black"
+                              : "border border-zinc-700 text-zinc-300 hover:border-zinc-500"
+                          )}
+                        >
                           {area.label}
-                        </option>
+                        </button>
                       ))}
-                    </select>
+                    </div>
                   </div>
+
+                  {/* Availability - Single-select dropdown */}
                   <div>
                     <label className="block text-xs font-secondary tracking-wide text-zinc-500 uppercase mb-2">
                       Availability
@@ -230,24 +275,22 @@ const NetworkDirectoryPage: React.FC = () => {
                     <select
                       value={selectedAvailability}
                       onChange={(e) => setSelectedAvailability(e.target.value as AvailabilityStatus | '')}
-                      className="w-full h-12 border border-zinc-800 bg-transparent px-4 text-sm text-white font-secondary focus:outline-none focus:border-zinc-600"
+                      className="w-full md:w-64 h-12 border border-zinc-800 bg-transparent px-4 text-sm text-white font-secondary focus:outline-none focus:border-zinc-600"
                     >
-                      <option value="">All Availability</option>
-                      {AVAILABILITY_OPTIONS.map(option => (
-                        <option key={option.value} value={option.value}>
-                          {option.label}
-                        </option>
-                      ))}
+                      <option value="">All</option>
+                      <option value="open-to-work">Open to Work</option>
+                      <option value="open-to-collaborations">Open to Collaborations</option>
                     </select>
                   </div>
                 </div>
+
                 {hasActiveFilters && (
                   <button
                     onClick={clearFilters}
-                    className="mt-4 flex items-center gap-2 text-sm font-secondary text-zinc-500 hover:text-white transition-colors"
+                    className="mt-6 flex items-center gap-2 text-sm font-secondary text-zinc-500 hover:text-white transition-colors"
                   >
                     <X className="h-4 w-4" />
-                    Clear all filters
+                    Clear Filters
                   </button>
                 )}
               </div>
@@ -258,7 +301,7 @@ const NetworkDirectoryPage: React.FC = () => {
           <div className="flex items-center gap-2 text-zinc-500 mb-8">
             <Users className="h-4 w-4" />
             <span className="text-xs font-secondary tracking-wide uppercase">
-              {loading ? 'Loading...' : `${filteredProfiles.length} profile${filteredProfiles.length !== 1 ? 's' : ''}`}
+              {loading ? 'Loading...' : `Showing ${filteredProfiles.length} creative technologist${filteredProfiles.length !== 1 ? 's' : ''}`}
             </span>
           </div>
 

@@ -372,14 +372,14 @@ The platform connects creative technologists with companies seeking talent. The 
 **Description:** As a visitor, I want to filter the directory by focus area, availability, and skills.
 
 **Acceptance Criteria:**
-- [ ] Directory has filter dropdowns: Focus Areas (multi-select), Availability (single-select)
-- [ ] Focus areas use existing FOCUS_AREAS constant
-- [ ] Availability options: All, Open to Work, Open to Collaborations
-- [ ] Filters combine with AND logic
-- [ ] Filter state persists in URL params
-- [ ] "Clear Filters" button resets all filters
-- [ ] Shows result count: "Showing X creative technologists"
-- [ ] Typecheck passes
+- [x] Directory has filter dropdowns: Focus Areas (multi-select), Availability (single-select)
+- [x] Focus areas use existing FOCUS_AREAS constant
+- [x] Availability options: All, Open to Work, Open to Collaborations
+- [x] Filters combine with AND logic
+- [x] Filter state persists in URL params
+- [x] "Clear Filters" button resets all filters
+- [x] Shows result count: "Showing X creative technologists"
+- [x] Typecheck passes
 - [ ] Verify changes work in browser
 
 ---
