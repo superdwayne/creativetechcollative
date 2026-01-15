@@ -397,3 +397,24 @@
   - Update multiple rows: `supabase.update({...}).in('id', arrayOfIds)`
   - Response includes markedAsRead count for client-side tracking
 ---
+
+## Iteration 20 - US-043: Create unread message count API endpoint
+- What was implemented:
+  - Created `/api/messages/unread-count.ts` edge function for fetching unread message count
+  - Returns total unread message count for current authenticated user
+  - For companies: counts messages where sender_type='member' and read_at is null across all their job matches
+  - For members: counts messages where sender_type='company' and read_at is null across their matches
+  - Returns { count: number } response
+  - Uses Supabase count query with `{ count: 'exact', head: true }` for efficient counting
+  - Handles users with no company or profile gracefully (returns count: 0)
+- Files created:
+  - api/messages/unread-count.ts (unread message count endpoint)
+- Files changed:
+  - PRD.md (marked US-043 as complete)
+- Learnings for future iterations:
+  - Supabase count query pattern: `.select('*', { count: 'exact', head: true })` returns only count, no rows
+  - For company matches, need to join job_matches -> job_submissions via company_id
+  - For member matches, simple filter on profile_id
+  - Pattern to check user type: try company first, then member, fallback to count: 0
+  - `.is('read_at', null)` for filtering null values in Supabase queries
+---

@@ -297,12 +297,12 @@ The platform connects creative technologists with companies seeking talent. The 
 **Description:** As a user, I need to know how many unread messages I have so I can see notifications.
 
 **Acceptance Criteria:**
-- [ ] Create `/api/messages/unread-count.ts` edge function
-- [ ] Returns total unread message count for current user
-- [ ] For companies: counts messages in their job matches where sender_type='member' and read_at is null
-- [ ] For members: counts messages in their matches where sender_type='company' and read_at is null
-- [ ] Returns { count: number }
-- [ ] Typecheck passes
+- [x] Create `/api/messages/unread-count.ts` edge function
+- [x] Returns total unread message count for current user
+- [x] For companies: counts messages in their job matches where sender_type='member' and read_at is null
+- [x] For members: counts messages in their matches where sender_type='company' and read_at is null
+- [x] Returns { count: number }
+- [x] Typecheck passes
 
 ---
 
