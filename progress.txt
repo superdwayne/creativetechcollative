@@ -125,3 +125,26 @@
   - US-030 is now fully complete - all acceptance criteria met
   - Consistent enrichment patterns between create and edit pages
 ---
+
+## Iteration 8 - US-031: Create job submission form
+- What was verified:
+  - Job submission form already fully implemented in CompanyDashboardPage.tsx
+  - Prominent "Submit New Job" button in header (lines 350-357)
+  - Form opens in modal (lines 588-814)
+  - Required fields: title, description, project_type (select), remote_preference (select)
+  - Optional fields: requirements (textarea), preferred_skills (TagInput), focus_areas (multi-select buttons), budget_range, location, timeline
+  - Form validation in validateJobForm function (lines 178-193)
+  - Submits to `/api/submit-job` endpoint with auth (lines 204-222)
+  - Success confirmation with "Pending Admin Review" message (lines 607-615)
+  - TypeScript typecheck passes
+  - Vite build succeeds
+- Files verified:
+  - src/pages/CompanyDashboardPage.tsx - complete job submission form implementation
+- Learnings for future iterations:
+  - US-031 was already implemented during earlier development
+  - JobFormData interface defines form state (lines 41-52)
+  - initialJobFormData provides defaults (lines 54-65)
+  - Form uses modal pattern with sticky header and scrollable content
+  - TagInput component with SUGGESTED_SKILLS for preferred skills
+  - Focus areas use button toggle pattern (multi-select)
+---

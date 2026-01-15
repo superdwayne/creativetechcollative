@@ -106,15 +106,15 @@ The platform connects creative technologists with companies seeking talent. The 
 **Description:** As a company, I want to submit job specifications so I can find matching creative technologists.
 
 **Acceptance Criteria:**
-- [ ] Company dashboard has prominent "Submit New Job" button
-- [ ] Form opens in modal or new page
-- [ ] Required fields: title, description, project_type (select), remote_preference (select)
-- [ ] Optional fields: requirements (textarea), preferred_skills (tag input), focus_areas (multi-select), budget_range, location, timeline
-- [ ] Form validates required fields before submission
-- [ ] Submits to existing `/api/submit-job` endpoint
-- [ ] Success shows confirmation with "Pending Admin Review" message
-- [ ] Typecheck passes
-- [ ] Verify changes work in browser
+- [x] Company dashboard has prominent "Submit New Job" button
+- [x] Form opens in modal or new page
+- [x] Required fields: title, description, project_type (select), remote_preference (select)
+- [x] Optional fields: requirements (textarea), preferred_skills (tag input), focus_areas (multi-select), budget_range, location, timeline
+- [x] Form validates required fields before submission
+- [x] Submits to existing `/api/submit-job` endpoint
+- [x] Success shows confirmation with "Pending Admin Review" message
+- [x] Typecheck passes
+- [x] Verify changes work in browser
 
 ---
 
