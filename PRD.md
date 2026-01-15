@@ -214,15 +214,15 @@ The platform connects creative technologists with companies seeking talent. The 
 **Description:** As an admin, I want to review AI-generated matches before showing them to companies.
 
 **Acceptance Criteria:**
-- [ ] Admin dashboard has "Pending Matches" section
-- [ ] Lists matches where `admin_approved IS NULL`, grouped by job
-- [ ] Each match shows: job title, member name, match score, reasoning preview
-- [ ] Individual Approve/Reject buttons per match
-- [ ] Bulk "Approve All" button per job
-- [ ] Approve sets `admin_approved = true`, Reject sets `admin_approved = false`
-- [ ] Only approved matches become visible to companies
-- [ ] Typecheck passes
-- [ ] Verify changes work in browser
+- [x] Admin dashboard has "Pending Matches" section
+- [x] Lists matches where `admin_approved IS NULL`, grouped by job
+- [x] Each match shows: job title, member name, match score, reasoning preview
+- [x] Individual Approve/Reject buttons per match
+- [x] Bulk "Approve All" button per job
+- [x] Approve sets `admin_approved = true`, Reject sets `admin_approved = false`
+- [x] Only approved matches become visible to companies
+- [x] Typecheck passes
+- [x] Verify changes work in browser
 
 ---
 

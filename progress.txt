@@ -252,3 +252,52 @@
   - Use Calendar icon for submission date display in job rows
   - JobSubmissionWithDetails already has preferredSkills, focusAreas, budgetRange, timeline for expanded view
 ---
+
+## Iteration 14 - US-037: Implement job approval and trigger matching
+- What was implemented:
+  - Created `/api/admin/jobs/reject.ts` endpoint that sets job status='rejected' with admin_notes
+  - Added Approve (green) and Reject (red) buttons to pending jobs section in AdminDashboardPage
+  - Approve button triggers existing `/api/match-job` endpoint and shows "Running AI matching..." loading state
+  - On successful matching, shows success toast with match count: "Job approved - X candidates matched"
+  - Job rejection dialog with optional reason textarea (similar pattern to profile rejection)
+  - Toast shows success/error messages using existing toast state
+- Files created:
+  - api/admin/jobs/reject.ts (job rejection endpoint)
+- Files changed:
+  - src/pages/AdminDashboardPage.tsx (added job action states, rejectJob function, Approve/Reject buttons, job rejection dialog, updated runMatching to show toast)
+  - PRD.md (marked US-037 as complete)
+- Learnings for future iterations:
+  - Reuse existing `/api/match-job` endpoint for approval - it handles status update to 'matched' internally
+  - Match job endpoint returns `matches` array with count for success toast
+  - Job rejection follows same dialog pattern as profile rejection with state: rejectDialogJob, rejectJobReason, rejectingJobId
+  - Toast message for approval includes dynamic match count: `${matchCount} candidate${matchCount !== 1 ? 's' : ''} matched`
+  - API endpoints in api/admin/jobs/ folder for job admin operations
+---
+
+## Iteration 15 - US-038: Create admin match review section
+- What was implemented:
+  - Created `/api/admin/pending-matches.ts` endpoint to fetch matches where `admin_approved IS NULL`, grouped by job
+  - Endpoint returns matches with profile details, sorted by job creation date (FIFO) and match score (descending)
+  - Added "Pending Matches" section to AdminDashboardPage between Pending Jobs and Pending Profiles
+  - Section shows yellow count badge with total pending matches
+  - Each job group is expandable to show member matches
+  - Each match card shows: profile picture, member name, match score, reasoning preview, skills
+  - Individual Approve/Reject buttons per match with loading states
+  - Bulk "Approve All" button per job for approving all matches at once
+  - Approve sets `admin_approved = true` via existing `/api/review-match` endpoint
+  - Reject sets `admin_approved = false`
+  - Toast notifications for success/error feedback
+  - Only approved matches visible to companies (per existing logic)
+- Files created:
+  - api/admin/pending-matches.ts (pending matches endpoint with grouping by job)
+- Files changed:
+  - src/pages/AdminDashboardPage.tsx (added new icons CheckCheck/Link2, pending match types, state, fetch functions, approve/reject handlers, Pending Matches section UI)
+  - PRD.md (marked US-038 as complete)
+- Learnings for future iterations:
+  - Pending matches grouped by job use `PendingMatchGroup` with `job` and `matches` arrays
+  - Supabase `.is('admin_approved', null)` filters for null values
+  - Approve All uses sequential API calls to avoid race conditions
+  - Link2 icon from lucide used for match-related sections
+  - CheckCheck icon used for bulk approve operations
+  - Same toast state pattern reused for new actions
+---
