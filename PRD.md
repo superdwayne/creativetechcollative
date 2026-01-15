@@ -283,13 +283,13 @@ The platform connects creative technologists with companies seeking talent. The 
 **Description:** As a user, I need an API to fetch conversation history for a match.
 
 **Acceptance Criteria:**
-- [ ] Create `/api/messages/conversation.ts` edge function
-- [ ] Accepts: match_id as query parameter
-- [ ] Validates requester is participant in the match
-- [ ] Returns all messages for the match, sorted by created_at ascending
-- [ ] Marks unread messages as read (sets read_at) for the requester
-- [ ] Returns 403 if requester not authorized
-- [ ] Typecheck passes
+- [x] Create `/api/messages/conversation.ts` edge function
+- [x] Accepts: match_id as query parameter
+- [x] Validates requester is participant in the match
+- [x] Returns all messages for the match, sorted by created_at ascending
+- [x] Marks unread messages as read (sets read_at) for the requester
+- [x] Returns 403 if requester not authorized
+- [x] Typecheck passes
 
 ---
 

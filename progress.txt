@@ -373,3 +373,27 @@
   - MessageResponse type with camelCase properties converted from snake_case database columns
   - Return 201 status for successful resource creation
 ---
+
+## Iteration 19 - US-042: Create get conversation API endpoint
+- What was implemented:
+  - Created `/api/messages/conversation.ts` edge function for fetching conversation history
+  - Accepts `matchId` as query parameter with Zod validation
+  - Validates requester is participant in the match (same pattern as send.ts)
+  - Determines requester type ('company' or 'member') from auth context
+  - Returns all messages for the match sorted by created_at ascending
+  - Marks unread messages as read by setting read_at timestamp
+    - Only marks messages from the OTHER party (company reads member messages, member reads company messages)
+  - Returns 403 if requester not authorized for the match
+  - Returns 401 for missing/invalid auth, 404 for match not found, 400 for invalid matchId
+  - Response includes { success: true, messages: MessageResponse[], markedAsRead: number }
+- Files created:
+  - api/messages/conversation.ts (get conversation API endpoint)
+- Files changed:
+  - PRD.md (marked US-042 as complete)
+- Learnings for future iterations:
+  - GET endpoint uses query parameters vs POST using request body
+  - Parse query params: `new URL(req.url).searchParams.get('matchId')`
+  - Unread messages filter: `read_at === null && sender_type === otherSenderType`
+  - Update multiple rows: `supabase.update({...}).in('id', arrayOfIds)`
+  - Response includes markedAsRead count for client-side tracking
+---
