@@ -170,14 +170,14 @@ The platform connects creative technologists with companies seeking talent. The 
 **Description:** As an admin, I want to approve or reject profiles to control directory quality.
 
 **Acceptance Criteria:**
-- [ ] Each pending profile has Approve and Reject buttons
-- [ ] Approve: sets `approved = true`, `approved_at = now()`, `approved_by = admin_id`
-- [ ] Reject: shows confirmation dialog with optional reason textarea
-- [ ] Rejection deletes the profile record
-- [ ] After action, profile removed from pending list with animation
-- [ ] Success toast: "Profile approved" or "Profile rejected"
-- [ ] Typecheck passes
-- [ ] Verify changes work in browser
+- [x] Each pending profile has Approve and Reject buttons
+- [x] Approve: sets `approved = true`, `approved_at = now()`, `approved_by = admin_id`
+- [x] Reject: shows confirmation dialog with optional reason textarea
+- [x] Rejection deletes the profile record
+- [x] After action, profile removed from pending list with animation
+- [x] Success toast: "Profile approved" or "Profile rejected"
+- [x] Typecheck passes
+- [x] Verify changes work in browser
 
 ---
 

@@ -21,6 +21,7 @@ import {
   Calendar,
   Linkedin,
   Globe,
+  X,
 } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import { cn } from '@/lib/utils';
@@ -138,6 +139,13 @@ const AdminDashboardPage: React.FC = () => {
   const [loadingProfiles, setLoadingProfiles] = useState(false);
   const [expandedProfileId, setExpandedProfileId] = useState<string | null>(null);
 
+  // Profile action states
+  const [approvingProfileId, setApprovingProfileId] = useState<string | null>(null);
+  const [rejectingProfileId, setRejectingProfileId] = useState<string | null>(null);
+  const [rejectDialogProfile, setRejectDialogProfile] = useState<PendingProfile | null>(null);
+  const [rejectReason, setRejectReason] = useState('');
+  const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' } | null>(null);
+
   const fetchPendingProfiles = useCallback(async () => {
     if (!session?.access_token) return;
 
@@ -163,6 +171,83 @@ const AdminDashboardPage: React.FC = () => {
       setLoadingProfiles(false);
     }
   }, [session?.access_token]);
+
+  const approveProfile = async (profileId: string) => {
+    if (!session?.access_token || approvingProfileId) return;
+
+    setApprovingProfileId(profileId);
+
+    try {
+      const response = await fetch('/api/admin/profiles/approve', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${session.access_token}`,
+        },
+        body: JSON.stringify({ profileId }),
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data.error || 'Failed to approve profile');
+      }
+
+      // Remove profile from pending list with animation effect (immediate removal)
+      setPendingProfiles((prev) => prev.filter((p) => p.id !== profileId));
+      setExpandedProfileId(null);
+
+      // Show success toast
+      setToast({ message: 'Profile approved', type: 'success' });
+      setTimeout(() => setToast(null), 3000);
+    } catch (err) {
+      console.error('Error approving profile:', err);
+      setToast({ message: err instanceof Error ? err.message : 'Failed to approve profile', type: 'error' });
+      setTimeout(() => setToast(null), 3000);
+    } finally {
+      setApprovingProfileId(null);
+    }
+  };
+
+  const rejectProfile = async () => {
+    if (!session?.access_token || !rejectDialogProfile || rejectingProfileId) return;
+
+    const profileId = rejectDialogProfile.id;
+    setRejectingProfileId(profileId);
+
+    try {
+      const response = await fetch('/api/admin/profiles/reject', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${session.access_token}`,
+        },
+        body: JSON.stringify({ profileId, reason: rejectReason || undefined }),
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data.error || 'Failed to reject profile');
+      }
+
+      // Remove profile from pending list
+      setPendingProfiles((prev) => prev.filter((p) => p.id !== profileId));
+      setExpandedProfileId(null);
+      setRejectDialogProfile(null);
+      setRejectReason('');
+
+      // Show success toast
+      setToast({ message: 'Profile rejected', type: 'success' });
+      setTimeout(() => setToast(null), 3000);
+    } catch (err) {
+      console.error('Error rejecting profile:', err);
+      setToast({ message: err instanceof Error ? err.message : 'Failed to reject profile', type: 'error' });
+      setTimeout(() => setToast(null), 3000);
+    } finally {
+      setRejectingProfileId(null);
+    }
+  };
 
   const fetchJobs = useCallback(async () => {
     if (!session?.access_token) return;
@@ -673,6 +758,35 @@ const AdminDashboardPage: React.FC = () => {
                               </div>
                             </div>
                           )}
+
+                          {/* Action Buttons */}
+                          <div className="flex gap-3 pt-4 border-t border-zinc-800">
+                            <button
+                              onClick={() => approveProfile(profile.id)}
+                              disabled={approvingProfileId === profile.id}
+                              className="flex items-center gap-2 px-4 py-2 bg-green-500 hover:bg-green-600 text-white font-secondary text-sm transition-colors disabled:opacity-50"
+                            >
+                              {approvingProfileId === profile.id ? (
+                                <>
+                                  <Loader2 className="h-4 w-4 animate-spin" />
+                                  Approving...
+                                </>
+                              ) : (
+                                <>
+                                  <CheckCircle2 className="h-4 w-4" />
+                                  Approve
+                                </>
+                              )}
+                            </button>
+                            <button
+                              onClick={() => setRejectDialogProfile(profile)}
+                              disabled={approvingProfileId === profile.id}
+                              className="flex items-center gap-2 px-4 py-2 bg-red-500/20 hover:bg-red-500/30 text-red-400 border border-red-500/30 font-secondary text-sm transition-colors disabled:opacity-50"
+                            >
+                              <XCircle className="h-4 w-4" />
+                              Reject
+                            </button>
+                          </div>
                         </div>
                       </div>
                     )}
@@ -1048,6 +1162,102 @@ const AdminDashboardPage: React.FC = () => {
           </span>
         </div>
       </div>
+
+      {/* Rejection Confirmation Dialog */}
+      {rejectDialogProfile && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center">
+          {/* Backdrop */}
+          <div
+            className="absolute inset-0 bg-black/80 backdrop-blur-sm"
+            onClick={() => {
+              setRejectDialogProfile(null);
+              setRejectReason('');
+            }}
+          />
+
+          {/* Dialog */}
+          <div className="relative bg-zinc-900 border border-zinc-700 w-full max-w-md mx-4 p-6">
+            {/* Close button */}
+            <button
+              onClick={() => {
+                setRejectDialogProfile(null);
+                setRejectReason('');
+              }}
+              className="absolute top-4 right-4 text-zinc-500 hover:text-white transition-colors"
+            >
+              <X className="h-5 w-5" />
+            </button>
+
+            <h3 className="font-primary text-xl text-white mb-2">Reject Profile</h3>
+            <p className="text-sm text-zinc-400 font-secondary mb-4">
+              Are you sure you want to reject <span className="text-white">{rejectDialogProfile.fullName}</span>'s profile? This will permanently delete their profile.
+            </p>
+
+            {/* Reason textarea */}
+            <div className="mb-6">
+              <label className="block text-xs font-secondary text-zinc-500 uppercase tracking-wide mb-2">
+                Reason (Optional)
+              </label>
+              <textarea
+                value={rejectReason}
+                onChange={(e) => setRejectReason(e.target.value)}
+                placeholder="Enter a reason for rejection..."
+                className="w-full px-4 py-3 bg-zinc-800 border border-zinc-700 text-white placeholder:text-zinc-500 font-secondary text-sm focus:outline-none focus:border-zinc-500 resize-none"
+                rows={3}
+              />
+            </div>
+
+            {/* Action buttons */}
+            <div className="flex gap-3">
+              <button
+                onClick={() => {
+                  setRejectDialogProfile(null);
+                  setRejectReason('');
+                }}
+                className="flex-1 px-4 py-2 border border-zinc-700 text-zinc-300 hover:border-zinc-500 font-secondary text-sm transition-colors"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={rejectProfile}
+                disabled={rejectingProfileId === rejectDialogProfile.id}
+                className="flex-1 flex items-center justify-center gap-2 px-4 py-2 bg-red-500 hover:bg-red-600 text-white font-secondary text-sm transition-colors disabled:opacity-50"
+              >
+                {rejectingProfileId === rejectDialogProfile.id ? (
+                  <>
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                    Rejecting...
+                  </>
+                ) : (
+                  <>
+                    <XCircle className="h-4 w-4" />
+                    Reject Profile
+                  </>
+                )}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Toast Notification */}
+      {toast && (
+        <div
+          className={cn(
+            'fixed bottom-6 right-6 z-50 flex items-center gap-2 px-4 py-3 border font-secondary text-sm',
+            toast.type === 'success'
+              ? 'bg-green-500/20 border-green-500/30 text-green-400'
+              : 'bg-red-500/20 border-red-500/30 text-red-400'
+          )}
+        >
+          {toast.type === 'success' ? (
+            <CheckCircle2 className="h-4 w-4" />
+          ) : (
+            <AlertCircle className="h-4 w-4" />
+          )}
+          {toast.message}
+        </div>
+      )}
     </div>
   );
 };
