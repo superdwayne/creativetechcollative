@@ -268,14 +268,14 @@ The platform connects creative technologists with companies seeking talent. The 
 **Description:** As a user, I need an API to send messages so conversations happen on the platform.
 
 **Acceptance Criteria:**
-- [ ] Create `/api/messages/send.ts` edge function
-- [ ] Accepts: match_id, content in request body
-- [ ] Validates sender is participant in the match (company or member)
-- [ ] Determines sender_type and sender_id from auth context
-- [ ] Creates message record
-- [ ] Returns created message with id and timestamp
-- [ ] Returns 403 if sender not authorized for this match
-- [ ] Typecheck passes
+- [x] Create `/api/messages/send.ts` edge function
+- [x] Accepts: match_id, content in request body
+- [x] Validates sender is participant in the match (company or member)
+- [x] Determines sender_type and sender_id from auth context
+- [x] Creates message record
+- [x] Returns created message with id and timestamp
+- [x] Returns 403 if sender not authorized for this match
+- [x] Typecheck passes
 
 ---
 

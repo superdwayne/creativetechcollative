@@ -327,3 +327,49 @@
   - Companies sorted by created_at descending (most recent first)
   - API pattern: update record and return updated data in single query using .select().single()
 ---
+
+## Iteration 17 - US-040: Create messages database table
+- What was implemented:
+  - Created migration `009_create_messages.sql` for messages table
+  - Table columns: id (UUID PK), match_id (FK to job_matches), sender_type ('company'/'member'), sender_id (UUID), content (TEXT), created_at (TIMESTAMP), read_at (TIMESTAMP nullable)
+  - Added index on match_id for fast conversation loading
+  - Added indexes on sender_id and created_at
+  - RLS policies for:
+    - Companies: view/insert messages for matches on their jobs, update read_at on member messages
+    - Members: view/insert messages for their matches, update read_at on company messages
+  - Comments documenting each column's purpose
+- Files created:
+  - supabase/migrations/009_create_messages.sql
+- Files changed:
+  - PRD.md (marked US-040 as complete)
+- Learnings for future iterations:
+  - Migration pattern: CREATE TABLE, CREATE INDEX, ALTER TABLE ENABLE RLS, DO $$ for policies
+  - RLS for messages requires checking match participation via joins to job_matches/job_submissions/companies/network_profiles
+  - Message read tracking: read_at column, null = unread, recipient can update only messages sent TO them
+  - sender_type + sender_id pattern allows polymorphic sender reference
+  - ON DELETE CASCADE on match_id ensures messages are deleted when match is deleted
+---
+
+## Iteration 18 - US-041: Create send message API endpoint
+- What was implemented:
+  - Created `/api/messages/send.ts` edge function for sending messages between match participants
+  - Accepts `matchId` and `content` in request body with Zod validation
+  - Validates sender is participant in the match by checking:
+    - If user is company owner (via job_submissions.companies.user_id)
+    - If user is member (via job_matches.network_profiles.user_id)
+  - Automatically determines sender_type ('company' or 'member') and sender_id from auth context
+  - Creates message record with sender info and content
+  - Returns created message with id, matchId, senderType, senderId, content, createdAt, readAt
+  - Returns 403 if sender not authorized for the match
+  - Returns 401 for missing/invalid auth, 404 for match not found, 400 for invalid request data
+- Files created:
+  - api/messages/send.ts (send message API endpoint)
+- Files changed:
+  - PRD.md (marked US-041 as complete)
+- Learnings for future iterations:
+  - Message API pattern: determine sender type/id from authenticated user by checking match relations
+  - Supabase nested select syntax: `job_submissions!inner ( ..., companies!inner ( ... ) )` for deep joins
+  - Messages folder structure: api/messages/send.ts, api/messages/conversation.ts etc.
+  - MessageResponse type with camelCase properties converted from snake_case database columns
+  - Return 201 status for successful resource creation
+---
