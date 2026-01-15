@@ -209,3 +209,46 @@
   - Profile row pattern: expandable with chevron, compact info on row, full details on expand
   - Added icons: UserCircle, Calendar, Linkedin, Globe
 ---
+
+## Iteration 12 - US-035: Implement profile approval/rejection actions
+- What was implemented:
+  - Created `/api/admin/profiles/approve.ts` endpoint that sets approved=true, approved_at, approved_by
+  - Created `/api/admin/profiles/reject.ts` endpoint that deletes the profile record
+  - Added Approve and Reject buttons to expanded pending profiles in AdminDashboardPage
+  - Added rejection confirmation dialog with optional reason textarea
+  - Added toast notifications showing "Profile approved" or "Profile rejected" after actions
+  - Profile removed from pending list immediately after action
+- Files created:
+  - api/admin/profiles/approve.ts (profile approval endpoint)
+  - api/admin/profiles/reject.ts (profile rejection endpoint)
+- Files changed:
+  - src/pages/AdminDashboardPage.tsx (added state for approval/rejection actions, approveProfile/rejectProfile functions, action buttons, rejection dialog, toast notifications)
+  - PRD.md (marked US-035 as complete)
+- Learnings for future iterations:
+  - API endpoints go in api/admin/profiles/ folder structure
+  - Toast state pattern: `{ message: string; type: 'success' | 'error' } | null` with setTimeout to clear
+  - Dialog pattern: state for profile being acted on (`rejectDialogProfile`), backdrop click to close
+  - Rejection deletes profile record (no soft delete)
+  - Use X icon from lucide for close buttons
+  - Approval updates: approved=true, approved_at=now(), approved_by=admin user id
+---
+
+## Iteration 13 - US-036: Create admin pending jobs section
+- What was implemented:
+  - Added "Pending Jobs" section to AdminDashboardPage above Pending Profiles section
+  - Section has yellow count badge showing number of pending jobs
+  - Lists all jobs where `status = 'pending'`, sorted by oldest first (FIFO review)
+  - Each row shows: title, company name, project type, remote preference, submission date with Calendar icon
+  - Expandable detail view shows: full description, requirements, preferred skills, focus areas, budget range, timeline
+  - "Run Matching" button in expanded view to trigger AI matching
+  - Empty state with green checkmark: "No pending jobs to review. All caught up!"
+- Files changed:
+  - src/pages/AdminDashboardPage.tsx (added Pending Jobs section above Pending Profiles)
+  - PRD.md (marked US-036 as complete)
+- Learnings for future iterations:
+  - Jobs data already fetched via `fetchJobs()` - filter client-side for pending status
+  - FIFO sort pattern: `sort((a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime())`
+  - Reuse same expandable card pattern from Job Submissions section
+  - Use Calendar icon for submission date display in job rows
+  - JobSubmissionWithDetails already has preferredSkills, focusAreas, budgetRange, timeline for expanded view
+---

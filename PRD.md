@@ -185,13 +185,13 @@ The platform connects creative technologists with companies seeking talent. The 
 **Description:** As an admin, I want to see pending job submissions so I can review them before matching.
 
 **Acceptance Criteria:**
-- [ ] Admin dashboard has "Pending Jobs" section with count badge
-- [ ] Lists all jobs where `status = 'pending'`
-- [ ] Each row shows: title, company name, project type, remote preference, submission date
-- [ ] Click to expand and see full job details
-- [ ] Sorted by oldest first
-- [ ] Typecheck passes
-- [ ] Verify changes work in browser
+- [x] Admin dashboard has "Pending Jobs" section with count badge
+- [x] Lists all jobs where `status = 'pending'`
+- [x] Each row shows: title, company name, project type, remote preference, submission date
+- [x] Click to expand and see full job details
+- [x] Sorted by oldest first
+- [x] Typecheck passes
+- [x] Verify changes work in browser
 
 ---
 

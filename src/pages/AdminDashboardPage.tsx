@@ -533,6 +533,207 @@ const AdminDashboardPage: React.FC = () => {
           </div>
         </div>
 
+        {/* Pending Jobs Section */}
+        <div className="mb-10">
+          <div className="flex items-center justify-between mb-4">
+            <div className="flex items-center gap-2">
+              <Briefcase className="h-5 w-5 text-zinc-500" />
+              <h2 className="text-xl font-primary">Pending Jobs</h2>
+              {jobs.filter((j) => j.status === 'pending').length > 0 && (
+                <span className="px-2 py-0.5 bg-yellow-500/20 text-yellow-400 text-xs font-secondary rounded-full">
+                  {jobs.filter((j) => j.status === 'pending').length}
+                </span>
+              )}
+            </div>
+          </div>
+
+          {loading ? (
+            <div className="border border-zinc-800 p-8 flex items-center justify-center">
+              <Loader2 className="h-6 w-6 animate-spin text-zinc-500" />
+            </div>
+          ) : jobs.filter((j) => j.status === 'pending').length === 0 ? (
+            <div className="border border-zinc-800 p-8 text-center">
+              <CheckCircle2 className="h-12 w-12 text-green-500 mx-auto mb-4" />
+              <p className="text-zinc-400 font-secondary">
+                No pending jobs to review. All caught up!
+              </p>
+            </div>
+          ) : (
+            <div className="space-y-3">
+              {jobs
+                .filter((j) => j.status === 'pending')
+                .sort((a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime())
+                .map((job) => {
+                  const isExpanded = expandedJobId === job.id;
+                  const jobMatches = matches[job.id] || [];
+                  const isLoadingMatches = loadingMatches[job.id];
+                  const projectTypeLabel =
+                    PROJECT_TYPES.find((p) => p.value === job.projectType)?.label ||
+                    job.projectType;
+                  const remoteLabel =
+                    REMOTE_PREFERENCES.find((r) => r.value === job.remotePreference)
+                      ?.label || job.remotePreference;
+
+                  return (
+                    <div key={job.id} className="border border-zinc-800">
+                      {/* Job Header */}
+                      <button
+                        onClick={() =>
+                          setExpandedJobId(isExpanded ? null : job.id)
+                        }
+                        className="w-full p-4 flex items-center justify-between text-left hover:bg-zinc-900/50 transition-colors"
+                      >
+                        <div className="flex-1">
+                          <div className="flex items-center gap-3 mb-1">
+                            <h3 className="font-primary text-lg">{job.title}</h3>
+                            {getStatusBadge(job.status)}
+                          </div>
+                          <div className="flex flex-wrap gap-4 text-sm text-zinc-500 font-secondary">
+                            <span className="flex items-center gap-1">
+                              <Building2 className="h-3 w-3" />
+                              {job.companyName}
+                            </span>
+                            <span>{projectTypeLabel}</span>
+                            <span>{remoteLabel}</span>
+                            {job.location && (
+                              <span className="flex items-center gap-1">
+                                <MapPin className="h-3 w-3" />
+                                {job.location}
+                              </span>
+                            )}
+                            <span className="flex items-center gap-1">
+                              <Calendar className="h-3 w-3" />
+                              {new Date(job.createdAt).toLocaleDateString()}
+                            </span>
+                          </div>
+                        </div>
+                        {isExpanded ? (
+                          <ChevronUp className="h-5 w-5 text-zinc-500" />
+                        ) : (
+                          <ChevronDown className="h-5 w-5 text-zinc-500" />
+                        )}
+                      </button>
+
+                      {/* Expanded Content */}
+                      {isExpanded && (
+                        <div className="px-4 pb-4 border-t border-zinc-800">
+                          <div className="pt-4 space-y-4">
+                            {/* Job Description */}
+                            <div>
+                              <p className="text-xs font-secondary text-zinc-500 uppercase tracking-wide mb-2">
+                                Description
+                              </p>
+                              <p className="text-sm text-zinc-300 font-secondary whitespace-pre-wrap">
+                                {job.description}
+                              </p>
+                            </div>
+
+                            {job.requirements && (
+                              <div>
+                                <p className="text-xs font-secondary text-zinc-500 uppercase tracking-wide mb-2">
+                                  Requirements
+                                </p>
+                                <p className="text-sm text-zinc-300 font-secondary whitespace-pre-wrap">
+                                  {job.requirements}
+                                </p>
+                              </div>
+                            )}
+
+                            {/* Preferred Skills */}
+                            {job.preferredSkills && job.preferredSkills.length > 0 && (
+                              <div>
+                                <p className="text-xs font-secondary text-zinc-500 uppercase tracking-wide mb-2">
+                                  Preferred Skills
+                                </p>
+                                <div className="flex flex-wrap gap-1">
+                                  {job.preferredSkills.map((skill) => (
+                                    <span
+                                      key={skill}
+                                      className="px-2 py-0.5 bg-zinc-800 text-zinc-300 text-xs font-secondary"
+                                    >
+                                      {skill}
+                                    </span>
+                                  ))}
+                                </div>
+                              </div>
+                            )}
+
+                            {/* Focus Areas */}
+                            {job.focusAreas && job.focusAreas.length > 0 && (
+                              <div>
+                                <p className="text-xs font-secondary text-zinc-500 uppercase tracking-wide mb-2">
+                                  Focus Areas
+                                </p>
+                                <div className="flex flex-wrap gap-1">
+                                  {job.focusAreas.map((area) => {
+                                    const areaInfo = FOCUS_AREAS.find((a) => a.value === area);
+                                    return (
+                                      <span
+                                        key={area}
+                                        className="px-2 py-0.5 bg-pink-500/20 text-pink-400 text-xs font-secondary"
+                                      >
+                                        {areaInfo?.label || area}
+                                      </span>
+                                    );
+                                  })}
+                                </div>
+                              </div>
+                            )}
+
+                            {/* Additional Job Details */}
+                            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                              {job.budgetRange && (
+                                <div>
+                                  <p className="text-xs font-secondary text-zinc-500 uppercase tracking-wide mb-1">
+                                    Budget Range
+                                  </p>
+                                  <p className="text-sm text-zinc-300 font-secondary">
+                                    {job.budgetRange}
+                                  </p>
+                                </div>
+                              )}
+                              {job.timeline && (
+                                <div>
+                                  <p className="text-xs font-secondary text-zinc-500 uppercase tracking-wide mb-1">
+                                    Timeline
+                                  </p>
+                                  <p className="text-sm text-zinc-300 font-secondary">
+                                    {job.timeline}
+                                  </p>
+                                </div>
+                              )}
+                            </div>
+
+                            {/* Action Buttons */}
+                            <div className="flex gap-3 pt-4 border-t border-zinc-800">
+                              <button
+                                onClick={() => runMatching(job.id)}
+                                disabled={matchingJobId === job.id}
+                                className="flex items-center gap-2 px-4 py-2 bg-pink-500 hover:bg-pink-600 text-white font-secondary text-sm transition-colors disabled:opacity-50"
+                              >
+                                {matchingJobId === job.id ? (
+                                  <>
+                                    <Loader2 className="h-4 w-4 animate-spin" />
+                                    Running...
+                                  </>
+                                ) : (
+                                  <>
+                                    <Play className="h-4 w-4" />
+                                    Run Matching
+                                  </>
+                                )}
+                              </button>
+                            </div>
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  );
+                })}
+            </div>
+          )}
+        </div>
+
         {/* Pending Profiles Section */}
         <div className="mb-10">
           <div className="flex items-center justify-between mb-4">
