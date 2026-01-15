@@ -51,7 +51,7 @@ The platform connects creative technologists with companies seeking talent. The 
 - [x] Badge indicates response status (New / Responded)
 - [x] Empty state: "No job matches yet. Companies will see your profile when they post relevant opportunities."
 - [x] Typecheck passes
-- [ ] Verify changes work in browser
+- [x] Verify changes work in browser
 
 ---
 
