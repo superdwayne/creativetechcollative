@@ -89,3 +89,21 @@
   - AlertTriangle icon with amber colors for warnings
   - Embedding is generated from: name, bio, skills, focus_areas, projects, location, enriched_content
 ---
+
+## Iteration 6 - US-030: Trigger profile enrichment on update
+- What was implemented:
+  - Added `session` from `useAuth()` hook for API authentication
+  - Added `isEnriching`, `enrichmentError`, and `originalUrls` state to track enrichment status and original URLs
+  - Stored original portfolioUrl and linkedinUrl when profile is fetched in useEffect
+  - Modified handleSubmit to check if URLs changed after successful update
+  - If URLs changed, calls `/api/enrich-profile` endpoint with profile ID
+  - Shows "Updating your AI profile..." message with Sparkles icon during enrichment
+  - Shows warning with AlertTriangle icon if enrichment fails (graceful degradation)
+  - Added Sparkles and AlertTriangle icons to imports
+- Files changed:
+  - src/pages/NetworkEditProfilePage.tsx (added enrichment state, URL tracking, enrichment call in handleSubmit, enrichment status UI in success screen)
+- Learnings for future iterations:
+  - Track original field values at load time to detect changes on submit
+  - Same enrichment pattern used in both create and edit flows for consistency
+  - The `/api/enrich-profile` endpoint handles both create and update scenarios
+---

@@ -88,12 +88,12 @@ The platform connects creative technologists with companies seeking talent. The 
 **Description:** As a system, I need to re-enrich profiles when portfolio URLs change so embeddings stay current.
 
 **Acceptance Criteria:**
-- [ ] After profile update, checks if portfolio_url or linkedin_url changed
-- [ ] If URLs changed, calls `/api/enrich-profile` endpoint
-- [ ] Shows "Updating your AI profile..." toast during enrichment
-- [ ] Updates embedding and embedding_updated_at
-- [ ] Failure shows warning but doesn't block update
-- [ ] Typecheck passes
+- [x] After profile update, checks if portfolio_url or linkedin_url changed
+- [x] If URLs changed, calls `/api/enrich-profile` endpoint
+- [x] Shows "Updating your AI profile..." toast during enrichment
+- [x] Updates embedding and embedding_updated_at
+- [x] Failure shows warning but doesn't block update
+- [x] Typecheck passes
 - [ ] Verify changes work in browser
 
 ---
