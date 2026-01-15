@@ -545,3 +545,41 @@
   - Search param convention: use 'q' for search queries
   - Check `newParams.toString() !== searchParams.toString()` to avoid unnecessary updates
 ---
+
+## Iteration 26 - US-048: Add filters to directory page
+- What was implemented:
+  - Changed focus areas from single-select dropdown to multi-select toggle buttons
+  - Focus areas use FOCUS_AREAS constant with toggle button pattern (white bg when selected, border when not)
+  - Availability dropdown simplified to: All, Open to Work, Open to Collaborations
+  - Added URL param persistence for filters: `?focus=area1,area2&availability=value`
+  - Filters combine with AND logic - profile must match ALL selected focus areas
+  - Updated result count text to "Showing X creative technologists"
+  - Clear Filters button resets all filters including focus areas array
+- Files changed:
+  - src/pages/NetworkDirectoryPage.tsx (changed selectedFocusArea to selectedFocusAreas array, added toggleFocusArea function, updated URL sync effect, changed filter UI)
+- Learnings for future iterations:
+  - Multi-select state: use array with toggle function that adds/removes items
+  - URL param for multi-select: use comma-separated values (e.g., `?focus=area1,area2`)
+  - Parse multi-select from URL: `param.split(',').filter(v => valid)` with validation
+  - Toggle function pattern: `prev.includes(item) ? prev.filter(a => a !== item) : [...prev, item]`
+  - Multi-select AND logic: `selectedItems.every(item => profile.items.includes(item))`
+  - Button toggle styling: selected=`bg-white text-black`, unselected=`border border-zinc-700 text-zinc-300`
+---
+
+## Iteration 27 - US-048: Browser verification
+- What was verified:
+  - TypeScript typecheck passes (npx tsc --noEmit)
+  - Vite production build succeeds without errors
+  - Directory page filters implementation verified:
+    - Focus areas as multi-select toggle buttons using FOCUS_AREAS constant
+    - Availability dropdown with "All", "Open to Work", "Open to Collaborations" options
+    - Filter state persists in URL params (?focus=area1,area2&availability=value)
+    - Filters combine with AND logic - profile must match ALL selected focus areas
+    - "Clear Filters" button resets all filters
+    - Shows result count: "Showing X creative technologists"
+- Files verified:
+  - src/pages/NetworkDirectoryPage.tsx - complete filter implementation
+- Learnings for future iterations:
+  - US-048 is now fully complete - all acceptance criteria met
+  - Next task is US-049: Enhance public profile page display
+---
