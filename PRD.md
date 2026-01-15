@@ -199,14 +199,14 @@ The platform connects creative technologists with companies seeking talent. The 
 **Description:** As an admin, I want to approve jobs and trigger AI matching to generate candidate recommendations.
 
 **Acceptance Criteria:**
-- [ ] Each pending job has Approve and Reject buttons
-- [ ] Approve: calls `/api/match-job` endpoint with job ID
-- [ ] Shows loading state "Running AI matching..." during process
-- [ ] On success, job status becomes 'matched' and shows match count
-- [ ] Reject: shows dialog for rejection reason, sets `status = 'rejected'` with admin_notes
-- [ ] Success toast with match count: "Job approved - 5 candidates matched"
-- [ ] Typecheck passes
-- [ ] Verify changes work in browser
+- [x] Each pending job has Approve and Reject buttons
+- [x] Approve: calls `/api/match-job` endpoint with job ID
+- [x] Shows loading state "Running AI matching..." during process
+- [x] On success, job status becomes 'matched' and shows match count
+- [x] Reject: shows dialog for rejection reason, sets `status = 'rejected'` with admin_notes
+- [x] Success toast with match count: "Job approved - 5 candidates matched"
+- [x] Typecheck passes
+- [x] Verify changes work in browser
 
 ---
 

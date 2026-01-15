@@ -146,6 +146,11 @@ const AdminDashboardPage: React.FC = () => {
   const [rejectReason, setRejectReason] = useState('');
   const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' } | null>(null);
 
+  // Job action states
+  const [rejectDialogJob, setRejectDialogJob] = useState<JobSubmissionWithDetails | null>(null);
+  const [rejectJobReason, setRejectJobReason] = useState('');
+  const [rejectingJobId, setRejectingJobId] = useState<string | null>(null);
+
   const fetchPendingProfiles = useCallback(async () => {
     if (!session?.access_token) return;
 
@@ -249,6 +254,46 @@ const AdminDashboardPage: React.FC = () => {
     }
   };
 
+  const rejectJob = async () => {
+    if (!session?.access_token || !rejectDialogJob || rejectingJobId) return;
+
+    const jobId = rejectDialogJob.id;
+    setRejectingJobId(jobId);
+
+    try {
+      const response = await fetch('/api/admin/jobs/reject', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${session.access_token}`,
+        },
+        body: JSON.stringify({ jobId, reason: rejectJobReason || undefined }),
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data.error || 'Failed to reject job');
+      }
+
+      // Refresh jobs list
+      await fetchJobs();
+      setExpandedJobId(null);
+      setRejectDialogJob(null);
+      setRejectJobReason('');
+
+      // Show success toast
+      setToast({ message: 'Job rejected', type: 'success' });
+      setTimeout(() => setToast(null), 3000);
+    } catch (err) {
+      console.error('Error rejecting job:', err);
+      setToast({ message: err instanceof Error ? err.message : 'Failed to reject job', type: 'error' });
+      setTimeout(() => setToast(null), 3000);
+    } finally {
+      setRejectingJobId(null);
+    }
+  };
+
   const fetchJobs = useCallback(async () => {
     if (!session?.access_token) return;
 
@@ -342,9 +387,21 @@ const AdminDashboardPage: React.FC = () => {
       if (expandedJobId === jobId) {
         await fetchMatchesForJob(jobId);
       }
+
+      // Show success toast with match count
+      const matchCount = data.matches?.length ?? 0;
+      setToast({
+        message: `Job approved - ${matchCount} candidate${matchCount !== 1 ? 's' : ''} matched`,
+        type: 'success',
+      });
+      setTimeout(() => setToast(null), 3000);
     } catch (err) {
       console.error('Error running matching:', err);
-      setError(err instanceof Error ? err.message : 'Matching failed');
+      setToast({
+        message: err instanceof Error ? err.message : 'Matching failed',
+        type: 'error',
+      });
+      setTimeout(() => setToast(null), 3000);
     } finally {
       setMatchingJobId(null);
     }
@@ -709,19 +766,27 @@ const AdminDashboardPage: React.FC = () => {
                               <button
                                 onClick={() => runMatching(job.id)}
                                 disabled={matchingJobId === job.id}
-                                className="flex items-center gap-2 px-4 py-2 bg-pink-500 hover:bg-pink-600 text-white font-secondary text-sm transition-colors disabled:opacity-50"
+                                className="flex items-center gap-2 px-4 py-2 bg-green-500 hover:bg-green-600 text-white font-secondary text-sm transition-colors disabled:opacity-50"
                               >
                                 {matchingJobId === job.id ? (
                                   <>
                                     <Loader2 className="h-4 w-4 animate-spin" />
-                                    Running...
+                                    Running AI matching...
                                   </>
                                 ) : (
                                   <>
-                                    <Play className="h-4 w-4" />
-                                    Run Matching
+                                    <CheckCircle2 className="h-4 w-4" />
+                                    Approve
                                   </>
                                 )}
+                              </button>
+                              <button
+                                onClick={() => setRejectDialogJob(job)}
+                                disabled={matchingJobId === job.id}
+                                className="flex items-center gap-2 px-4 py-2 bg-red-500/20 hover:bg-red-500/30 text-red-400 border border-red-500/30 font-secondary text-sm transition-colors disabled:opacity-50"
+                              >
+                                <XCircle className="h-4 w-4" />
+                                Reject
                               </button>
                             </div>
                           </div>
@@ -1433,6 +1498,83 @@ const AdminDashboardPage: React.FC = () => {
                   <>
                     <XCircle className="h-4 w-4" />
                     Reject Profile
+                  </>
+                )}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Job Rejection Confirmation Dialog */}
+      {rejectDialogJob && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center">
+          {/* Backdrop */}
+          <div
+            className="absolute inset-0 bg-black/80 backdrop-blur-sm"
+            onClick={() => {
+              setRejectDialogJob(null);
+              setRejectJobReason('');
+            }}
+          />
+
+          {/* Dialog */}
+          <div className="relative bg-zinc-900 border border-zinc-700 w-full max-w-md mx-4 p-6">
+            {/* Close button */}
+            <button
+              onClick={() => {
+                setRejectDialogJob(null);
+                setRejectJobReason('');
+              }}
+              className="absolute top-4 right-4 text-zinc-500 hover:text-white transition-colors"
+            >
+              <X className="h-5 w-5" />
+            </button>
+
+            <h3 className="font-primary text-xl text-white mb-2">Reject Job</h3>
+            <p className="text-sm text-zinc-400 font-secondary mb-4">
+              Are you sure you want to reject the job <span className="text-white">"{rejectDialogJob.title}"</span>? This will mark the job as rejected.
+            </p>
+
+            {/* Reason textarea */}
+            <div className="mb-6">
+              <label className="block text-xs font-secondary text-zinc-500 uppercase tracking-wide mb-2">
+                Reason (Optional)
+              </label>
+              <textarea
+                value={rejectJobReason}
+                onChange={(e) => setRejectJobReason(e.target.value)}
+                placeholder="Enter a reason for rejection..."
+                className="w-full px-4 py-3 bg-zinc-800 border border-zinc-700 text-white placeholder:text-zinc-500 font-secondary text-sm focus:outline-none focus:border-zinc-500 resize-none"
+                rows={3}
+              />
+            </div>
+
+            {/* Action buttons */}
+            <div className="flex gap-3">
+              <button
+                onClick={() => {
+                  setRejectDialogJob(null);
+                  setRejectJobReason('');
+                }}
+                className="flex-1 px-4 py-2 border border-zinc-700 text-zinc-300 hover:border-zinc-500 font-secondary text-sm transition-colors"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={rejectJob}
+                disabled={rejectingJobId === rejectDialogJob.id}
+                className="flex-1 flex items-center justify-center gap-2 px-4 py-2 bg-red-500 hover:bg-red-600 text-white font-secondary text-sm transition-colors disabled:opacity-50"
+              >
+                {rejectingJobId === rejectDialogJob.id ? (
+                  <>
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                    Rejecting...
+                  </>
+                ) : (
+                  <>
+                    <XCircle className="h-4 w-4" />
+                    Reject Job
                   </>
                 )}
               </button>
