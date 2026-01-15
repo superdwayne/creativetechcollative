@@ -1,451 +1,459 @@
-# PRD: AI-Powered Job Matching Engine for CTC Network Directory
+# PRD: CTC Creative Technology Platform - Phase 2: Full-Featured UI & Messaging
 
 ## Introduction
 
-Build an intelligent job matching engine that allows registered companies to submit job specifications and receive AI-curated matches from the Creative Technologists Collective directory. The system uses semantic understanding via vector embeddings and Claude AI to match job requirements with member capabilities—even inferring skills from portfolio context that members haven't explicitly listed.
+This is Phase 2 of the CTC Creative Technology Platform. Phase 1 (completed) established the API layer, database schema, and matching engine. This phase delivers the full-featured user interfaces for creative technologists, companies, and admins—plus a complete in-platform messaging system.
 
-The matching engine will be API-first (no UI initially), with an admin review workflow before introductions are facilitated.
+The platform connects creative technologists with companies seeking talent. The AI-powered matching system analyzes job specs against all member profiles—enriched with data from portfolios and social profiles—to surface the top 3-5 most relevant candidates for each opportunity.
+
+**Completed in Phase 1:**
+- Database schema (profiles, companies, jobs, matches, embeddings)
+- Authentication flows (member and company)
+- API endpoints (job submission, matching, profile enrichment)
+- Vector search with pgvector
 
 ## Goals
 
-- Enable companies to register accounts and submit structured job specifications
-- Generate rich semantic embeddings for all member profiles (including scraped portfolio data)
-- Build a matching engine that understands context beyond explicit skills/keywords
-- Surface top candidates with AI-generated explanations for why they match
-- Provide admin interface to review matches before facilitating introductions
-- Store all job submissions and match results for analytics and improvement
+- Complete member dashboard with match notifications and response flow
+- Complete company dashboard with job submission form and match viewing
+- Complete admin dashboard with profile approval, job approval, and match review
+- Implement full messaging system between companies and matched members
+- Add AI profile enrichment triggered on profile creation/update
+- Deliver polished directory with search and filtering
 
 ## User Stories
 
-### US-001: Enable pgvector extension in Supabase
-**Description:** As a developer, I need the pgvector extension enabled so I can store and query vector embeddings for semantic search.
+---
 
-**Acceptance Criteria:**
-- [x] Create migration to enable pgvector extension (`CREATE EXTENSION IF NOT EXISTS vector`)
-- [x] Migration runs successfully in Supabase
-- [x] Verify extension is active with test query
-- [x] Typecheck passes
+### PHASE 2A: Member Dashboard & Matches
 
 ---
 
-### US-002: Create companies table schema
-**Description:** As a developer, I need a companies table to store registered company accounts that can submit job specs.
+### US-026: Display approval status on member dashboard
+**Description:** As a creative technologist, I want to see my profile's approval status so I know when I'm visible in the directory.
 
 **Acceptance Criteria:**
-- [x] Create `companies` table with columns:
+- [x] Member dashboard shows approval status badge (Pending Review / Approved)
+- [x] Pending profiles show message: "Your profile is under review and will appear in the directory once approved"
+- [x] Approved profiles show "Your profile is live in the directory" with link to view
+- [x] Typecheck passes
+- [x] Verify changes work in browser
+
+---
+
+### US-027: Create member matches dashboard section
+**Description:** As a creative technologist, I want to see jobs I've been matched with so I can respond to opportunities.
+
+**Acceptance Criteria:**
+- [ ] Member dashboard has "Job Matches" section below profile info
+- [ ] Lists all matches for member's profile where `admin_approved = true`
+- [ ] Each match card shows: job title, company name, match score percentage, date matched
+- [ ] Badge indicates response status (New / Responded)
+- [ ] Empty state: "No job matches yet. Companies will see your profile when they post relevant opportunities."
+- [ ] Typecheck passes
+- [ ] Verify changes work in browser
+
+---
+
+### US-028: Create match detail view for members
+**Description:** As a creative technologist, I want to view match details and respond so companies know my interest level.
+
+**Acceptance Criteria:**
+- [ ] Clicking match card opens detail modal or page
+- [ ] Shows full job description, requirements, and project details
+- [ ] Shows AI-generated match reasoning explaining why you're a fit
+- [ ] Shows company name and verified badge if applicable
+- [ ] Response buttons: "I'm Interested" / "Not Interested"
+- [ ] After response, saves to `member_response` column and shows confirmation
+- [ ] Typecheck passes
+- [ ] Verify changes work in browser
+
+---
+
+### US-029: Trigger profile enrichment on creation
+**Description:** As a system, I need to automatically enrich profiles when they're created so AI matching has rich context.
+
+**Acceptance Criteria:**
+- [ ] After profile creation succeeds, calls `/api/enrich-profile` endpoint
+- [ ] Shows "Enhancing your profile with AI..." toast during enrichment
+- [ ] Enrichment scrapes portfolio_url and linkedin_url if provided
+- [ ] Generates embedding from bio + skills + enriched content
+- [ ] Failure doesn't block profile creation (graceful degradation)
+- [ ] Typecheck passes
+- [ ] Verify changes work in browser
+
+---
+
+### US-030: Trigger profile enrichment on update
+**Description:** As a system, I need to re-enrich profiles when portfolio URLs change so embeddings stay current.
+
+**Acceptance Criteria:**
+- [ ] After profile update, checks if portfolio_url or linkedin_url changed
+- [ ] If URLs changed, calls `/api/enrich-profile` endpoint
+- [ ] Shows "Updating your AI profile..." toast during enrichment
+- [ ] Updates embedding and embedding_updated_at
+- [ ] Failure shows warning but doesn't block update
+- [ ] Typecheck passes
+- [ ] Verify changes work in browser
+
+---
+
+### PHASE 2B: Company Dashboard & Job Submission
+
+---
+
+### US-031: Create job submission form
+**Description:** As a company, I want to submit job specifications so I can find matching creative technologists.
+
+**Acceptance Criteria:**
+- [ ] Company dashboard has prominent "Submit New Job" button
+- [ ] Form opens in modal or new page
+- [ ] Required fields: title, description, project_type (select), remote_preference (select)
+- [ ] Optional fields: requirements (textarea), preferred_skills (tag input), focus_areas (multi-select), budget_range, location, timeline
+- [ ] Form validates required fields before submission
+- [ ] Submits to existing `/api/submit-job` endpoint
+- [ ] Success shows confirmation with "Pending Admin Review" message
+- [ ] Typecheck passes
+- [ ] Verify changes work in browser
+
+---
+
+### US-032: Display company's submitted jobs list
+**Description:** As a company, I want to see all my submitted jobs and their statuses so I can track my requests.
+
+**Acceptance Criteria:**
+- [ ] Company dashboard shows "Your Job Submissions" section
+- [ ] Lists all jobs for the company, sorted by most recent
+- [ ] Each job card shows: title, status badge, submission date, match count (if matched)
+- [ ] Status badges: yellow="Pending Review", blue="Under Review", green="Matched", gray="Closed"
+- [ ] Click job to expand/view details
+- [ ] Empty state: "No job submissions yet. Submit a job spec to find matching creative technologists."
+- [ ] Typecheck passes
+- [ ] Verify changes work in browser
+
+---
+
+### US-033: Create job detail view with matches for companies
+**Description:** As a company, I want to view job details and matched candidates so I can see recommendations.
+
+**Acceptance Criteria:**
+- [ ] Clicking job opens detail view (modal or page)
+- [ ] Shows full job specification
+- [ ] If status is 'matched', shows "Matched Candidates" section
+- [ ] Each match shows: member name, profile picture, match score, reasoning summary
+- [ ] Click member to view their full profile (opens in new tab or modal)
+- [ ] If status is 'pending', shows "Awaiting admin review"
+- [ ] Typecheck passes
+- [ ] Verify changes work in browser
+
+---
+
+### PHASE 2C: Admin Dashboard
+
+---
+
+### US-034: Create admin pending profiles section
+**Description:** As an admin, I want to see pending profiles so I can review and approve them.
+
+**Acceptance Criteria:**
+- [ ] Admin dashboard has "Pending Profiles" section with count badge
+- [ ] Lists all profiles where `approved = false`
+- [ ] Each row shows: name, email, location, focus areas (tags), submission date
+- [ ] Click to expand and see full profile details (bio, skills, projects, portfolio links)
+- [ ] Sorted by oldest first (FIFO review)
+- [ ] Typecheck passes
+- [ ] Verify changes work in browser
+
+---
+
+### US-035: Implement profile approval/rejection actions
+**Description:** As an admin, I want to approve or reject profiles to control directory quality.
+
+**Acceptance Criteria:**
+- [ ] Each pending profile has Approve and Reject buttons
+- [ ] Approve: sets `approved = true`, `approved_at = now()`, `approved_by = admin_id`
+- [ ] Reject: shows confirmation dialog with optional reason textarea
+- [ ] Rejection deletes the profile record
+- [ ] After action, profile removed from pending list with animation
+- [ ] Success toast: "Profile approved" or "Profile rejected"
+- [ ] Typecheck passes
+- [ ] Verify changes work in browser
+
+---
+
+### US-036: Create admin pending jobs section
+**Description:** As an admin, I want to see pending job submissions so I can review them before matching.
+
+**Acceptance Criteria:**
+- [ ] Admin dashboard has "Pending Jobs" section with count badge
+- [ ] Lists all jobs where `status = 'pending'`
+- [ ] Each row shows: title, company name, project type, remote preference, submission date
+- [ ] Click to expand and see full job details
+- [ ] Sorted by oldest first
+- [ ] Typecheck passes
+- [ ] Verify changes work in browser
+
+---
+
+### US-037: Implement job approval and trigger matching
+**Description:** As an admin, I want to approve jobs and trigger AI matching to generate candidate recommendations.
+
+**Acceptance Criteria:**
+- [ ] Each pending job has Approve and Reject buttons
+- [ ] Approve: calls `/api/match-job` endpoint with job ID
+- [ ] Shows loading state "Running AI matching..." during process
+- [ ] On success, job status becomes 'matched' and shows match count
+- [ ] Reject: shows dialog for rejection reason, sets `status = 'rejected'` with admin_notes
+- [ ] Success toast with match count: "Job approved - 5 candidates matched"
+- [ ] Typecheck passes
+- [ ] Verify changes work in browser
+
+---
+
+### US-038: Create admin match review section
+**Description:** As an admin, I want to review AI-generated matches before showing them to companies.
+
+**Acceptance Criteria:**
+- [ ] Admin dashboard has "Pending Matches" section
+- [ ] Lists matches where `admin_approved IS NULL`, grouped by job
+- [ ] Each match shows: job title, member name, match score, reasoning preview
+- [ ] Individual Approve/Reject buttons per match
+- [ ] Bulk "Approve All" button per job
+- [ ] Approve sets `admin_approved = true`, Reject sets `admin_approved = false`
+- [ ] Only approved matches become visible to companies
+- [ ] Typecheck passes
+- [ ] Verify changes work in browser
+
+---
+
+### US-039: Create admin company verification section
+**Description:** As an admin, I want to verify companies so members know they're legitimate.
+
+**Acceptance Criteria:**
+- [ ] Admin dashboard has "Companies" section
+- [ ] Lists all registered companies
+- [ ] Each row shows: company name, contact email, industry, verified status, registration date
+- [ ] Verify/Unverify toggle button for each company
+- [ ] Verify sets `verified = true`, Unverify sets `verified = false`
+- [ ] Verified badge appears next to company names throughout platform
+- [ ] Typecheck passes
+- [ ] Verify changes work in browser
+
+---
+
+### PHASE 2D: Messaging System
+
+---
+
+### US-040: Create messages database table
+**Description:** As a system, I need a messages table so companies and members can communicate about job matches.
+
+**Acceptance Criteria:**
+- [ ] Create migration for `messages` table with columns:
   - `id` (UUID, primary key)
-  - `user_id` (UUID, FK to auth.users, unique, not null)
-  - `company_name` (VARCHAR 255, not null)
-  - `company_website` (TEXT, nullable)
-  - `contact_name` (VARCHAR 255, not null)
-  - `contact_email` (VARCHAR 255, not null)
-  - `contact_phone` (VARCHAR 50, nullable)
-  - `company_size` (VARCHAR 50, nullable) - startup/small/medium/large/enterprise
-  - `industry` (VARCHAR 255, nullable)
-  - `verified` (BOOLEAN, default false) - admin verification status
+  - `match_id` (UUID, FK to job_matches, not null)
+  - `sender_type` (VARCHAR, 'company' or 'member')
+  - `sender_id` (UUID, not null) - company.id or profile.id depending on sender_type
+  - `content` (TEXT, not null)
   - `created_at` (TIMESTAMP, default now())
-  - `updated_at` (TIMESTAMP, default now())
-- [x] Add appropriate indexes on user_id, verified, created_at
-- [x] Add RLS policies: companies can read/update own record, admins can read all
-- [x] Migration runs successfully
-- [x] Typecheck passes
+  - `read_at` (TIMESTAMP, nullable)
+- [ ] Add index on match_id for fast conversation loading
+- [ ] Add RLS: only match participants can read/write messages
+- [ ] Migration runs successfully
+- [ ] Typecheck passes
 
 ---
 
-### US-003: Create job_submissions table schema
-**Description:** As a developer, I need a job_submissions table to store job specifications submitted by companies.
+### US-041: Create send message API endpoint
+**Description:** As a user, I need an API to send messages so conversations happen on the platform.
 
 **Acceptance Criteria:**
-- [x] Create `job_submissions` table with columns:
-  - `id` (UUID, primary key)
-  - `company_id` (UUID, FK to companies.id, not null)
-  - `title` (VARCHAR 255, not null) - job title
-  - `description` (TEXT, not null) - full job description
-  - `requirements` (TEXT, nullable) - specific requirements
-  - `preferred_skills` (TEXT[], nullable) - array of desired skills
-  - `focus_areas` (TEXT[], nullable) - relevant focus areas from our taxonomy
-  - `budget_range` (VARCHAR 100, nullable) - budget indication
-  - `project_type` (VARCHAR 50, not null) - freelance/contract/full-time/project-based
-  - `remote_preference` (VARCHAR 50, not null) - remote/hybrid/onsite/flexible
-  - `location` (VARCHAR 255, nullable) - if onsite/hybrid
-  - `timeline` (VARCHAR 255, nullable) - project timeline
-  - `status` (VARCHAR 50, default 'pending') - pending/reviewed/matched/closed/rejected
-  - `admin_notes` (TEXT, nullable) - internal notes
-  - `created_at` (TIMESTAMP, default now())
-  - `updated_at` (TIMESTAMP, default now())
-- [x] Add indexes on company_id, status, created_at
-- [x] Add RLS policies: companies see own submissions, admins see all
-- [x] Add trigger to update updated_at on changes
-- [x] Migration runs successfully
-- [x] Typecheck passes
+- [ ] Create `/api/messages/send.ts` edge function
+- [ ] Accepts: match_id, content in request body
+- [ ] Validates sender is participant in the match (company or member)
+- [ ] Determines sender_type and sender_id from auth context
+- [ ] Creates message record
+- [ ] Returns created message with id and timestamp
+- [ ] Returns 403 if sender not authorized for this match
+- [ ] Typecheck passes
 
 ---
 
-### US-004: Create job_matches table schema
-**Description:** As a developer, I need a job_matches table to store AI-generated matches between jobs and members.
+### US-042: Create get conversation API endpoint
+**Description:** As a user, I need an API to fetch conversation history for a match.
 
 **Acceptance Criteria:**
-- [x] Create `job_matches` table with columns:
-  - `id` (UUID, primary key)
-  - `job_id` (UUID, FK to job_submissions.id, not null)
-  - `profile_id` (UUID, FK to network_profiles.id, not null)
-  - `match_score` (FLOAT, not null) - 0-100 relevance score
-  - `match_reasoning` (TEXT, not null) - AI explanation of why they match
-  - `skill_matches` (JSONB, nullable) - specific skills that matched
-  - `vector_similarity` (FLOAT, nullable) - raw cosine similarity score
-  - `admin_approved` (BOOLEAN, default null) - null=pending, true=approved, false=rejected
-  - `member_notified` (BOOLEAN, default false)
-  - `member_response` (VARCHAR 50, nullable) - interested/not-interested/no-response
-  - `created_at` (TIMESTAMP, default now())
-- [x] Add unique constraint on (job_id, profile_id)
-- [x] Add indexes on job_id, profile_id, match_score, admin_approved
-- [x] Add RLS policies: admins full access, companies see approved matches for own jobs
-- [x] Migration runs successfully
-- [x] Typecheck passes
+- [ ] Create `/api/messages/conversation.ts` edge function
+- [ ] Accepts: match_id as query parameter
+- [ ] Validates requester is participant in the match
+- [ ] Returns all messages for the match, sorted by created_at ascending
+- [ ] Marks unread messages as read (sets read_at) for the requester
+- [ ] Returns 403 if requester not authorized
+- [ ] Typecheck passes
 
 ---
 
-### US-005: Add embedding column to network_profiles
-**Description:** As a developer, I need to store vector embeddings for each member profile to enable semantic search.
+### US-043: Create unread message count API endpoint
+**Description:** As a user, I need to know how many unread messages I have so I can see notifications.
 
 **Acceptance Criteria:**
-- [x] Add `embedding` column to network_profiles (vector(1536) for OpenAI embeddings)
-- [x] Add `embedding_updated_at` timestamp column
-- [x] Add `enriched_content` TEXT column for storing scraped/processed portfolio content
-- [x] Create index for vector similarity search (ivfflat or hnsw)
-- [x] Migration runs successfully without affecting existing data
-- [x] Typecheck passes
+- [ ] Create `/api/messages/unread-count.ts` edge function
+- [ ] Returns total unread message count for current user
+- [ ] For companies: counts messages in their job matches where sender_type='member' and read_at is null
+- [ ] For members: counts messages in their matches where sender_type='company' and read_at is null
+- [ ] Returns { count: number }
+- [ ] Typecheck passes
 
 ---
 
-### US-006: Create TypeScript types for new tables
-**Description:** As a developer, I need TypeScript interfaces for the new database tables to ensure type safety.
+### US-044: Add messaging UI to company match view
+**Description:** As a company, I want to message matched candidates to discuss the opportunity.
 
 **Acceptance Criteria:**
-- [x] Create `Company` interface matching companies table schema
-- [x] Create `JobSubmission` interface matching job_submissions table schema
-- [x] Create `JobMatch` interface matching job_matches table schema
-- [x] Update `NetworkProfile` interface to include embedding fields
-- [x] Create union types for status/enum fields (JobStatus, ProjectType, RemotePreference, etc.)
-- [x] Export all types from appropriate location
-- [x] Typecheck passes
+- [ ] Match detail view has "Messages" section below candidate info
+- [ ] Shows conversation history with timestamps and sender labels
+- [ ] Company messages aligned right, member messages aligned left
+- [ ] Text input with Send button at bottom
+- [ ] Sending a message immediately adds it to the conversation
+- [ ] Auto-scrolls to newest messages on load and send
+- [ ] Typecheck passes
+- [ ] Verify changes work in browser
 
 ---
 
-### US-007: Create Supabase client functions for companies
-**Description:** As a developer, I need CRUD functions for company management in the Supabase client library.
+### US-045: Add messaging UI to member match view
+**Description:** As a creative technologist, I want to message companies about matches to learn more.
 
 **Acceptance Criteria:**
-- [x] Add `createCompany(data)` function - creates company linked to auth user
-- [x] Add `getCompanyByUserId(userId)` function - fetch company by auth user
-- [x] Add `updateCompany(id, data)` function - update company details
-- [x] Add `getCompanyById(id)` function - fetch single company
-- [x] All functions include proper error handling
-- [x] All functions are properly typed
-- [x] Typecheck passes
+- [ ] Match detail view has "Messages" section below job info
+- [ ] Shows conversation history with timestamps and sender labels
+- [ ] Member messages aligned right, company messages aligned left
+- [ ] Text input with Send button at bottom
+- [ ] Messaging only enabled after member responds "Interested"
+- [ ] If not yet responded, shows "Respond to this match to start messaging"
+- [ ] Typecheck passes
+- [ ] Verify changes work in browser
 
 ---
 
-### US-008: Create Supabase client functions for job submissions
-**Description:** As a developer, I need CRUD functions for job submission management.
+### US-046: Show unread message indicators on dashboards
+**Description:** As a user, I want to see when I have unread messages so I know to check conversations.
 
 **Acceptance Criteria:**
-- [x] Add `createJobSubmission(companyId, data)` function
-- [x] Add `getJobSubmissionsByCompany(companyId)` function - list company's jobs
-- [x] Add `getJobSubmissionById(id)` function - fetch single job
-- [x] Add `updateJobSubmissionStatus(id, status, adminNotes?)` function
-- [x] Add `getAllPendingJobSubmissions()` function - for admin review
-- [x] All functions include proper error handling and typing
-- [x] Typecheck passes
+- [ ] Member dashboard shows red badge with unread count next to "Job Matches" header
+- [ ] Company dashboard shows red badge with unread count next to matched jobs
+- [ ] Individual match cards show blue dot indicator if conversation has unread messages
+- [ ] Counts update after viewing conversation
+- [ ] Typecheck passes
+- [ ] Verify changes work in browser
 
 ---
 
-### US-009: Create Supabase client functions for job matches
-**Description:** As a developer, I need functions to create and manage job matches.
-
-**Acceptance Criteria:**
-- [x] Add `createJobMatches(jobId, matches[])` function - bulk insert matches
-- [x] Add `getMatchesByJobId(jobId)` function - fetch all matches for a job
-- [x] Add `updateMatchApproval(matchId, approved, adminNotes?)` function
-- [x] Add `updateMemberResponse(matchId, response)` function
-- [x] Add `getApprovedMatchesForCompany(companyId)` function
-- [x] All functions include proper error handling and typing
-- [x] Typecheck passes
+### PHASE 2E: Directory & Polish
 
 ---
 
-### US-010: Create profile embedding generation utility
-**Description:** As a developer, I need a utility function to generate embeddings from member profile data.
+### US-047: Add search to directory page
+**Description:** As a visitor, I want to search the directory to find creative technologists by name or keywords.
 
 **Acceptance Criteria:**
-- [x] Create `generateProfileEmbedding(profile)` function using OpenAI embeddings API
-- [x] Function combines: bio, skills, focus areas, project descriptions into embedding text
-- [x] Use text-embedding-3-small model (1536 dimensions, cost-effective)
-- [x] Include proper error handling and retry logic
-- [x] Function returns embedding vector array
-- [x] Typecheck passes
+- [ ] Directory page has search input at top
+- [ ] Search filters profiles by name and bio content
+- [ ] Search is debounced (300ms delay)
+- [ ] Results update as user types
+- [ ] Clear button to reset search
+- [ ] URL updates with search param for shareability
+- [ ] Typecheck passes
+- [ ] Verify changes work in browser
 
 ---
 
-### US-011: Create job spec embedding generation utility
-**Description:** As a developer, I need a utility function to generate embeddings from job specifications.
+### US-048: Add filters to directory page
+**Description:** As a visitor, I want to filter the directory by focus area, availability, and skills.
 
 **Acceptance Criteria:**
-- [x] Create `generateJobEmbedding(jobSubmission)` function using OpenAI embeddings API
-- [x] Function combines: title, description, requirements, preferred_skills, focus_areas
-- [x] Use same model as profile embeddings (text-embedding-3-small)
-- [x] Include proper error handling and retry logic
-- [x] Function returns embedding vector array
-- [x] Typecheck passes
+- [ ] Directory has filter dropdowns: Focus Areas (multi-select), Availability (single-select)
+- [ ] Focus areas use existing FOCUS_AREAS constant
+- [ ] Availability options: All, Open to Work, Open to Collaborations
+- [ ] Filters combine with AND logic
+- [ ] Filter state persists in URL params
+- [ ] "Clear Filters" button resets all filters
+- [ ] Shows result count: "Showing X creative technologists"
+- [ ] Typecheck passes
+- [ ] Verify changes work in browser
 
 ---
 
-### US-012: Create portfolio content scraping utility
-**Description:** As a developer, I need a utility to scrape and extract relevant content from member portfolio URLs.
+### US-049: Enhance public profile page display
+**Description:** As a visitor, I want to see rich profile details on public profile pages.
 
 **Acceptance Criteria:**
-- [x] Create `scrapePortfolioContent(urls[])` function
-- [x] Accepts portfolio_url, linkedin_url, and other_social_links
-- [x] Uses web scraping to extract text content (project descriptions, about sections)
-- [x] Handles rate limiting and timeouts gracefully
-- [x] Returns cleaned, concatenated text for embedding
-- [x] Respects robots.txt and includes reasonable delays
-- [x] Typecheck passes
+- [ ] Profile page shows profile picture prominently
+- [ ] Shows focus areas as colored badges with descriptions on hover
+- [ ] Shows skills as tag pills
+- [ ] Projects section with images and descriptions
+- [ ] External links (portfolio, LinkedIn) open in new tab with icons
+- [ ] Availability status clearly displayed with appropriate color
+- [ ] Typecheck passes
+- [ ] Verify changes work in browser
 
 ---
 
-### US-013: Create profile enrichment function
-**Description:** As a developer, I need a function that enriches a profile with scraped content and generates its embedding.
+### US-050: Add match email notification webhook
+**Description:** As a system, I want to email members when they're matched with a job so they check the platform.
 
 **Acceptance Criteria:**
-- [x] Create `enrichProfile(profileId)` function
-- [x] Fetches profile from database
-- [x] Calls scrapePortfolioContent for profile URLs
-- [x] Stores enriched_content in profile record
-- [x] Generates embedding from profile + enriched content
-- [x] Updates embedding and embedding_updated_at in database
-- [x] Returns success/failure status
-- [x] Typecheck passes
+- [ ] After admin approves a match, triggers notification
+- [ ] Calls existing n8n webhook or Resend API
+- [ ] Email includes: job title, match score, "Why you matched" summary, link to dashboard
+- [ ] Sets `member_notified = true` on match record after sending
+- [ ] Handles send failures gracefully (logs error, doesn't crash)
+- [ ] Typecheck passes
 
 ---
-
-### US-014: Create batch profile enrichment API endpoint
-**Description:** As a developer, I need an API endpoint to trigger enrichment for all profiles (admin use).
-
-**Acceptance Criteria:**
-- [x] Create `/api/enrich-profiles.ts` edge function
-- [x] Accepts optional `profileIds[]` param (or enriches all if not provided)
-- [x] Only processes profiles where embedding is null or outdated
-- [x] Implements batching to avoid rate limits (max 10 concurrent)
-- [x] Returns progress/status JSON
-- [x] Requires admin authentication
-- [x] Typecheck passes
-
----
-
-### US-015: Create vector similarity search function
-**Description:** As a developer, I need a function to find similar profiles using vector search.
-
-**Acceptance Criteria:**
-- [x] Create `findSimilarProfiles(embedding, limit, threshold?)` function
-- [x] Uses pgvector cosine similarity operator (<=>)
-- [x] Only searches approved profiles with available availability status
-- [x] Returns profiles ordered by similarity with scores
-- [x] Accepts optional minimum similarity threshold
-- [x] Typecheck passes
-
----
-
-### US-016: Create Claude match ranking utility
-**Description:** As a developer, I need a utility that uses Claude to analyze and rank candidate matches.
-
-**Acceptance Criteria:**
-- [x] Create `rankMatchesWithClaude(job, candidates[])` function
-- [x] Sends job spec and top N candidates (from vector search) to Claude
-- [x] Claude analyzes fit based on job requirements vs candidate profiles
-- [x] Returns ranked list with match_score (0-100) and match_reasoning for each
-- [x] Includes skill_matches extraction in response
-- [x] Uses structured output for consistent parsing
-- [x] Typecheck passes
-
----
-
-### US-017: Create main matching engine function
-**Description:** As a developer, I need the core matching engine that orchestrates the full matching pipeline.
-
-**Acceptance Criteria:**
-- [x] Create `runJobMatching(jobId)` function
-- [x] Fetches job submission from database
-- [x] Generates embedding for job spec
-- [x] Performs vector similarity search (top 20 candidates)
-- [x] Calls Claude ranking for detailed analysis (top 10)
-- [x] Creates job_matches records in database
-- [x] Updates job status to 'matched'
-- [x] Returns array of created matches
-- [x] Typecheck passes
-
----
-
-### US-018: Create job matching API endpoint
-**Description:** As a developer, I need an API endpoint to trigger matching for a job submission.
-
-**Acceptance Criteria:**
-- [x] Create `/api/match-job.ts` edge function
-- [x] Accepts `jobId` in request body
-- [x] Validates job exists and is in 'pending' or 'reviewed' status
-- [x] Calls runJobMatching function
-- [x] Returns matches with scores and reasoning
-- [x] Requires authentication (admin or owning company)
-- [x] Typecheck passes
-
----
-
-### US-019: Create job submission API endpoint
-**Description:** As a developer, I need an API endpoint for companies to submit new job specs.
-
-**Acceptance Criteria:**
-- [x] Create `/api/submit-job.ts` edge function
-- [x] Accepts job specification fields in request body
-- [x] Validates required fields (title, description, project_type, remote_preference)
-- [x] Creates job_submission record linked to company
-- [x] Sends notification webhook to admin (like profile approval flow)
-- [x] Returns created job record
-- [x] Requires authenticated company user
-- [x] Typecheck passes
-
----
-
-### US-020: Create admin match review API endpoint
-**Description:** As a developer, I need an API endpoint for admins to approve/reject matches.
-
-**Acceptance Criteria:**
-- [x] Create `/api/review-match.ts` edge function
-- [x] Accepts matchId, approved (boolean), adminNotes (optional)
-- [x] Updates job_match record with approval status
-- [x] If approved, optionally triggers member notification
-- [x] Returns updated match record
-- [x] Requires admin authentication
-- [x] Typecheck passes
-
----
-
-### US-021: Create company registration API endpoint
-**Description:** As a developer, I need an API endpoint for company account registration.
-
-**Acceptance Criteria:**
-- [x] Create `/api/register-company.ts` edge function
-- [x] Accepts company details (name, website, contact info, size, industry)
-- [x] Links to authenticated user account
-- [x] Creates company record with verified=false
-- [x] Sends notification to admin for verification
-- [x] Returns created company record
-- [x] Requires authentication, rejects if user already has company
-- [x] Typecheck passes
-
----
-
-### US-022: Create webhook for member match notification
-**Description:** As a developer, I need a function to notify members when they've been matched to a job.
-
-**Acceptance Criteria:**
-- [x] Create `notifyMemberOfMatch(matchId)` function
-- [x] Fetches match, job, and profile details
-- [x] Sends webhook to n8n with match details (similar to approval notification)
-- [x] Updates member_notified flag on match record
-- [x] Includes job title, company name, match reasoning in payload
-- [x] Returns success/failure status
-- [x] Typecheck passes
-
----
-
-### US-023: Create admin jobs list API endpoint
-**Description:** As a developer, I need an API endpoint for admins to list and filter all job submissions.
-
-**Acceptance Criteria:**
-- [x] Create `/api/admin/jobs.ts` edge function
-- [x] Returns paginated list of job submissions
-- [x] Supports filtering by status (pending, reviewed, matched, closed)
-- [x] Includes company name and match count for each job
-- [x] Supports sorting by created_at, status
-- [x] Requires admin authentication
-- [x] Typecheck passes
-
----
-
-### US-024: Create admin matches list API endpoint
-**Description:** As a developer, I need an API endpoint for admins to view matches for a specific job.
-
-**Acceptance Criteria:**
-- [x] Create `/api/admin/matches.ts` edge function
-- [x] Accepts jobId query parameter
-- [x] Returns all matches for the job with full profile details
-- [x] Includes match_score, match_reasoning, admin_approved status
-- [x] Orders by match_score descending
-- [x] Requires admin authentication
-- [x] Typecheck passes
-
----
-
-### US-025: Add environment variables documentation
-**Description:** As a developer, I need documentation for required environment variables for the matching system.
-
-**Acceptance Criteria:**
-- [x] Update .env.example with new variables:
-  - `OPENAI_API_KEY` (for embeddings)
-  - `ANTHROPIC_API_KEY` (for Claude matching)
-  - `ADMIN_USER_IDS` (comma-separated UUIDs for admin access)
-- [x] Add comments explaining each variable's purpose
-- [x] Document any rate limits or quotas to be aware of
-- [x] Typecheck passes
 
 ## Non-Goals
 
-- **No company-facing UI in this phase** - API only, UI comes later
-- **No real-time matching** - Jobs are processed asynchronously
-- **No member opt-out system** - Members can respond to matches but can't pre-emptively opt out
-- **No automated introductions** - Admin manually facilitates after approval
-- **No payment/billing integration** - Future phase
-- **No job posting expiration** - Manual status management only
-- **No public job board** - Jobs are private between company and matched members
-- **No matching algorithm tuning UI** - Weights and thresholds hardcoded initially
+- No real-time chat (messages use send/refresh pattern)
+- No payment processing or billing
+- No automated job posting from external sources (jobs are manual submissions)
+- No public company profiles (companies only visible through matches)
+- No mobile native apps (responsive web only)
+- No calendar/scheduling integration
+- No video calling integration
+- No bulk messaging or marketing emails
 
 ## Technical Considerations
 
-### Existing Infrastructure to Leverage
-- Supabase PostgreSQL with RLS already configured
-- Auth system with user accounts ready
-- n8n webhook integration for notifications (used in profile approval)
-- OpenAI integration already exists in `/api/analyze-job.ts`
-- Vercel Edge Functions pattern established
+### Existing Infrastructure
+- Supabase Auth configured for both members and companies
+- Supabase Storage for file uploads (profile pictures)
+- OpenAI API for embeddings (text-embedding-3-small)
+- pgvector for similarity search
+- n8n webhooks for notifications
+- Vercel Edge Functions for API
 
-### New Dependencies Required
-- `@anthropic-ai/sdk` - Claude API for match ranking
-- pgvector extension in Supabase (free tier compatible)
+### UI Components Available
+- Button, Input, Textarea, Checkbox, RadioGroup, TagInput
+- ImageUpload for profile pictures
+- Alert for notifications
+- Existing form patterns in profile creation pages
 
-### Embedding Strategy
-- Use OpenAI `text-embedding-3-small` (1536 dimensions)
-- ~$0.00002 per 1K tokens - very cost effective
-- Re-generate embeddings when profile is updated
-- Batch processing for initial enrichment
+### Database Schema (Already Exists)
+- `network_profiles` with embeddings and approval fields
+- `companies` with verification
+- `job_submissions` with status workflow
+- `job_matches` with scores and member_response
 
-### Matching Pipeline
-1. Job submitted → stored with status 'pending'
-2. Admin triggers matching → generates job embedding
-3. Vector search finds top 20 similar profiles
-4. Claude ranks top 10 with detailed reasoning
-5. Matches stored → admin reviews
-6. Approved matches → members notified
-7. Members respond → admin facilitates intro
+### API Endpoints (Already Exist)
+- `/api/enrich-profile.ts` - Profile enrichment
+- `/api/match-job.ts` - AI matching
+- `/api/submit-job.ts` - Job submission
+- `/api/register-company.ts` - Company registration
+- `/api/review-match.ts` - Match review
 
-### Performance Considerations
-- pgvector HNSW index for fast approximate nearest neighbor search
-- Limit Claude calls to top 10 candidates per job (cost control)
-- Cache embeddings - only regenerate on profile update
-- Batch profile enrichment during off-peak hours
-
-### Security Considerations
-- Admin-only access to matching triggers and reviews
-- Companies only see approved matches for their own jobs
-- Members only see jobs they've been matched to (future UI)
-- Rate limiting on API endpoints
-- Validate admin status via ADMIN_USER_IDS env var
+### Key Patterns
+- Service role key for admin operations (bypasses RLS)
+- React Hook Form with Zod validation
+- Toast notifications for user feedback
+- Mobile-responsive design required
