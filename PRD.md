@@ -59,11 +59,11 @@ Implement a usage-based billing system for the AI job analysis feature. Companie
 **Description:** As a new company, I should automatically receive 5 free analysis credits when I register.
 
 **Acceptance Criteria:**
-- [ ] Modify `api/register-company.ts` to create a `company_analysis_credits` record
-- [ ] Set `free_analyses_remaining: 5` and `purchased_credits: 0`
-- [ ] Credits record created in the same request as company registration
-- [ ] Handle case where credits record already exists (idempotent)
-- [ ] Typecheck passes
+- [x] Modify `api/register-company.ts` to create a `company_analysis_credits` record
+- [x] Set `free_analyses_remaining: 5` and `purchased_credits: 0`
+- [x] Credits record created in the same request as company registration
+- [x] Handle case where credits record already exists (idempotent)
+- [x] Typecheck passes
 
 ---
 

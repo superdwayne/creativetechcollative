@@ -39,7 +39,7 @@ interface CompanyResponse {
  * Uses test endpoint in test mode, production endpoint otherwise
  */
 function getWebhookUrl(): string {
-  const isTest = process.env.VITE_TEST === 'TRUE';
+  const isTest = process.env.TEST_MODE === 'TRUE';
   const baseUrl = isTest
     ? 'https://n8n.creativetechnologists.nl/webhook-test'
     : 'https://n8n.creativetechnologists.nl/webhook';
@@ -54,8 +54,8 @@ async function sendCompanyRegistrationNotification(
 ): Promise<void> {
   try {
     const webhookUrl = getWebhookUrl();
-    const username = process.env.VITE_N8N_BASIC_AUTH_USERNAME;
-    const password = process.env.VITE_N8N_BASIC_AUTH_PASSWORD;
+    const username = process.env.N8N_BASIC_AUTH_USERNAME;
+    const password = process.env.N8N_BASIC_AUTH_PASSWORD;
 
     if (!username || !password) {
       console.warn(
@@ -129,7 +129,7 @@ export default async function handler(req: Request) {
   }
 
   // Check for required environment variables
-  const supabaseUrl = process.env.VITE_SUPABASE_URL;
+  const supabaseUrl = process.env.SUPABASE_URL;
   const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
 
   if (!supabaseUrl || !supabaseServiceKey) {
@@ -245,6 +245,28 @@ export default async function handler(req: Request) {
     const companyResponse = rowToCompany(createdCompany);
 
     console.log(`[REGISTER-COMPANY] Company created successfully: ${companyResponse.id}`);
+
+    // Initialize analysis credits for the new company (5 free credits)
+    const { error: creditsError } = await supabase
+      .from('company_analysis_credits')
+      .upsert(
+        {
+          company_id: companyResponse.id,
+          free_analyses_remaining: 5,
+          purchased_credits: 0,
+        },
+        {
+          onConflict: 'company_id',
+          ignoreDuplicates: true,
+        }
+      );
+
+    if (creditsError) {
+      // Log but don't fail registration - credits can be created later if needed
+      console.error('[REGISTER-COMPANY] Failed to create analysis credits:', creditsError);
+    } else {
+      console.log(`[REGISTER-COMPANY] Analysis credits initialized for company: ${companyResponse.id}`);
+    }
 
     // Send notification to admin for verification (non-blocking)
     await sendCompanyRegistrationNotification(companyResponse);
