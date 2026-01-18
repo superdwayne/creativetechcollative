@@ -97,12 +97,12 @@ Implement a usage-based billing system for the AI job analysis feature. Companie
 **Description:** As a company user, I should see a clear message when I'm out of credits.
 
 **Acceptance Criteria:**
-- [ ] Detect 402 status code in `useJobAnalysis` hook
-- [ ] Parse response JSON to extract error code
-- [ ] Set error state with type: `{ type: 'credits_exhausted', message: string }`
-- [ ] Add `creditsRemaining` state (from X-Credits-Remaining header)
-- [ ] Update hook return type to include new states
-- [ ] Typecheck passes
+- [x] Detect 402 status code in `useJobAnalysis` hook
+- [x] Parse response JSON to extract error code
+- [x] Set error state with type: `{ type: 'credits_exhausted', message: string }`
+- [x] Add `creditsRemaining` state (from X-Credits-Remaining header)
+- [x] Update hook return type to include new states
+- [x] Typecheck passes
 
 ---
 

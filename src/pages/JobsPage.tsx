@@ -417,7 +417,7 @@ const JobDetailModal: React.FC<JobDetailModalProps> = ({ job, onClose, formatSal
 
             {error && (
               <div className="p-4 bg-red-400/10 border border-red-400/20 text-red-400 text-sm font-secondary">
-                {error}
+                {error.message}
               </div>
             )}
 
