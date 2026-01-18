@@ -125,3 +125,56 @@
   - Back link uses /discover-talent as there's no company dashboard yet
   - Bundle prices are: 2900, 5900, 9900 cents (needed for Stripe in US-009)
 ---
+
+## Iteration 9 - US-009: Create Stripe checkout API endpoint
+- Installed `stripe` npm package (with --legacy-peer-deps due to peer conflicts)
+- Created `api/company/checkout.ts` endpoint that:
+  - Accepts POST with `bundle_id` ('basic' | 'popular' | 'pro') and `company_id`
+  - Maps bundle_id to correct price: basic=2900, popular=5900, pro=9900 cents
+  - Creates Stripe Checkout session with mode='payment', line_items, metadata
+  - Includes metadata: company_id, bundle_id, credits_amount (for webhook use)
+  - Uses origin header for success_url and cancel_url
+  - Returns `{ url: checkoutSession.url }`
+- Files changed: api/company/checkout.ts (new), package.json, package-lock.json, PRD.md
+- Learnings for future iterations:
+  - Stripe initialization: `new Stripe(stripeSecretKey)` - no config object required
+  - Use request origin header for dynamic success/cancel URLs
+  - Environment variable: STRIPE_SECRET_KEY must be set in Vercel
+  - credits_amount stored as string in metadata (Stripe requires string values)
+  - Peer dependency conflict resolved with `--legacy-peer-deps` flag
+---
+
+## Iteration 10 - US-010: Connect purchase page to Stripe checkout
+- Updated `src/pages/PurchaseCreditsPage.tsx` to connect to Stripe checkout:
+  - Added company_id fetch from authenticated user via `getCompanyByUserId()`
+  - "Buy Now" buttons call `/api/company/checkout` with bundle_id and company_id
+  - Loading state shown while creating checkout session (Loader2 spinner + disabled buttons)
+  - Redirects to Stripe checkout URL on success
+  - Handles success/canceled URL params with toast messages
+  - Toast auto-hides after 5 seconds, clears URL params without reload
+- Files changed: src/pages/PurchaseCreditsPage.tsx, PRD.md
+- Learnings for future iterations:
+  - Use `useAuth()` hook to get current user, then query companies table by user_id
+  - `window.history.replaceState({}, '', path)` clears URL params without page reload
+  - Use discriminated state (`loadingBundleId`) to show loading only on clicked button
+  - Toast pattern: useState with type: 'success' | 'error', auto-clear with setTimeout
+  - Disable all buttons during any loading state to prevent double-clicks
+---
+
+## Iteration 11 - US-011: Create Stripe webhook for payment completion
+- Created `api/webhooks/stripe.ts` endpoint that:
+  - Verifies Stripe webhook signature using `stripe.webhooks.constructEventAsync()`
+  - Handles `checkout.session.completed` event
+  - Extracts company_id and credits_amount from session metadata
+  - Adds credits to `company_analysis_credits.purchased_credits` (with idempotency check)
+  - Creates record in `credit_purchases` table with stripe_payment_id
+  - Returns 200 OK to acknowledge receipt (even for unhandled events)
+- Files changed: api/webhooks/stripe.ts (new), PRD.md, progress.txt
+- Learnings for future iterations:
+  - Edge runtime requires `stripe.webhooks.constructEventAsync()` (not sync version)
+  - Use `req.text()` to get raw body for signature verification
+  - Always check for duplicate payments before processing (idempotency via stripe_payment_id)
+  - Return 200 for successfully received but unprocessable webhooks (prevents retries)
+  - Return 500 for database errors (Stripe will retry)
+  - Environment variable: STRIPE_WEBHOOK_SECRET must be set in Vercel + registered in Stripe dashboard
+---

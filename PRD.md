@@ -185,14 +185,14 @@ Implement a usage-based billing system for the AI job analysis feature. Companie
 **Description:** As the system, I need to add purchased credits when Stripe payment succeeds.
 
 **Acceptance Criteria:**
-- [ ] Create `api/webhooks/stripe.ts` endpoint
-- [ ] Verify Stripe webhook signature using STRIPE_WEBHOOK_SECRET
-- [ ] Handle `checkout.session.completed` event
-- [ ] Extract company_id and credits_amount from session metadata
-- [ ] Add credits to `company_analysis_credits.purchased_credits`
-- [ ] Create record in `credit_purchases` table with stripe_payment_id
-- [ ] Return 200 OK to acknowledge receipt
-- [ ] Typecheck passes
+- [x] Create `api/webhooks/stripe.ts` endpoint
+- [x] Verify Stripe webhook signature using STRIPE_WEBHOOK_SECRET
+- [x] Handle `checkout.session.completed` event
+- [x] Extract company_id and credits_amount from session metadata
+- [x] Add credits to `company_analysis_credits.purchased_credits`
+- [x] Create record in `credit_purchases` table with stripe_payment_id
+- [x] Return 200 OK to acknowledge receipt
+- [x] Typecheck passes
 
 ---
 
