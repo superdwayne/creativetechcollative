@@ -200,13 +200,13 @@ Implement a usage-based billing system for the AI job analysis feature. Companie
 **Description:** As a CTC admin, I want to see credit usage and revenue across all companies.
 
 **Acceptance Criteria:**
-- [ ] Create `api/admin/credit-usage.ts` endpoint
-- [ ] Add "Credit Usage" section to admin dashboard
-- [ ] Show table with columns: company name, free used, purchased remaining, total analyses, total revenue
-- [ ] Sort by total analyses (most active first)
-- [ ] Show platform totals: total analyses, total revenue
-- [ ] Typecheck passes
-- [ ] Verify changes work in browser
+- [x] Create `api/admin/credit-usage.ts` endpoint
+- [x] Add "Credit Usage" section to admin dashboard
+- [x] Show table with columns: company name, free used, purchased remaining, total analyses, total revenue
+- [x] Sort by total analyses (most active first)
+- [x] Show platform totals: total analyses, total revenue
+- [x] Typecheck passes
+- [x] Verify changes work in browser
 
 ---
 

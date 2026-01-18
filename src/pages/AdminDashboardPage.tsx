@@ -27,6 +27,11 @@ import {
   BadgeCheck,
   Mail,
   Phone,
+  Sparkles,
+  Search,
+  CreditCard,
+  DollarSign,
+  BarChart3,
 } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import { cn } from '@/lib/utils';
@@ -180,6 +185,21 @@ interface AdminCompany {
   updatedAt: string;
 }
 
+// Credit usage type for admin view
+interface CreditUsageCompany {
+  companyId: string;
+  companyName: string;
+  freeUsed: number;
+  purchasedRemaining: number;
+  totalAnalyses: number;
+  totalRevenue: number; // in cents
+}
+
+interface CreditUsageTotals {
+  totalAnalyses: number;
+  totalRevenue: number;
+}
+
 const AdminDashboardPage: React.FC = () => {
   const navigate = useNavigate();
   const { user, session, signOut, loading: authLoading } = useAuth();
@@ -229,6 +249,30 @@ const AdminDashboardPage: React.FC = () => {
   const [expandedCompanyId, setExpandedCompanyId] = useState<string | null>(null);
   const [togglingVerifyId, setTogglingVerifyId] = useState<string | null>(null);
 
+  // Credit usage state
+  const [creditUsageCompanies, setCreditUsageCompanies] = useState<CreditUsageCompany[]>([]);
+  const [creditUsageTotals, setCreditUsageTotals] = useState<CreditUsageTotals>({ totalAnalyses: 0, totalRevenue: 0 });
+  const [loadingCreditUsage, setLoadingCreditUsage] = useState(false);
+
+  // Enrichment state
+  const [enrichingProfiles, setEnrichingProfiles] = useState(false);
+  const [enrichmentResult, setEnrichmentResult] = useState<{
+    total: number;
+    successful: number;
+    failed: number;
+  } | null>(null);
+
+  // Web enrichment state
+  const [webEnrichingProfileId, setWebEnrichingProfileId] = useState<string | null>(null);
+  const [webEnrichmentResult, setWebEnrichmentResult] = useState<{
+    profileId: string;
+    profileName: string;
+    discoveredProjects?: Array<{ title: string; description: string; url?: string }>;
+    additionalSkills?: string[];
+    summary?: string;
+    error?: string;
+  } | null>(null);
+
   const fetchPendingProfiles = useCallback(async () => {
     if (!session?.access_token) return;
 
@@ -254,6 +298,112 @@ const AdminDashboardPage: React.FC = () => {
       setLoadingProfiles(false);
     }
   }, [session?.access_token]);
+
+  const enrichProfiles = useCallback(async () => {
+    if (!session?.access_token) return;
+
+    setEnrichingProfiles(true);
+    setEnrichmentResult(null);
+
+    try {
+      const response = await fetch('/api/enrich-profiles', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${session.access_token}`,
+        },
+        body: JSON.stringify({}), // Empty body to enrich all profiles that need it
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data.error || 'Failed to enrich profiles');
+      }
+
+      setEnrichmentResult({
+        total: data.total,
+        successful: data.successful,
+        failed: data.failed,
+      });
+
+      setToast({
+        message: data.total === 0
+          ? 'All profiles are already enriched!'
+          : `Enriched ${data.successful} of ${data.total} profiles`,
+        type: data.failed === 0 ? 'success' : 'error',
+      });
+    } catch (err) {
+      console.error('Error enriching profiles:', err);
+      setToast({
+        message: err instanceof Error ? err.message : 'Failed to enrich profiles',
+        type: 'error',
+      });
+    } finally {
+      setEnrichingProfiles(false);
+    }
+  }, [session?.access_token]);
+
+  // Web enrichment function - searches internet for profile info
+  const webEnrichProfile = useCallback(async (profileId: string, profileName: string, autoApply: boolean = false) => {
+    if (!session?.access_token) return;
+
+    setWebEnrichingProfileId(profileId);
+    setWebEnrichmentResult(null);
+
+    try {
+      const response = await fetch('/api/admin/enrich-profile-web', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${session.access_token}`,
+        },
+        body: JSON.stringify({ profileId, autoApply }),
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data.error || 'Failed to web enrich profile');
+      }
+
+      setWebEnrichmentResult({
+        profileId,
+        profileName,
+        discoveredProjects: data.discoveredProjects,
+        additionalSkills: data.additionalSkills,
+        summary: data.webSummary,
+        error: data.error,
+      });
+
+      if (autoApply && data.success) {
+        setToast({
+          message: `Web enrichment applied to ${profileName}`,
+          type: 'success',
+        });
+        // Refresh profiles to show updates
+        fetchPendingProfiles();
+      } else if (data.success) {
+        setToast({
+          message: `Found info for ${profileName} - review results below`,
+          type: 'success',
+        });
+      }
+    } catch (err) {
+      console.error('Error web enriching profile:', err);
+      setWebEnrichmentResult({
+        profileId,
+        profileName,
+        error: err instanceof Error ? err.message : 'Web enrichment failed',
+      });
+      setToast({
+        message: err instanceof Error ? err.message : 'Failed to web enrich profile',
+        type: 'error',
+      });
+    } finally {
+      setWebEnrichingProfileId(null);
+    }
+  }, [session?.access_token, fetchPendingProfiles]);
 
   const fetchPendingMatches = useCallback(async () => {
     if (!session?.access_token) return;
@@ -304,6 +454,33 @@ const AdminDashboardPage: React.FC = () => {
       console.error('Error fetching companies:', err);
     } finally {
       setLoadingCompanies(false);
+    }
+  }, [session?.access_token]);
+
+  const fetchCreditUsage = useCallback(async () => {
+    if (!session?.access_token) return;
+
+    setLoadingCreditUsage(true);
+
+    try {
+      const response = await fetch('/api/admin/credit-usage', {
+        headers: {
+          Authorization: `Bearer ${session.access_token}`,
+        },
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data.error || 'Failed to fetch credit usage');
+      }
+
+      setCreditUsageCompanies(data.companies);
+      setCreditUsageTotals(data.totals);
+    } catch (err) {
+      console.error('Error fetching credit usage:', err);
+    } finally {
+      setLoadingCreditUsage(false);
     }
   }, [session?.access_token]);
 
@@ -740,8 +917,9 @@ const AdminDashboardPage: React.FC = () => {
       fetchPendingProfiles();
       fetchPendingMatches();
       fetchCompanies();
+      fetchCreditUsage();
     }
-  }, [user, session, authLoading, navigate, fetchJobs, fetchPendingProfiles, fetchPendingMatches, fetchCompanies]);
+  }, [user, session, authLoading, navigate, fetchJobs, fetchPendingProfiles, fetchPendingMatches, fetchCompanies, fetchCreditUsage]);
 
   useEffect(() => {
     if (expandedJobId && !matches[expandedJobId]) {
@@ -1319,19 +1497,73 @@ const AdminDashboardPage: React.FC = () => {
                 </span>
               )}
             </div>
-            <button
-              onClick={() => fetchPendingProfiles()}
-              disabled={loadingProfiles}
-              className="flex items-center gap-2 px-3 py-2 border border-zinc-800 text-zinc-400 hover:text-white hover:border-zinc-600 font-secondary text-sm transition-colors disabled:opacity-50"
-            >
-              {loadingProfiles ? (
-                <Loader2 className="h-4 w-4 animate-spin" />
-              ) : (
-                <RefreshCw className="h-4 w-4" />
-              )}
-              Refresh
-            </button>
+            <div className="flex items-center gap-2">
+              <button
+                onClick={enrichProfiles}
+                disabled={enrichingProfiles}
+                className="flex items-center gap-2 px-3 py-2 bg-purple-500/20 border border-purple-500/30 text-purple-400 hover:bg-purple-500/30 hover:text-purple-300 font-secondary text-sm transition-colors disabled:opacity-50"
+              >
+                {enrichingProfiles ? (
+                  <>
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                    Enriching...
+                  </>
+                ) : (
+                  <>
+                    <Sparkles className="h-4 w-4" />
+                    Enrich Profiles
+                  </>
+                )}
+              </button>
+              <button
+                onClick={() => fetchPendingProfiles()}
+                disabled={loadingProfiles}
+                className="flex items-center gap-2 px-3 py-2 border border-zinc-800 text-zinc-400 hover:text-white hover:border-zinc-600 font-secondary text-sm transition-colors disabled:opacity-50"
+              >
+                {loadingProfiles ? (
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                ) : (
+                  <RefreshCw className="h-4 w-4" />
+                )}
+                Refresh
+              </button>
+            </div>
           </div>
+
+          {/* Enrichment Result Banner */}
+          {enrichmentResult && (
+            <div className={cn(
+              "mb-4 p-3 border rounded flex items-center justify-between",
+              enrichmentResult.failed === 0
+                ? "bg-green-500/10 border-green-500/20"
+                : "bg-yellow-500/10 border-yellow-500/20"
+            )}>
+              <div className="flex items-center gap-2">
+                <Sparkles className={cn(
+                  "h-4 w-4",
+                  enrichmentResult.failed === 0 ? "text-green-400" : "text-yellow-400"
+                )} />
+                <span className="text-sm font-secondary text-zinc-300">
+                  {enrichmentResult.total === 0 ? (
+                    "All profiles are already enriched with embeddings"
+                  ) : (
+                    <>
+                      Enriched {enrichmentResult.successful} of {enrichmentResult.total} profiles
+                      {enrichmentResult.failed > 0 && (
+                        <span className="text-red-400"> ({enrichmentResult.failed} failed)</span>
+                      )}
+                    </>
+                  )}
+                </span>
+              </div>
+              <button
+                onClick={() => setEnrichmentResult(null)}
+                className="text-zinc-500 hover:text-zinc-300"
+              >
+                <X className="h-4 w-4" />
+              </button>
+            </div>
+          )}
 
           {loadingProfiles ? (
             <div className="border border-zinc-800 p-8 flex items-center justify-center">
@@ -1534,7 +1766,7 @@ const AdminDashboardPage: React.FC = () => {
                           )}
 
                           {/* Action Buttons */}
-                          <div className="flex gap-3 pt-4 border-t border-zinc-800">
+                          <div className="flex flex-wrap gap-3 pt-4 border-t border-zinc-800">
                             <button
                               onClick={() => approveProfile(profile.id)}
                               disabled={approvingProfileId === profile.id}
@@ -1560,7 +1792,99 @@ const AdminDashboardPage: React.FC = () => {
                               <XCircle className="h-4 w-4" />
                               Reject
                             </button>
+                            <button
+                              onClick={() => webEnrichProfile(profile.id, profile.fullName, true)}
+                              disabled={webEnrichingProfileId === profile.id}
+                              className="flex items-center gap-2 px-4 py-2 bg-blue-500/20 hover:bg-blue-500/30 text-blue-400 border border-blue-500/30 font-secondary text-sm transition-colors disabled:opacity-50"
+                            >
+                              {webEnrichingProfileId === profile.id ? (
+                                <>
+                                  <Loader2 className="h-4 w-4 animate-spin" />
+                                  Searching web...
+                                </>
+                              ) : (
+                                <>
+                                  <Search className="h-4 w-4" />
+                                  Web Enrich
+                                </>
+                              )}
+                            </button>
                           </div>
+
+                          {/* Web Enrichment Results */}
+                          {webEnrichmentResult && webEnrichmentResult.profileId === profile.id && (
+                            <div className="mt-4 p-4 bg-blue-500/10 border border-blue-500/20 rounded">
+                              <div className="flex items-center justify-between mb-3">
+                                <h4 className="text-sm font-secondary text-blue-400 flex items-center gap-2">
+                                  <Search className="h-4 w-4" />
+                                  Web Enrichment Results
+                                </h4>
+                                <button
+                                  onClick={() => setWebEnrichmentResult(null)}
+                                  className="text-zinc-500 hover:text-zinc-300"
+                                >
+                                  <X className="h-4 w-4" />
+                                </button>
+                              </div>
+
+                              {webEnrichmentResult.error ? (
+                                <p className="text-sm text-red-400">{webEnrichmentResult.error}</p>
+                              ) : (
+                                <div className="space-y-3">
+                                  {webEnrichmentResult.summary && (
+                                    <div>
+                                      <p className="text-xs text-zinc-500 uppercase tracking-wide mb-1">Summary</p>
+                                      <p className="text-sm text-zinc-300">{webEnrichmentResult.summary}</p>
+                                    </div>
+                                  )}
+
+                                  {webEnrichmentResult.discoveredProjects && webEnrichmentResult.discoveredProjects.length > 0 && (
+                                    <div>
+                                      <p className="text-xs text-zinc-500 uppercase tracking-wide mb-1">
+                                        Discovered Projects ({webEnrichmentResult.discoveredProjects.length})
+                                      </p>
+                                      <div className="space-y-2">
+                                        {webEnrichmentResult.discoveredProjects.map((project, idx) => (
+                                          <div key={idx} className="bg-zinc-800/50 p-2 rounded text-sm">
+                                            <p className="text-zinc-200 font-medium">{project.title}</p>
+                                            <p className="text-zinc-400 text-xs mt-1">{project.description}</p>
+                                            {project.url && (
+                                              <a
+                                                href={project.url}
+                                                target="_blank"
+                                                rel="noopener noreferrer"
+                                                className="text-blue-400 text-xs hover:underline mt-1 inline-flex items-center gap-1"
+                                              >
+                                                {project.url} <ExternalLink className="h-3 w-3" />
+                                              </a>
+                                            )}
+                                          </div>
+                                        ))}
+                                      </div>
+                                    </div>
+                                  )}
+
+                                  {webEnrichmentResult.additionalSkills && webEnrichmentResult.additionalSkills.length > 0 && (
+                                    <div>
+                                      <p className="text-xs text-zinc-500 uppercase tracking-wide mb-1">
+                                        Additional Skills Found
+                                      </p>
+                                      <div className="flex flex-wrap gap-1">
+                                        {webEnrichmentResult.additionalSkills.map((skill) => (
+                                          <span
+                                            key={skill}
+                                            className="px-2 py-0.5 bg-blue-500/20 text-blue-400 text-xs rounded"
+                                          >
+                                            {skill}
+                                          </span>
+                                        ))}
+                                      </div>
+                                    </div>
+                                  )}
+                                </div>
+                              )}
+                            </div>
+                          )}
                         </div>
                       </div>
                     )}
@@ -1777,6 +2101,123 @@ const AdminDashboardPage: React.FC = () => {
                   </div>
                 );
               })}
+            </div>
+          )}
+        </div>
+
+        {/* Credit Usage Section */}
+        <div className="mb-10">
+          <div className="flex items-center justify-between mb-4">
+            <div className="flex items-center gap-2">
+              <CreditCard className="h-5 w-5 text-zinc-500" />
+              <h2 className="text-xl font-primary">Credit Usage</h2>
+              <span className="px-2 py-0.5 bg-zinc-500/20 text-zinc-400 text-xs font-secondary rounded-full">
+                {creditUsageCompanies.length}
+              </span>
+            </div>
+            <button
+              onClick={() => fetchCreditUsage()}
+              disabled={loadingCreditUsage}
+              className="flex items-center gap-2 px-3 py-2 border border-zinc-800 text-zinc-400 hover:text-white hover:border-zinc-600 font-secondary text-sm transition-colors disabled:opacity-50"
+            >
+              {loadingCreditUsage ? (
+                <Loader2 className="h-4 w-4 animate-spin" />
+              ) : (
+                <RefreshCw className="h-4 w-4" />
+              )}
+              Refresh
+            </button>
+          </div>
+
+          {/* Platform Totals */}
+          <div className="grid grid-cols-2 gap-4 mb-6">
+            <div className="border border-zinc-800 p-4">
+              <p className="text-xs font-secondary text-zinc-500 uppercase tracking-wide mb-1 flex items-center gap-2">
+                <BarChart3 className="h-3 w-3" />
+                Total Analyses
+              </p>
+              <p className="text-2xl font-primary text-pink-400">{creditUsageTotals.totalAnalyses}</p>
+            </div>
+            <div className="border border-zinc-800 p-4">
+              <p className="text-xs font-secondary text-zinc-500 uppercase tracking-wide mb-1 flex items-center gap-2">
+                <DollarSign className="h-3 w-3" />
+                Total Revenue
+              </p>
+              <p className="text-2xl font-primary text-green-400">
+                ${(creditUsageTotals.totalRevenue / 100).toFixed(2)}
+              </p>
+            </div>
+          </div>
+
+          {loadingCreditUsage ? (
+            <div className="border border-zinc-800 p-8 flex items-center justify-center">
+              <Loader2 className="h-6 w-6 animate-spin text-zinc-500" />
+            </div>
+          ) : creditUsageCompanies.length === 0 ? (
+            <div className="border border-zinc-800 p-8 text-center">
+              <CreditCard className="h-12 w-12 text-zinc-700 mx-auto mb-4" />
+              <p className="text-zinc-400 font-secondary">No credit usage data yet.</p>
+            </div>
+          ) : (
+            <div className="border border-zinc-800 overflow-hidden">
+              {/* Table Header */}
+              <div className="grid grid-cols-6 gap-4 px-4 py-3 bg-zinc-900/50 border-b border-zinc-800">
+                <div className="text-xs font-secondary text-zinc-500 uppercase tracking-wide col-span-2">
+                  Company
+                </div>
+                <div className="text-xs font-secondary text-zinc-500 uppercase tracking-wide text-center">
+                  Free Used
+                </div>
+                <div className="text-xs font-secondary text-zinc-500 uppercase tracking-wide text-center">
+                  Purchased
+                </div>
+                <div className="text-xs font-secondary text-zinc-500 uppercase tracking-wide text-center">
+                  Total Analyses
+                </div>
+                <div className="text-xs font-secondary text-zinc-500 uppercase tracking-wide text-right">
+                  Revenue
+                </div>
+              </div>
+
+              {/* Table Rows */}
+              <div className="divide-y divide-zinc-800">
+                {creditUsageCompanies.map((company) => (
+                  <div
+                    key={company.companyId}
+                    className="grid grid-cols-6 gap-4 px-4 py-3 hover:bg-zinc-900/30 transition-colors"
+                  >
+                    <div className="col-span-2 flex items-center gap-2">
+                      <Building2 className="h-4 w-4 text-zinc-500 flex-shrink-0" />
+                      <span className="font-secondary text-sm text-zinc-300 truncate">
+                        {company.companyName}
+                      </span>
+                    </div>
+                    <div className="text-center">
+                      <span className="font-secondary text-sm text-zinc-400">
+                        {company.freeUsed}/5
+                      </span>
+                    </div>
+                    <div className="text-center">
+                      <span className="font-secondary text-sm text-zinc-400">
+                        {company.purchasedRemaining}
+                      </span>
+                    </div>
+                    <div className="text-center">
+                      <span className="font-secondary text-sm text-pink-400 font-medium">
+                        {company.totalAnalyses}
+                      </span>
+                    </div>
+                    <div className="text-right">
+                      <span className={cn(
+                        'font-secondary text-sm font-medium',
+                        company.totalRevenue > 0 ? 'text-green-400' : 'text-zinc-500'
+                      )}>
+                        ${(company.totalRevenue / 100).toFixed(2)}
+                      </span>
+                    </div>
+                  </div>
+                ))}
+              </div>
             </div>
           )}
         </div>
