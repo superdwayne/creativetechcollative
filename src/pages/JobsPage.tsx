@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
-import { MapPin, Clock, Briefcase, Globe, ChevronRight, X, ExternalLink, Building2, Sparkles, Loader2 } from 'lucide-react';
+import { useNavigate, Link } from 'react-router-dom';
+import { MapPin, Clock, Briefcase, Globe, ChevronRight, X, ExternalLink, Building2, Sparkles, Loader2, CreditCard, AlertCircle } from 'lucide-react';
 import { jobs, getDepartments, getJobTypes, Job } from '../data/jobs';
 import { useJobAnalysis } from '../hooks/useJobAnalysis';
 import Footer from '../components/ui/footer';
@@ -415,7 +415,39 @@ const JobDetailModal: React.FC<JobDetailModalProps> = ({ job, onClose, formatSal
               </div>
             )}
 
-            {error && (
+            {error && error.type === 'credits_exhausted' && (
+              <div className="p-6 bg-amber-500/10 border border-amber-500/30 rounded-lg">
+                <div className="flex items-start gap-4">
+                  <div className="p-2 bg-amber-500/20 rounded-full">
+                    <AlertCircle className="w-6 h-6 text-amber-400" />
+                  </div>
+                  <div className="flex-1">
+                    <h4 className="text-lg font-primary font-medium text-white mb-2">
+                      You've used all your analysis credits
+                    </h4>
+                    <p className="text-sm font-secondary text-zinc-400 mb-4">
+                      Purchase more credits to continue using AI-powered job analysis.
+                    </p>
+                    <div className="flex items-center gap-4 mb-4 p-3 bg-zinc-800/50 rounded">
+                      <CreditCard className="w-5 h-5 text-zinc-500" />
+                      <div className="text-sm font-secondary">
+                        <span className="text-zinc-400">Current balance: </span>
+                        <span className="text-white">0 free, 0 purchased</span>
+                      </div>
+                    </div>
+                    <Link
+                      to="/company/purchase-credits"
+                      className="inline-flex items-center gap-2 px-6 py-3 bg-amber-500 hover:bg-amber-400 text-black font-secondary text-sm tracking-wide transition-colors rounded"
+                    >
+                      <CreditCard className="w-4 h-4" />
+                      Purchase More Credits
+                    </Link>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {error && error.type !== 'credits_exhausted' && (
               <div className="p-4 bg-red-400/10 border border-red-400/20 text-red-400 text-sm font-secondary">
                 {error.message}
               </div>

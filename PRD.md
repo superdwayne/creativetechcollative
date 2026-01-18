@@ -110,12 +110,12 @@ Implement a usage-based billing system for the AI job analysis feature. Companie
 **Description:** As a company user who has run out of credits, I should see a prompt to purchase more.
 
 **Acceptance Criteria:**
-- [ ] When analysis fails with credits_exhausted error, show alert/modal
-- [ ] Display message: "You've used all your analysis credits"
-- [ ] Show "Purchase More Credits" button linking to `/company/purchase-credits`
-- [ ] Display current credit balance (0 free, 0 purchased)
-- [ ] Typecheck passes
-- [ ] Verify changes work in browser
+- [x] When analysis fails with credits_exhausted error, show alert/modal
+- [x] Display message: "You've used all your analysis credits"
+- [x] Show "Purchase More Credits" button linking to `/company/purchase-credits`
+- [x] Display current credit balance (0 free, 0 purchased)
+- [x] Typecheck passes
+- [x] Verify changes work in browser
 
 ---
 
