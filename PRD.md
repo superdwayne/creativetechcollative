@@ -71,12 +71,12 @@ Implement a usage-based billing system for the AI job analysis feature. Companie
 **Description:** As the system, I need to verify a company has available credits before allowing an analysis.
 
 **Acceptance Criteria:**
-- [ ] Add `company_id` parameter to analyze-job request schema (required)
-- [ ] Query `company_analysis_credits` to check balance
-- [ ] Allow if `free_analyses_remaining > 0` OR `purchased_credits > 0`
-- [ ] Return 402 Payment Required with JSON body: `{ error: 'No analysis credits remaining', code: 'CREDITS_EXHAUSTED' }`
-- [ ] Include `X-Credits-Remaining` header in successful response
-- [ ] Typecheck passes
+- [x] Add `company_id` parameter to analyze-job request schema (required)
+- [x] Query `company_analysis_credits` to check balance
+- [x] Allow if `free_analyses_remaining > 0` OR `purchased_credits > 0`
+- [x] Return 402 Payment Required with JSON body: `{ error: 'No analysis credits remaining', code: 'CREDITS_EXHAUSTED' }`
+- [x] Include `X-Credits-Remaining` header in successful response
+- [x] Typecheck passes
 
 ---
 
