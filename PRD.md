@@ -123,13 +123,13 @@ Implement a usage-based billing system for the AI job analysis feature. Companie
 **Description:** As a company user, I want to see my credit balance and usage history on my dashboard.
 
 **Acceptance Criteria:**
-- [ ] Create `api/company/credits.ts` endpoint to fetch company's credit balance and recent usage
-- [ ] Add "Analysis Credits" card to company dashboard (above or beside job submissions)
-- [ ] Display: free credits remaining, purchased credits, total analyses used
-- [ ] Show last 5 analyses with job title and date
-- [ ] Include "Purchase More" button
-- [ ] Typecheck passes
-- [ ] Verify changes work in browser
+- [x] Create `api/company/credits.ts` endpoint to fetch company's credit balance and recent usage
+- [x] Add "Analysis Credits" card to company dashboard (above or beside job submissions)
+- [x] Display: free credits remaining, purchased credits, total analyses used
+- [x] Show last 5 analyses with job title and date
+- [x] Include "Purchase More" button
+- [x] Typecheck passes
+- [x] Verify changes work in browser
 
 ---
 
