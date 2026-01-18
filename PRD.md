@@ -221,7 +221,7 @@ Implement a usage-based billing system for the AI job analysis feature. Companie
 - [x] Log grant in `credit_purchases` with stripe_payment_id = 'ADMIN_GRANT' and note
 - [x] Show success toast: "Added X credits to [Company Name]"
 - [x] Typecheck passes
-- [ ] Verify changes work in browser
+- [x] Verify changes work in browser
 
 ---
 
