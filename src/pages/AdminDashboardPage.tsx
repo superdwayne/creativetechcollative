@@ -254,6 +254,12 @@ const AdminDashboardPage: React.FC = () => {
   const [creditUsageTotals, setCreditUsageTotals] = useState<CreditUsageTotals>({ totalAnalyses: 0, totalRevenue: 0 });
   const [loadingCreditUsage, setLoadingCreditUsage] = useState(false);
 
+  // Grant credits state
+  const [grantCreditsCompany, setGrantCreditsCompany] = useState<CreditUsageCompany | null>(null);
+  const [grantCreditsAmount, setGrantCreditsAmount] = useState('');
+  const [grantCreditsNote, setGrantCreditsNote] = useState('');
+  const [grantingCredits, setGrantingCredits] = useState(false);
+
   // Enrichment state
   const [enrichingProfiles, setEnrichingProfiles] = useState(false);
   const [enrichmentResult, setEnrichmentResult] = useState<{
@@ -483,6 +489,66 @@ const AdminDashboardPage: React.FC = () => {
       setLoadingCreditUsage(false);
     }
   }, [session?.access_token]);
+
+  const grantCredits = async () => {
+    if (!session?.access_token || !grantCreditsCompany || grantingCredits) return;
+
+    const amount = parseInt(grantCreditsAmount, 10);
+    if (isNaN(amount) || amount <= 0) {
+      setToast({ message: 'Please enter a valid credit amount', type: 'error' });
+      return;
+    }
+
+    setGrantingCredits(true);
+
+    try {
+      const response = await fetch('/api/admin/grant-credits', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${session.access_token}`,
+        },
+        body: JSON.stringify({
+          companyId: grantCreditsCompany.companyId,
+          creditsAmount: amount,
+          note: grantCreditsNote || undefined,
+        }),
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data.error || 'Failed to grant credits');
+      }
+
+      // Update local state
+      setCreditUsageCompanies((prev) =>
+        prev.map((c) =>
+          c.companyId === grantCreditsCompany.companyId
+            ? { ...c, purchasedRemaining: data.newBalance }
+            : c
+        )
+      );
+
+      setToast({
+        message: `Added ${amount} credits to ${grantCreditsCompany.companyName}`,
+        type: 'success',
+      });
+
+      // Close modal and reset state
+      setGrantCreditsCompany(null);
+      setGrantCreditsAmount('');
+      setGrantCreditsNote('');
+    } catch (err) {
+      console.error('Error granting credits:', err);
+      setToast({
+        message: err instanceof Error ? err.message : 'Failed to grant credits',
+        type: 'error',
+      });
+    } finally {
+      setGrantingCredits(false);
+    }
+  };
 
   const toggleCompanyVerification = async (companyId: string, verified: boolean) => {
     if (!session?.access_token || togglingVerifyId) return;
@@ -2161,7 +2227,7 @@ const AdminDashboardPage: React.FC = () => {
           ) : (
             <div className="border border-zinc-800 overflow-hidden">
               {/* Table Header */}
-              <div className="grid grid-cols-6 gap-4 px-4 py-3 bg-zinc-900/50 border-b border-zinc-800">
+              <div className="grid grid-cols-7 gap-4 px-4 py-3 bg-zinc-900/50 border-b border-zinc-800">
                 <div className="text-xs font-secondary text-zinc-500 uppercase tracking-wide col-span-2">
                   Company
                 </div>
@@ -2174,8 +2240,11 @@ const AdminDashboardPage: React.FC = () => {
                 <div className="text-xs font-secondary text-zinc-500 uppercase tracking-wide text-center">
                   Total Analyses
                 </div>
-                <div className="text-xs font-secondary text-zinc-500 uppercase tracking-wide text-right">
+                <div className="text-xs font-secondary text-zinc-500 uppercase tracking-wide text-center">
                   Revenue
+                </div>
+                <div className="text-xs font-secondary text-zinc-500 uppercase tracking-wide text-right">
+                  Actions
                 </div>
               </div>
 
@@ -2184,7 +2253,7 @@ const AdminDashboardPage: React.FC = () => {
                 {creditUsageCompanies.map((company) => (
                   <div
                     key={company.companyId}
-                    className="grid grid-cols-6 gap-4 px-4 py-3 hover:bg-zinc-900/30 transition-colors"
+                    className="grid grid-cols-7 gap-4 px-4 py-3 hover:bg-zinc-900/30 transition-colors items-center"
                   >
                     <div className="col-span-2 flex items-center gap-2">
                       <Building2 className="h-4 w-4 text-zinc-500 flex-shrink-0" />
@@ -2207,13 +2276,22 @@ const AdminDashboardPage: React.FC = () => {
                         {company.totalAnalyses}
                       </span>
                     </div>
-                    <div className="text-right">
+                    <div className="text-center">
                       <span className={cn(
                         'font-secondary text-sm font-medium',
                         company.totalRevenue > 0 ? 'text-green-400' : 'text-zinc-500'
                       )}>
                         ${(company.totalRevenue / 100).toFixed(2)}
                       </span>
+                    </div>
+                    <div className="text-right">
+                      <button
+                        onClick={() => setGrantCreditsCompany(company)}
+                        className="inline-flex items-center gap-1 px-2 py-1 text-xs font-secondary text-violet-400 hover:text-violet-300 hover:bg-violet-500/10 border border-violet-500/30 hover:border-violet-500/50 transition-colors"
+                      >
+                        <Sparkles className="h-3 w-3" />
+                        Grant
+                      </button>
                     </div>
                   </div>
                 ))}
@@ -2734,6 +2812,111 @@ const AdminDashboardPage: React.FC = () => {
                   <>
                     <XCircle className="h-4 w-4" />
                     Reject Job
+                  </>
+                )}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Grant Credits Modal */}
+      {grantCreditsCompany && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center">
+          {/* Backdrop */}
+          <div
+            className="absolute inset-0 bg-black/80 backdrop-blur-sm"
+            onClick={() => {
+              setGrantCreditsCompany(null);
+              setGrantCreditsAmount('');
+              setGrantCreditsNote('');
+            }}
+          />
+
+          {/* Dialog */}
+          <div className="relative bg-zinc-900 border border-zinc-700 w-full max-w-md mx-4 p-6">
+            {/* Close button */}
+            <button
+              onClick={() => {
+                setGrantCreditsCompany(null);
+                setGrantCreditsAmount('');
+                setGrantCreditsNote('');
+              }}
+              className="absolute top-4 right-4 text-zinc-500 hover:text-white transition-colors"
+            >
+              <X className="h-5 w-5" />
+            </button>
+
+            <h3 className="font-primary text-xl text-white mb-2">Grant Credits</h3>
+            <p className="text-sm text-zinc-400 font-secondary mb-4">
+              Add bonus credits to <span className="text-white">{grantCreditsCompany.companyName}</span>'s account.
+            </p>
+
+            {/* Current balance display */}
+            <div className="mb-4 p-3 bg-zinc-800/50 border border-zinc-700">
+              <p className="text-xs font-secondary text-zinc-500 uppercase tracking-wide mb-1">
+                Current Balance
+              </p>
+              <p className="font-secondary text-sm text-zinc-300">
+                {grantCreditsCompany.freeUsed < 5 ? 5 - grantCreditsCompany.freeUsed : 0} free + {grantCreditsCompany.purchasedRemaining} purchased credits
+              </p>
+            </div>
+
+            {/* Credit amount input */}
+            <div className="mb-4">
+              <label className="block text-xs font-secondary text-zinc-500 uppercase tracking-wide mb-2">
+                Credits to Add *
+              </label>
+              <input
+                type="number"
+                min="1"
+                value={grantCreditsAmount}
+                onChange={(e) => setGrantCreditsAmount(e.target.value)}
+                placeholder="Enter credit amount"
+                className="w-full px-4 py-3 bg-zinc-800 border border-zinc-700 text-white placeholder:text-zinc-500 font-secondary text-sm focus:outline-none focus:border-zinc-500"
+              />
+            </div>
+
+            {/* Note textarea */}
+            <div className="mb-6">
+              <label className="block text-xs font-secondary text-zinc-500 uppercase tracking-wide mb-2">
+                Note (Optional)
+              </label>
+              <textarea
+                value={grantCreditsNote}
+                onChange={(e) => setGrantCreditsNote(e.target.value)}
+                placeholder="e.g., Promotional bonus, support compensation..."
+                className="w-full px-4 py-3 bg-zinc-800 border border-zinc-700 text-white placeholder:text-zinc-500 font-secondary text-sm focus:outline-none focus:border-zinc-500 resize-none"
+                rows={2}
+              />
+            </div>
+
+            {/* Action buttons */}
+            <div className="flex gap-3">
+              <button
+                onClick={() => {
+                  setGrantCreditsCompany(null);
+                  setGrantCreditsAmount('');
+                  setGrantCreditsNote('');
+                }}
+                className="flex-1 px-4 py-2 border border-zinc-700 text-zinc-300 hover:border-zinc-500 font-secondary text-sm transition-colors"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={grantCredits}
+                disabled={grantingCredits || !grantCreditsAmount}
+                className="flex-1 flex items-center justify-center gap-2 px-4 py-2 bg-violet-500 hover:bg-violet-600 text-white font-secondary text-sm transition-colors disabled:opacity-50"
+              >
+                {grantingCredits ? (
+                  <>
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                    Granting...
+                  </>
+                ) : (
+                  <>
+                    <Sparkles className="h-4 w-4" />
+                    Grant Credits
                   </>
                 )}
               </button>

@@ -214,13 +214,13 @@ Implement a usage-based billing system for the AI job analysis feature. Companie
 **Description:** As a CTC admin, I want to manually add credits to a company account for support or promotions.
 
 **Acceptance Criteria:**
-- [ ] Add "Grant Credits" button in admin credit usage section for each company
-- [ ] Button opens modal with: credit amount input, optional note textarea
-- [ ] Create `api/admin/grant-credits.ts` endpoint
-- [ ] Add credits to `purchased_credits` (not free credits)
-- [ ] Log grant in `credit_purchases` with stripe_payment_id = 'ADMIN_GRANT' and note
-- [ ] Show success toast: "Added X credits to [Company Name]"
-- [ ] Typecheck passes
+- [x] Add "Grant Credits" button in admin credit usage section for each company
+- [x] Button opens modal with: credit amount input, optional note textarea
+- [x] Create `api/admin/grant-credits.ts` endpoint
+- [x] Add credits to `purchased_credits` (not free credits)
+- [x] Log grant in `credit_purchases` with stripe_payment_id = 'ADMIN_GRANT' and note
+- [x] Show success toast: "Added X credits to [Company Name]"
+- [x] Typecheck passes
 - [ ] Verify changes work in browser
 
 ---

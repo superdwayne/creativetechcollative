@@ -178,3 +178,45 @@
   - Return 500 for database errors (Stripe will retry)
   - Environment variable: STRIPE_WEBHOOK_SECRET must be set in Vercel + registered in Stripe dashboard
 ---
+
+## Iteration 12 - US-012: Add credit usage to admin dashboard
+- Created `api/admin/credit-usage.ts` endpoint that:
+  - Fetches company credit balances, usage logs, and purchases
+  - Calculates freeUsed (5 - free_analyses_remaining), purchasedRemaining, totalAnalyses, totalRevenue
+  - Sorts by total analyses (most active first)
+  - Returns platform totals for totalAnalyses and totalRevenue
+- Added Credit Usage section to `src/pages/AdminDashboardPage.tsx`:
+  - Added CreditUsageCompany and CreditUsageTotals interfaces
+  - Added state variables and fetchCreditUsage callback
+  - Created platform totals cards (Total Analyses in pink, Total Revenue in green)
+  - Created table with columns: Company, Free Used, Purchased, Total Analyses, Revenue
+  - Added Refresh button and loading/empty states
+- Files changed: api/admin/credit-usage.ts (new), src/pages/AdminDashboardPage.tsx, PRD.md
+- Learnings for future iterations:
+  - Admin dashboard uses section pattern: div.mb-10 with header containing icon, title, count badge, and refresh button
+  - Table styling: grid-cols-N layout, bg-zinc-900/50 for headers, hover:bg-zinc-900/30 for rows
+  - Add new icons to lucide-react imports: CreditCard, DollarSign, BarChart3
+  - Follow existing useCallback pattern and add to initial useEffect fetch list
+  - Revenue displayed in green, analyses in pink for visual consistency with other stats
+---
+
+## Iteration 13 - US-013: Add admin ability to grant bonus credits
+- Created `api/admin/grant-credits.ts` endpoint that:
+  - Accepts POST with companyId, creditsAmount, and optional note
+  - Validates inputs and admin authentication
+  - Adds credits to `purchased_credits` (not free credits)
+  - Logs grant in `credit_purchases` with stripe_payment_id = 'ADMIN_GRANT:note' or 'ADMIN_GRANT'
+  - Returns new balance and company name
+- Updated `src/pages/AdminDashboardPage.tsx`:
+  - Added grant credits state: grantCreditsCompany, grantCreditsAmount, grantCreditsNote, grantingCredits
+  - Added grantCredits async function to handle API call
+  - Added "Actions" column with "Grant" button for each company in credit usage table (grid-cols-6 -> grid-cols-7)
+  - Added Grant Credits modal with: current balance display, credit amount input, optional note textarea
+  - Updates local state after successful grant and shows success toast
+- Files changed: api/admin/grant-credits.ts (new), src/pages/AdminDashboardPage.tsx, PRD.md
+- Learnings for future iterations:
+  - Modal pattern: useState for company selection, string state for inputs, boolean for loading
+  - Follow existing modal styling: fixed inset-0, bg-black/80 backdrop, border border-zinc-700
+  - Use violet colors for positive actions (grants), red for negative (rejects)
+  - Store note in stripe_payment_id field with prefix format 'ADMIN_GRANT:note' for admin grants
+---
