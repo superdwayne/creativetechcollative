@@ -172,12 +172,12 @@ Implement a usage-based billing system for the AI job analysis feature. Companie
 **Description:** As a company, clicking "Buy Now" should redirect me to Stripe payment.
 
 **Acceptance Criteria:**
-- [ ] "Buy Now" buttons call `/api/company/checkout` with bundle_id
-- [ ] Show loading state while creating checkout session
-- [ ] Redirect to Stripe checkout URL on success
-- [ ] Handle success/canceled URL params with toast messages
-- [ ] Typecheck passes
-- [ ] Verify changes work in browser
+- [x] "Buy Now" buttons call `/api/company/checkout` with bundle_id
+- [x] Show loading state while creating checkout session
+- [x] Redirect to Stripe checkout URL on success
+- [x] Handle success/canceled URL params with toast messages
+- [x] Typecheck passes
+- [x] Verify changes work in browser
 
 ---
 

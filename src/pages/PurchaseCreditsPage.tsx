@@ -1,7 +1,9 @@
-import React from 'react';
-import { Link } from 'react-router-dom';
-import { ArrowLeft, CreditCard, Sparkles, Check, Star, Zap } from 'lucide-react';
+import React, { useState, useEffect } from 'react';
+import { Link, useSearchParams } from 'react-router-dom';
+import { ArrowLeft, CreditCard, Sparkles, Check, Star, Zap, Loader2, CheckCircle2, AlertCircle } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { useAuth } from '@/contexts/AuthContext';
+import { getCompanyByUserId } from '@/lib/supabase';
 
 interface CreditBundle {
   id: 'basic' | 'popular' | 'pro';
@@ -46,10 +48,100 @@ const bundles: CreditBundle[] = [
 ];
 
 const PurchaseCreditsPage: React.FC = () => {
-  const handleBuyNow = (bundleId: string) => {
-    // Placeholder action - will be connected to Stripe in US-010
-    console.log('Purchase bundle:', bundleId);
-    alert(`Coming soon: Purchase ${bundleId} bundle`);
+  const { user } = useAuth();
+  const [searchParams] = useSearchParams();
+  const [companyId, setCompanyId] = useState<string | null>(null);
+  const [loadingCompany, setLoadingCompany] = useState(true);
+  const [loadingBundleId, setLoadingBundleId] = useState<string | null>(null);
+  const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' } | null>(null);
+
+  // Handle success/canceled URL params
+  useEffect(() => {
+    const success = searchParams.get('success');
+    const canceled = searchParams.get('canceled');
+
+    if (success === 'true') {
+      setToast({ message: 'Payment successful! Credits have been added to your account.', type: 'success' });
+      // Clear params from URL without reload
+      window.history.replaceState({}, '', '/company/purchase-credits');
+    } else if (canceled === 'true') {
+      setToast({ message: 'Payment canceled. No charges were made.', type: 'error' });
+      window.history.replaceState({}, '', '/company/purchase-credits');
+    }
+
+    // Auto-hide toast after 5 seconds
+    if (success || canceled) {
+      const timer = setTimeout(() => setToast(null), 5000);
+      return () => clearTimeout(timer);
+    }
+  }, [searchParams]);
+
+  // Fetch company_id for the current user
+  useEffect(() => {
+    async function fetchCompanyId() {
+      if (!user?.id) {
+        setLoadingCompany(false);
+        return;
+      }
+
+      try {
+        const company = await getCompanyByUserId(user.id);
+        if (company) {
+          setCompanyId(company.id);
+        }
+      } catch (err) {
+        console.error('Error fetching company:', err);
+      } finally {
+        setLoadingCompany(false);
+      }
+    }
+
+    fetchCompanyId();
+  }, [user?.id]);
+
+  const handleBuyNow = async (bundleId: 'basic' | 'popular' | 'pro') => {
+    if (!companyId) {
+      setToast({ message: 'Company not found. Please register your company first.', type: 'error' });
+      setTimeout(() => setToast(null), 5000);
+      return;
+    }
+
+    setLoadingBundleId(bundleId);
+
+    try {
+      const response = await fetch('/api/company/checkout', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          bundle_id: bundleId,
+          company_id: companyId,
+        }),
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data.error || 'Failed to create checkout session');
+      }
+
+      // Redirect to Stripe checkout
+      if (data.url) {
+        window.location.href = data.url;
+      } else {
+        throw new Error('No checkout URL returned');
+      }
+    } catch (err) {
+      console.error('Checkout error:', err);
+      setToast({
+        message: err instanceof Error ? err.message : 'Failed to start checkout. Please try again.',
+        type: 'error'
+      });
+      setTimeout(() => setToast(null), 5000);
+    } finally {
+      setLoadingBundleId(null);
+    }
   };
 
   return (
@@ -146,15 +238,26 @@ const PurchaseCreditsPage: React.FC = () => {
               {/* Buy Button */}
               <button
                 onClick={() => handleBuyNow(bundle.id)}
+                disabled={loadingBundleId !== null || loadingCompany}
                 className={cn(
                   'w-full py-3 rounded-xl font-medium transition-all flex items-center justify-center gap-2',
                   bundle.isPopular
                     ? 'bg-gradient-to-r from-violet-500 to-fuchsia-500 hover:from-violet-600 hover:to-fuchsia-600 text-white shadow-lg shadow-violet-500/20'
-                    : 'bg-zinc-800 hover:bg-zinc-700 text-white'
+                    : 'bg-zinc-800 hover:bg-zinc-700 text-white',
+                  (loadingBundleId !== null || loadingCompany) && 'opacity-50 cursor-not-allowed'
                 )}
               >
-                <CreditCard className="w-4 h-4" />
-                Buy Now
+                {loadingBundleId === bundle.id ? (
+                  <>
+                    <Loader2 className="w-4 h-4 animate-spin" />
+                    Processing...
+                  </>
+                ) : (
+                  <>
+                    <CreditCard className="w-4 h-4" />
+                    Buy Now
+                  </>
+                )}
               </button>
             </div>
           </div>
@@ -167,6 +270,25 @@ const PurchaseCreditsPage: React.FC = () => {
           Secure payment powered by Stripe. Credits are added instantly after purchase.
         </p>
       </div>
+
+      {/* Toast Notification */}
+      {toast && (
+        <div
+          className={cn(
+            'fixed bottom-6 right-6 z-50 flex items-center gap-2 px-4 py-3 border font-secondary text-sm rounded-lg',
+            toast.type === 'success'
+              ? 'bg-green-500/20 border-green-500/30 text-green-400'
+              : 'bg-red-500/20 border-red-500/30 text-red-400'
+          )}
+        >
+          {toast.type === 'success' ? (
+            <CheckCircle2 className="h-4 w-4" />
+          ) : (
+            <AlertCircle className="h-4 w-4" />
+          )}
+          {toast.message}
+        </div>
+      )}
     </div>
   );
 };
