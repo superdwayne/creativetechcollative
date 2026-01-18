@@ -154,17 +154,17 @@ Implement a usage-based billing system for the AI job analysis feature. Companie
 **Description:** As a company, I need to start a Stripe checkout session to purchase credits.
 
 **Acceptance Criteria:**
-- [ ] Create `api/company/checkout.ts` endpoint
-- [ ] Accept `bundle_id` ('basic' | 'popular' | 'pro') in request body
-- [ ] Map bundle_id to correct price in cents (2900, 5900, 9900)
-- [ ] Create Stripe Checkout session with:
+- [x] Create `api/company/checkout.ts` endpoint
+- [x] Accept `bundle_id` ('basic' | 'popular' | 'pro') in request body
+- [x] Map bundle_id to correct price in cents (2900, 5900, 9900)
+- [x] Create Stripe Checkout session with:
   - mode: 'payment'
   - line_items with bundle description and price
   - metadata: { company_id, bundle_id, credits_amount }
   - success_url: `/company/purchase-credits?success=true`
   - cancel_url: `/company/purchase-credits?canceled=true`
-- [ ] Return `{ url: checkoutSession.url }`
-- [ ] Typecheck passes
+- [x] Return `{ url: checkoutSession.url }`
+- [x] Typecheck passes
 
 ---
 
