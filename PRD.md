@@ -1,459 +1,269 @@
-# PRD: CTC Creative Technology Platform - Phase 2: Full-Featured UI & Messaging
+# PRD: Token-Based AI Analysis Billing System
 
 ## Introduction
 
-This is Phase 2 of the CTC Creative Technology Platform. Phase 1 (completed) established the API layer, database schema, and matching engine. This phase delivers the full-featured user interfaces for creative technologists, companies, and admins—plus a complete in-platform messaging system.
+Implement a usage-based billing system for the AI job analysis feature. Companies receive a fixed number of free analyses (5), after which they must purchase analysis bundles to continue using the feature. This creates a sustainable revenue model while providing initial value for free.
 
-The platform connects creative technologists with companies seeking talent. The AI-powered matching system analyzes job specs against all member profiles—enriched with data from portfolios and social profiles—to surface the top 3-5 most relevant candidates for each opportunity.
-
-**Completed in Phase 1:**
-- Database schema (profiles, companies, jobs, matches, embeddings)
-- Authentication flows (member and company)
-- API endpoints (job submission, matching, profile enrichment)
-- Vector search with pgvector
+**Key Decisions (from user input):**
+- Token counting: Both input and output tokens combined
+- Free tier: Fixed number of free analyses (5 per company)
+- Payment: Pre-purchase token/analysis bundles
+- Out of credits: Block analysis with "buy more" message
+- Management: Companies see usage, CTC admins manage billing
 
 ## Goals
 
-- Complete member dashboard with match notifications and response flow
-- Complete company dashboard with job submission form and match viewing
-- Complete admin dashboard with profile approval, job approval, and match review
-- Implement full messaging system between companies and matched members
-- Add AI profile enrichment triggered on profile creation/update
-- Deliver polished directory with search and filtering
+- Give each company 5 free AI job analyses to experience the feature
+- Track analysis usage per company with logging
+- Block analysis requests when a company has no remaining credits
+- Allow companies to purchase analysis bundles via Stripe (pre-paid credits)
+- Provide usage visibility to companies on their dashboard
+- Enable CTC admins to view usage, revenue, and grant bonus credits
 
 ## User Stories
 
 ---
 
-### PHASE 2A: Member Dashboard & Matches
-
----
-
-### US-026: Display approval status on member dashboard
-**Description:** As a creative technologist, I want to see my profile's approval status so I know when I'm visible in the directory.
+### US-001: Create analysis credits database schema
+**Description:** As a developer, I need database tables to track company analysis credits and usage history.
 
 **Acceptance Criteria:**
-- [x] Member dashboard shows approval status badge (Pending Review / Approved)
-- [x] Pending profiles show message: "Your profile is under review and will appear in the directory once approved"
-- [x] Approved profiles show "Your profile is live in the directory" with link to view
-- [x] Typecheck passes
-- [x] Verify changes work in browser
-
----
-
-### US-027: Create member matches dashboard section
-**Description:** As a creative technologist, I want to see jobs I've been matched with so I can respond to opportunities.
-
-**Acceptance Criteria:**
-- [x] Member dashboard has "Job Matches" section below profile info
-- [x] Lists all matches for member's profile where `admin_approved = true`
-- [x] Each match card shows: job title, company name, match score percentage, date matched
-- [x] Badge indicates response status (New / Responded)
-- [x] Empty state: "No job matches yet. Companies will see your profile when they post relevant opportunities."
-- [x] Typecheck passes
-- [x] Verify changes work in browser
-
----
-
-### US-028: Create match detail view for members
-**Description:** As a creative technologist, I want to view match details and respond so companies know my interest level.
-
-**Acceptance Criteria:**
-- [x] Clicking match card opens detail modal or page
-- [x] Shows full job description, requirements, and project details
-- [x] Shows AI-generated match reasoning explaining why you're a fit
-- [x] Shows company name and verified badge if applicable
-- [x] Response buttons: "I'm Interested" / "Not Interested"
-- [x] After response, saves to `member_response` column and shows confirmation
-- [x] Typecheck passes
-- [x] Verify changes work in browser
-
----
-
-### US-029: Trigger profile enrichment on creation
-**Description:** As a system, I need to automatically enrich profiles when they're created so AI matching has rich context.
-
-**Acceptance Criteria:**
-- [x] After profile creation succeeds, calls `/api/enrich-profile` endpoint
-- [x] Shows "Enhancing your profile with AI..." toast during enrichment
-- [x] Enrichment scrapes portfolio_url and linkedin_url if provided
-- [x] Generates embedding from bio + skills + enriched content
-- [x] Failure doesn't block profile creation (graceful degradation)
-- [x] Typecheck passes
-- [x] Verify changes work in browser
-
----
-
-### US-030: Trigger profile enrichment on update
-**Description:** As a system, I need to re-enrich profiles when portfolio URLs change so embeddings stay current.
-
-**Acceptance Criteria:**
-- [x] After profile update, checks if portfolio_url or linkedin_url changed
-- [x] If URLs changed, calls `/api/enrich-profile` endpoint
-- [x] Shows "Updating your AI profile..." toast during enrichment
-- [x] Updates embedding and embedding_updated_at
-- [x] Failure shows warning but doesn't block update
-- [x] Typecheck passes
-- [x] Verify changes work in browser
-
----
-
-### PHASE 2B: Company Dashboard & Job Submission
-
----
-
-### US-031: Create job submission form
-**Description:** As a company, I want to submit job specifications so I can find matching creative technologists.
-
-**Acceptance Criteria:**
-- [x] Company dashboard has prominent "Submit New Job" button
-- [x] Form opens in modal or new page
-- [x] Required fields: title, description, project_type (select), remote_preference (select)
-- [x] Optional fields: requirements (textarea), preferred_skills (tag input), focus_areas (multi-select), budget_range, location, timeline
-- [x] Form validates required fields before submission
-- [x] Submits to existing `/api/submit-job` endpoint
-- [x] Success shows confirmation with "Pending Admin Review" message
-- [x] Typecheck passes
-- [x] Verify changes work in browser
-
----
-
-### US-032: Display company's submitted jobs list
-**Description:** As a company, I want to see all my submitted jobs and their statuses so I can track my requests.
-
-**Acceptance Criteria:**
-- [x] Company dashboard shows "Your Job Submissions" section
-- [x] Lists all jobs for the company, sorted by most recent
-- [x] Each job card shows: title, status badge, submission date, match count (if matched)
-- [x] Status badges: yellow="Pending Review", blue="Under Review", green="Matched", gray="Closed"
-- [x] Click job to expand/view details
-- [x] Empty state: "No job submissions yet. Submit a job spec to find matching creative technologists."
-- [x] Typecheck passes
-- [x] Verify changes work in browser
-
----
-
-### US-033: Create job detail view with matches for companies
-**Description:** As a company, I want to view job details and matched candidates so I can see recommendations.
-
-**Acceptance Criteria:**
-- [x] Clicking job opens detail view (modal or page)
-- [x] Shows full job specification
-- [x] If status is 'matched', shows "Matched Candidates" section
-- [x] Each match shows: member name, profile picture, match score, reasoning summary
-- [x] Click member to view their full profile (opens in new tab or modal)
-- [x] If status is 'pending', shows "Awaiting admin review"
-- [x] Typecheck passes
-- [x] Verify changes work in browser
-
----
-
-### PHASE 2C: Admin Dashboard
-
----
-
-### US-034: Create admin pending profiles section
-**Description:** As an admin, I want to see pending profiles so I can review and approve them.
-
-**Acceptance Criteria:**
-- [x] Admin dashboard has "Pending Profiles" section with count badge
-- [x] Lists all profiles where `approved = false`
-- [x] Each row shows: name, email, location, focus areas (tags), submission date
-- [x] Click to expand and see full profile details (bio, skills, projects, portfolio links)
-- [x] Sorted by oldest first (FIFO review)
-- [x] Typecheck passes
-- [x] Verify changes work in browser
-
----
-
-### US-035: Implement profile approval/rejection actions
-**Description:** As an admin, I want to approve or reject profiles to control directory quality.
-
-**Acceptance Criteria:**
-- [x] Each pending profile has Approve and Reject buttons
-- [x] Approve: sets `approved = true`, `approved_at = now()`, `approved_by = admin_id`
-- [x] Reject: shows confirmation dialog with optional reason textarea
-- [x] Rejection deletes the profile record
-- [x] After action, profile removed from pending list with animation
-- [x] Success toast: "Profile approved" or "Profile rejected"
-- [x] Typecheck passes
-- [x] Verify changes work in browser
-
----
-
-### US-036: Create admin pending jobs section
-**Description:** As an admin, I want to see pending job submissions so I can review them before matching.
-
-**Acceptance Criteria:**
-- [x] Admin dashboard has "Pending Jobs" section with count badge
-- [x] Lists all jobs where `status = 'pending'`
-- [x] Each row shows: title, company name, project type, remote preference, submission date
-- [x] Click to expand and see full job details
-- [x] Sorted by oldest first
-- [x] Typecheck passes
-- [x] Verify changes work in browser
-
----
-
-### US-037: Implement job approval and trigger matching
-**Description:** As an admin, I want to approve jobs and trigger AI matching to generate candidate recommendations.
-
-**Acceptance Criteria:**
-- [x] Each pending job has Approve and Reject buttons
-- [x] Approve: calls `/api/match-job` endpoint with job ID
-- [x] Shows loading state "Running AI matching..." during process
-- [x] On success, job status becomes 'matched' and shows match count
-- [x] Reject: shows dialog for rejection reason, sets `status = 'rejected'` with admin_notes
-- [x] Success toast with match count: "Job approved - 5 candidates matched"
-- [x] Typecheck passes
-- [x] Verify changes work in browser
-
----
-
-### US-038: Create admin match review section
-**Description:** As an admin, I want to review AI-generated matches before showing them to companies.
-
-**Acceptance Criteria:**
-- [x] Admin dashboard has "Pending Matches" section
-- [x] Lists matches where `admin_approved IS NULL`, grouped by job
-- [x] Each match shows: job title, member name, match score, reasoning preview
-- [x] Individual Approve/Reject buttons per match
-- [x] Bulk "Approve All" button per job
-- [x] Approve sets `admin_approved = true`, Reject sets `admin_approved = false`
-- [x] Only approved matches become visible to companies
-- [x] Typecheck passes
-- [x] Verify changes work in browser
-
----
-
-### US-039: Create admin company verification section
-**Description:** As an admin, I want to verify companies so members know they're legitimate.
-
-**Acceptance Criteria:**
-- [x] Admin dashboard has "Companies" section
-- [x] Lists all registered companies
-- [x] Each row shows: company name, contact email, industry, verified status, registration date
-- [x] Verify/Unverify toggle button for each company
-- [x] Verify sets `verified = true`, Unverify sets `verified = false`
-- [x] Verified badge appears next to company names throughout platform
-- [x] Typecheck passes
-- [x] Verify changes work in browser
-
----
-
-### PHASE 2D: Messaging System
-
----
-
-### US-040: Create messages database table
-**Description:** As a system, I need a messages table so companies and members can communicate about job matches.
-
-**Acceptance Criteria:**
-- [x] Create migration for `messages` table with columns:
+- [x] Create `company_analysis_credits` table with columns:
   - `id` (UUID, primary key)
-  - `match_id` (UUID, FK to job_matches, not null)
-  - `sender_type` (VARCHAR, 'company' or 'member')
-  - `sender_id` (UUID, not null) - company.id or profile.id depending on sender_type
-  - `content` (TEXT, not null)
+  - `company_id` (UUID, FK to companies, unique, not null)
+  - `free_analyses_remaining` (INTEGER, default 5)
+  - `purchased_credits` (INTEGER, default 0)
   - `created_at` (TIMESTAMP, default now())
-  - `read_at` (TIMESTAMP, nullable)
-- [x] Add index on match_id for fast conversation loading
-- [x] Add RLS: only match participants can read/write messages
+  - `updated_at` (TIMESTAMP, default now())
+- [x] Create `analysis_usage_logs` table with columns:
+  - `id` (UUID, primary key)
+  - `company_id` (UUID, FK to companies, not null)
+  - `job_title` (VARCHAR, not null)
+  - `credit_type` (VARCHAR, 'free' or 'purchased')
+  - `created_at` (TIMESTAMP, default now())
+- [x] Create `credit_purchases` table with columns:
+  - `id` (UUID, primary key)
+  - `company_id` (UUID, FK to companies, not null)
+  - `credits_amount` (INTEGER, not null)
+  - `price_cents` (INTEGER, not null)
+  - `stripe_payment_id` (VARCHAR)
+  - `created_at` (TIMESTAMP, default now())
+- [x] Add indexes on company_id columns for all tables
+- [x] Add RLS policies: companies read own records, service role full access
 - [x] Migration runs successfully
 - [x] Typecheck passes
 
 ---
 
-### US-041: Create send message API endpoint
-**Description:** As a user, I need an API to send messages so conversations happen on the platform.
+### US-002: Initialize credits for new companies
+**Description:** As a new company, I should automatically receive 5 free analysis credits when I register.
 
 **Acceptance Criteria:**
-- [x] Create `/api/messages/send.ts` edge function
-- [x] Accepts: match_id, content in request body
-- [x] Validates sender is participant in the match (company or member)
-- [x] Determines sender_type and sender_id from auth context
-- [x] Creates message record
-- [x] Returns created message with id and timestamp
-- [x] Returns 403 if sender not authorized for this match
-- [x] Typecheck passes
+- [ ] Modify `api/register-company.ts` to create a `company_analysis_credits` record
+- [ ] Set `free_analyses_remaining: 5` and `purchased_credits: 0`
+- [ ] Credits record created in the same request as company registration
+- [ ] Handle case where credits record already exists (idempotent)
+- [ ] Typecheck passes
 
 ---
 
-### US-042: Create get conversation API endpoint
-**Description:** As a user, I need an API to fetch conversation history for a match.
+### US-003: Add credit check to analyze-job API
+**Description:** As the system, I need to verify a company has available credits before allowing an analysis.
 
 **Acceptance Criteria:**
-- [x] Create `/api/messages/conversation.ts` edge function
-- [x] Accepts: match_id as query parameter
-- [x] Validates requester is participant in the match
-- [x] Returns all messages for the match, sorted by created_at ascending
-- [x] Marks unread messages as read (sets read_at) for the requester
-- [x] Returns 403 if requester not authorized
-- [x] Typecheck passes
+- [ ] Add `company_id` parameter to analyze-job request schema (required)
+- [ ] Query `company_analysis_credits` to check balance
+- [ ] Allow if `free_analyses_remaining > 0` OR `purchased_credits > 0`
+- [ ] Return 402 Payment Required with JSON body: `{ error: 'No analysis credits remaining', code: 'CREDITS_EXHAUSTED' }`
+- [ ] Include `X-Credits-Remaining` header in successful response
+- [ ] Typecheck passes
 
 ---
 
-### US-043: Create unread message count API endpoint
-**Description:** As a user, I need to know how many unread messages I have so I can see notifications.
+### US-004: Deduct credits after successful analysis
+**Description:** As the system, I need to deduct one credit after an analysis stream completes.
 
 **Acceptance Criteria:**
-- [x] Create `/api/messages/unread-count.ts` edge function
-- [x] Returns total unread message count for current user
-- [x] For companies: counts messages in their job matches where sender_type='member' and read_at is null
-- [x] For members: counts messages in their matches where sender_type='company' and read_at is null
-- [x] Returns { count: number }
-- [x] Typecheck passes
+- [ ] After streaming completes successfully, deduct 1 credit
+- [ ] Deduct from `free_analyses_remaining` first (if > 0), else from `purchased_credits`
+- [ ] Create entry in `analysis_usage_logs` with job title and credit type
+- [ ] Use database transaction to ensure atomicity
+- [ ] Update `company_analysis_credits.updated_at` timestamp
+- [ ] Typecheck passes
 
 ---
 
-### US-044: Add messaging UI to company match view
-**Description:** As a company, I want to message matched candidates to discuss the opportunity.
+### US-005: Update useJobAnalysis hook for credit errors
+**Description:** As a company user, I should see a clear message when I'm out of credits.
 
 **Acceptance Criteria:**
-- [x] Match detail view has "Messages" section below candidate info
-- [x] Shows conversation history with timestamps and sender labels
-- [x] Company messages aligned right, member messages aligned left
-- [x] Text input with Send button at bottom
-- [x] Sending a message immediately adds it to the conversation
-- [x] Auto-scrolls to newest messages on load and send
-- [x] Typecheck passes
-- [x] Verify changes work in browser
+- [ ] Detect 402 status code in `useJobAnalysis` hook
+- [ ] Parse response JSON to extract error code
+- [ ] Set error state with type: `{ type: 'credits_exhausted', message: string }`
+- [ ] Add `creditsRemaining` state (from X-Credits-Remaining header)
+- [ ] Update hook return type to include new states
+- [ ] Typecheck passes
 
 ---
 
-### US-045: Add messaging UI to member match view
-**Description:** As a creative technologist, I want to message companies about matches to learn more.
+### US-006: Show "Buy More Credits" prompt when exhausted
+**Description:** As a company user who has run out of credits, I should see a prompt to purchase more.
 
 **Acceptance Criteria:**
-- [x] Match detail view has "Messages" section below job info
-- [x] Shows conversation history with timestamps and sender labels
-- [x] Member messages aligned right, company messages aligned left
-- [x] Text input with Send button at bottom
-- [x] Messaging only enabled after member responds "Interested"
-- [x] If not yet responded, shows "Respond to this match to start messaging"
-- [x] Typecheck passes
-- [x] Verify changes work in browser
+- [ ] When analysis fails with credits_exhausted error, show alert/modal
+- [ ] Display message: "You've used all your analysis credits"
+- [ ] Show "Purchase More Credits" button linking to `/company/purchase-credits`
+- [ ] Display current credit balance (0 free, 0 purchased)
+- [ ] Typecheck passes
+- [ ] Verify changes work in browser
 
 ---
 
-### US-046: Show unread message indicators on dashboards
-**Description:** As a user, I want to see when I have unread messages so I know to check conversations.
+### US-007: Add credits section to company dashboard
+**Description:** As a company user, I want to see my credit balance and usage history on my dashboard.
 
 **Acceptance Criteria:**
-- [x] Member dashboard shows red badge with unread count next to "Job Matches" header
-- [x] Company dashboard shows red badge with unread count next to matched jobs
-- [x] Individual match cards show blue dot indicator if conversation has unread messages
-- [x] Counts update after viewing conversation
-- [x] Typecheck passes
-- [x] Verify changes work in browser
+- [ ] Create `api/company/credits.ts` endpoint to fetch company's credit balance and recent usage
+- [ ] Add "Analysis Credits" card to company dashboard (above or beside job submissions)
+- [ ] Display: free credits remaining, purchased credits, total analyses used
+- [ ] Show last 5 analyses with job title and date
+- [ ] Include "Purchase More" button
+- [ ] Typecheck passes
+- [ ] Verify changes work in browser
 
 ---
 
-### PHASE 2E: Directory & Polish
+### US-008: Create credit bundle purchase page
+**Description:** As a company user, I want to see available credit bundles and their pricing.
+
+**Acceptance Criteria:**
+- [ ] Create `/company/purchase-credits` route and page
+- [ ] Display 3 bundle options:
+  - 10 analyses for $29 ($2.90/analysis)
+  - 25 analyses for $59 ($2.36/analysis)
+  - 50 analyses for $99 ($1.98/analysis)
+- [ ] Each bundle card shows: credit count, price, price per analysis
+- [ ] Highlight "Most Popular" on middle tier
+- [ ] "Buy Now" button on each (placeholder action for now)
+- [ ] Typecheck passes
+- [ ] Verify changes work in browser
 
 ---
 
-### US-047: Add search to directory page
-**Description:** As a visitor, I want to search the directory to find creative technologists by name or keywords.
+### US-009: Create Stripe checkout API endpoint
+**Description:** As a company, I need to start a Stripe checkout session to purchase credits.
 
 **Acceptance Criteria:**
-- [x] Directory page has search input at top
-- [x] Search filters profiles by name and bio content
-- [x] Search is debounced (300ms delay)
-- [x] Results update as user types
-- [x] Clear button to reset search
-- [x] URL updates with search param for shareability
-- [x] Typecheck passes
-- [x] Verify changes work in browser
+- [ ] Create `api/company/checkout.ts` endpoint
+- [ ] Accept `bundle_id` ('basic' | 'popular' | 'pro') in request body
+- [ ] Map bundle_id to correct price in cents (2900, 5900, 9900)
+- [ ] Create Stripe Checkout session with:
+  - mode: 'payment'
+  - line_items with bundle description and price
+  - metadata: { company_id, bundle_id, credits_amount }
+  - success_url: `/company/purchase-credits?success=true`
+  - cancel_url: `/company/purchase-credits?canceled=true`
+- [ ] Return `{ url: checkoutSession.url }`
+- [ ] Typecheck passes
 
 ---
 
-### US-048: Add filters to directory page
-**Description:** As a visitor, I want to filter the directory by focus area, availability, and skills.
+### US-010: Connect purchase page to Stripe checkout
+**Description:** As a company, clicking "Buy Now" should redirect me to Stripe payment.
 
 **Acceptance Criteria:**
-- [x] Directory has filter dropdowns: Focus Areas (multi-select), Availability (single-select)
-- [x] Focus areas use existing FOCUS_AREAS constant
-- [x] Availability options: All, Open to Work, Open to Collaborations
-- [x] Filters combine with AND logic
-- [x] Filter state persists in URL params
-- [x] "Clear Filters" button resets all filters
-- [x] Shows result count: "Showing X creative technologists"
-- [x] Typecheck passes
-- [x] Verify changes work in browser
+- [ ] "Buy Now" buttons call `/api/company/checkout` with bundle_id
+- [ ] Show loading state while creating checkout session
+- [ ] Redirect to Stripe checkout URL on success
+- [ ] Handle success/canceled URL params with toast messages
+- [ ] Typecheck passes
+- [ ] Verify changes work in browser
 
 ---
 
-### US-049: Enhance public profile page display
-**Description:** As a visitor, I want to see rich profile details on public profile pages.
+### US-011: Create Stripe webhook for payment completion
+**Description:** As the system, I need to add purchased credits when Stripe payment succeeds.
 
 **Acceptance Criteria:**
-- [x] Profile page shows profile picture prominently
-- [x] Shows focus areas as colored badges with descriptions on hover
-- [x] Shows skills as tag pills
-- [x] Projects section with images and descriptions
-- [x] External links (portfolio, LinkedIn) open in new tab with icons
-- [x] Availability status clearly displayed with appropriate color
-- [x] Typecheck passes
-- [x] Verify changes work in browser
+- [ ] Create `api/webhooks/stripe.ts` endpoint
+- [ ] Verify Stripe webhook signature using STRIPE_WEBHOOK_SECRET
+- [ ] Handle `checkout.session.completed` event
+- [ ] Extract company_id and credits_amount from session metadata
+- [ ] Add credits to `company_analysis_credits.purchased_credits`
+- [ ] Create record in `credit_purchases` table with stripe_payment_id
+- [ ] Return 200 OK to acknowledge receipt
+- [ ] Typecheck passes
 
 ---
 
-### US-050: Add match email notification webhook
-**Description:** As a system, I want to email members when they're matched with a job so they check the platform.
+### US-012: Add credit usage to admin dashboard
+**Description:** As a CTC admin, I want to see credit usage and revenue across all companies.
 
 **Acceptance Criteria:**
-- [x] After admin approves a match, triggers notification
-- [x] Calls existing n8n webhook or Resend API
-- [x] Email includes: job title, match score, "Why you matched" summary, link to dashboard
-- [x] Sets `member_notified = true` on match record after sending
-- [x] Handles send failures gracefully (logs error, doesn't crash)
-- [x] Typecheck passes
+- [ ] Create `api/admin/credit-usage.ts` endpoint
+- [ ] Add "Credit Usage" section to admin dashboard
+- [ ] Show table with columns: company name, free used, purchased remaining, total analyses, total revenue
+- [ ] Sort by total analyses (most active first)
+- [ ] Show platform totals: total analyses, total revenue
+- [ ] Typecheck passes
+- [ ] Verify changes work in browser
+
+---
+
+### US-013: Add admin ability to grant bonus credits
+**Description:** As a CTC admin, I want to manually add credits to a company account for support or promotions.
+
+**Acceptance Criteria:**
+- [ ] Add "Grant Credits" button in admin credit usage section for each company
+- [ ] Button opens modal with: credit amount input, optional note textarea
+- [ ] Create `api/admin/grant-credits.ts` endpoint
+- [ ] Add credits to `purchased_credits` (not free credits)
+- [ ] Log grant in `credit_purchases` with stripe_payment_id = 'ADMIN_GRANT' and note
+- [ ] Show success toast: "Added X credits to [Company Name]"
+- [ ] Typecheck passes
+- [ ] Verify changes work in browser
 
 ---
 
 ## Non-Goals
 
-- No real-time chat (messages use send/refresh pattern)
-- No payment processing or billing
-- No automated job posting from external sources (jobs are manual submissions)
-- No public company profiles (companies only visible through matches)
-- No mobile native apps (responsive web only)
-- No calendar/scheduling integration
-- No video calling integration
-- No bulk messaging or marketing emails
+- Subscription/recurring billing (bundle purchase only)
+- Refunds or credit expiration
+- Different pricing tiers per company
+- Usage-based pricing tied to actual AI token counts (we count analyses, not tokens)
+- Credit transfer between companies
+- Automatic top-up when credits run low
+- Invoicing or receipts (Stripe handles this)
 
 ## Technical Considerations
 
 ### Existing Infrastructure
-- Supabase Auth configured for both members and companies
-- Supabase Storage for file uploads (profile pictures)
-- OpenAI API for embeddings (text-embedding-3-small)
-- pgvector for similarity search
-- n8n webhooks for notifications
+- Supabase for database with RLS
 - Vercel Edge Functions for API
+- Companies table already exists with user_id FK to auth.users
+- `api/analyze-job.ts` is an edge function using streaming
 
-### UI Components Available
-- Button, Input, Textarea, Checkbox, RadioGroup, TagInput
-- ImageUpload for profile pictures
-- Alert for notifications
-- Existing form patterns in profile creation pages
+### Stripe Integration
+- Use Stripe Checkout for payments (simplest integration)
+- Store STRIPE_SECRET_KEY and STRIPE_WEBHOOK_SECRET in environment
+- Webhook endpoint must be registered in Stripe dashboard
+- Use `stripe` npm package for API calls
 
-### Database Schema (Already Exists)
-- `network_profiles` with embeddings and approval fields
-- `companies` with verification
-- `job_submissions` with status workflow
-- `job_matches` with scores and member_response
+### Credit Deduction Logic
+```
+if (free_analyses_remaining > 0) {
+  deduct from free_analyses_remaining
+  log with credit_type = 'free'
+} else if (purchased_credits > 0) {
+  deduct from purchased_credits
+  log with credit_type = 'purchased'
+} else {
+  return 402 CREDITS_EXHAUSTED
+}
+```
 
-### API Endpoints (Already Exist)
-- `/api/enrich-profile.ts` - Profile enrichment
-- `/api/match-job.ts` - AI matching
-- `/api/submit-job.ts` - Job submission
-- `/api/register-company.ts` - Company registration
-- `/api/review-match.ts` - Match review
-
-### Key Patterns
+### Key Patterns to Follow
 - Service role key for admin operations (bypasses RLS)
-- React Hook Form with Zod validation
+- Edge runtime for API endpoints
 - Toast notifications for user feedback
-- Mobile-responsive design required
+- React Query or direct fetch for data loading
