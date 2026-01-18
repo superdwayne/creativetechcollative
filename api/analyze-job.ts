@@ -350,6 +350,78 @@ async function checkCredits(companyId: string): Promise<{ hasCredits: boolean; f
   }
 }
 
+// Deduct one credit after successful analysis
+async function deductCredit(companyId: string, jobTitle: string, freeRemaining: number): Promise<void> {
+  const supabaseUrl = process.env.SUPABASE_URL;
+  const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+
+  if (!supabaseUrl || !supabaseServiceKey) {
+    console.warn('[ANALYZE-JOB] Supabase not configured, skipping credit deduction');
+    return;
+  }
+
+  const supabase = createClient(supabaseUrl, supabaseServiceKey);
+
+  // Determine credit type to deduct: free first, then purchased
+  const creditType = freeRemaining > 0 ? 'free' : 'purchased';
+  const updateField = freeRemaining > 0 ? 'free_analyses_remaining' : 'purchased_credits';
+
+  console.log(`[ANALYZE-JOB] Deducting 1 ${creditType} credit for company ${companyId}`);
+
+  try {
+    // Use RPC for atomic decrement operation
+    // First, update the credits (decrement the appropriate field)
+    const { data: currentCredits, error: fetchError } = await supabase
+      .from('company_analysis_credits')
+      .select('free_analyses_remaining, purchased_credits')
+      .eq('company_id', companyId)
+      .single();
+
+    if (fetchError) {
+      console.error('[ANALYZE-JOB] Error fetching credits for deduction:', fetchError);
+      throw fetchError;
+    }
+
+    const newValue = creditType === 'free'
+      ? (currentCredits.free_analyses_remaining || 0) - 1
+      : (currentCredits.purchased_credits || 0) - 1;
+
+    // Update credits with new value and updated_at timestamp
+    const updateData = creditType === 'free'
+      ? { free_analyses_remaining: newValue, updated_at: new Date().toISOString() }
+      : { purchased_credits: newValue, updated_at: new Date().toISOString() };
+
+    const { error: updateError } = await supabase
+      .from('company_analysis_credits')
+      .update(updateData)
+      .eq('company_id', companyId);
+
+    if (updateError) {
+      console.error('[ANALYZE-JOB] Error updating credits:', updateError);
+      throw updateError;
+    }
+
+    // Log the usage
+    const { error: logError } = await supabase
+      .from('analysis_usage_logs')
+      .insert({
+        company_id: companyId,
+        job_title: jobTitle,
+        credit_type: creditType,
+      });
+
+    if (logError) {
+      console.error('[ANALYZE-JOB] Error logging usage:', logError);
+      // Don't throw here - credit deduction succeeded, logging is secondary
+    }
+
+    console.log(`[ANALYZE-JOB] Successfully deducted 1 ${creditType} credit. New ${updateField} value: ${newValue}`);
+  } catch (err) {
+    console.error('[ANALYZE-JOB] Failed to deduct credit:', err);
+    // Don't throw - we don't want to fail the response after streaming has started
+  }
+}
+
 // Format job for analysis
 function formatJobForAnalysis(job: {
   title: string;
@@ -461,12 +533,17 @@ export default async function handler(req: Request) {
       model: openai(modelName),
       system: systemPrompt,
       prompt: enrichedPrompt,
+      onFinish: async () => {
+        // Deduct credit after streaming completes successfully
+        console.log('✅ [STREAMING COMPLETE] Deducting credit...');
+        await deductCredit(job.company_id, job.title, creditCheck.freeRemaining);
+      },
     });
 
     console.log('✨ [STREAMING ANALYSIS RESPONSE...]\n');
 
     // Return streaming response with credits remaining header
-    // Note: We return credits remaining BEFORE deduction (US-004 will handle deduction)
+    // X-Credits-Remaining shows credits BEFORE this analysis (will be -1 after)
     return result.toTextStreamResponse({
       headers: {
         'X-Credits-Remaining': String(totalCreditsRemaining),

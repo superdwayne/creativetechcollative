@@ -84,12 +84,12 @@ Implement a usage-based billing system for the AI job analysis feature. Companie
 **Description:** As the system, I need to deduct one credit after an analysis stream completes.
 
 **Acceptance Criteria:**
-- [ ] After streaming completes successfully, deduct 1 credit
-- [ ] Deduct from `free_analyses_remaining` first (if > 0), else from `purchased_credits`
-- [ ] Create entry in `analysis_usage_logs` with job title and credit type
-- [ ] Use database transaction to ensure atomicity
-- [ ] Update `company_analysis_credits.updated_at` timestamp
-- [ ] Typecheck passes
+- [x] After streaming completes successfully, deduct 1 credit
+- [x] Deduct from `free_analyses_remaining` first (if > 0), else from `purchased_credits`
+- [x] Create entry in `analysis_usage_logs` with job title and credit type
+- [x] Use database transaction to ensure atomicity
+- [x] Update `company_analysis_credits.updated_at` timestamp
+- [x] Typecheck passes
 
 ---
 
