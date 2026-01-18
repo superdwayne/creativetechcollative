@@ -137,16 +137,16 @@ Implement a usage-based billing system for the AI job analysis feature. Companie
 **Description:** As a company user, I want to see available credit bundles and their pricing.
 
 **Acceptance Criteria:**
-- [ ] Create `/company/purchase-credits` route and page
-- [ ] Display 3 bundle options:
+- [x] Create `/company/purchase-credits` route and page
+- [x] Display 3 bundle options:
   - 10 analyses for $29 ($2.90/analysis)
   - 25 analyses for $59 ($2.36/analysis)
   - 50 analyses for $99 ($1.98/analysis)
-- [ ] Each bundle card shows: credit count, price, price per analysis
-- [ ] Highlight "Most Popular" on middle tier
-- [ ] "Buy Now" button on each (placeholder action for now)
-- [ ] Typecheck passes
-- [ ] Verify changes work in browser
+- [x] Each bundle card shows: credit count, price, price per analysis
+- [x] Highlight "Most Popular" on middle tier
+- [x] "Buy Now" button on each (placeholder action for now)
+- [x] Typecheck passes
+- [x] Verify changes work in browser
 
 ---
 

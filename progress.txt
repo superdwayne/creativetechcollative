@@ -2,584 +2,126 @@
 
 ## Learnings
 (Patterns discovered during implementation)
-
-- NetworkProfile type has `approved`, `approvedAt`, and `approvedBy` fields for approval tracking
-- Lucide icons used throughout: CheckCircle2 for approved state, Clock for pending state
-- Tailwind color scheme: green-500/20 for approved badges, yellow-500/20 for pending badges
+- Migrations use pattern: `NNN_description.sql` in supabase/migrations/
+- RLS policies wrapped in DO $$ BEGIN ... EXCEPTION WHEN duplicate_object THEN NULL; END $$; for idempotency
+- Use `update_updated_at_column()` function for updated_at triggers (defined in 001 migration)
+- No local Supabase/Docker available - test migrations by build pass only
+- Build command: `npm run build` (no typecheck script available)
 
 ---
 
-## Iteration 1 - US-026: Display approval status on member dashboard
-- What was implemented:
-  - Added approval status badge showing "Approved" (green) or "Pending Review" (yellow)
-  - For approved profiles: "Your profile is live in the directory" with link to public profile
-  - For pending profiles: "Your profile is under review and will appear in the directory once approved"
-- Files changed:
-  - src/pages/NetworkDashboardPage.tsx (added Clock icon import, replaced static status message with conditional approval status display)
+## Iteration 1 - US-001: Create analysis credits database schema
+- Created `supabase/migrations/010_create_analysis_credits.sql`
+- Added three tables: company_analysis_credits, analysis_usage_logs, credit_purchases
+- Added indexes on company_id for all tables
+- Added RLS policies for companies to read their own records
+- Added trigger for updated_at on company_analysis_credits
+- Files changed: supabase/migrations/010_create_analysis_credits.sql, PRD.md
 - Learnings for future iterations:
-  - The profile.approved boolean determines visibility in directory
-  - Use profile.slug for linking to public profile: `/directory/profile/${profile.slug}`
-  - Badge styling pattern: `inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-{color}-500/20 text-{color}-400 text-sm font-medium border border-{color}-500/30`
+  - Follow existing migration patterns (004_create_companies.sql is a good reference)
+  - company_id column should reference companies(id) with ON DELETE CASCADE
+  - Service role access bypasses RLS (documented in comments)
 ---
 
-## Iteration 2 - US-027: Create member matches dashboard section
-- What was implemented:
-  - Renamed "Job Opportunities" section to "Job Matches" for consistency with PRD
-  - Added empty state with icon and message when no matches exist
-  - Added "New" badge (blue) for matches without member response
-  - Changed from conditional rendering (only show when matches exist) to always showing section with conditional content
-  - Added date matched display using Calendar icon and match.createdAt
-- Files changed:
-  - src/pages/NetworkDashboardPage.tsx (refactored Job Matches section with empty state, added date display, added New badge)
+## Iteration 2 - US-002: Initialize credits for new companies
+- Modified `api/register-company.ts` to create `company_analysis_credits` record after company creation
+- Set `free_analyses_remaining: 5` and `purchased_credits: 0`
+- Used `upsert` with `onConflict: 'company_id'` and `ignoreDuplicates: true` for idempotency
+- Credits creation failure is logged but doesn't fail registration (non-critical path)
+- Files changed: api/register-company.ts, PRD.md
 - Learnings for future iterations:
-  - getMatchesForMember in supabase.ts already filters by admin_approved = true
-  - JobMatchWithDetails type includes match, job, and company data
-  - Badge color scheme: blue-500/20 for "New", green-500/20 for "Interested", zinc-500/20 for "Not Interested"
-  - Date formatting: `new Date(match.createdAt).toLocaleDateString()`
+  - Supabase upsert with `ignoreDuplicates: true` is good for idempotent operations
+  - Non-critical operations (like credits init) should log errors but not fail the main operation
 ---
 
-## Iteration 3 - US-027: Browser verification
-- What was verified:
-  - TypeScript typecheck passes (npx tsc --noEmit)
-  - Vite build succeeds without errors
-  - Job Matches section implementation complete with all features:
-    - Empty state with Sparkles icon and message
-    - Match cards with job title, company name, match score percentage, date matched
-    - New/Responded badges based on memberResponse field
-    - Expandable card details with match reasoning, job description, requirements
-    - Response buttons (Interested/Not Interested) that update state
-- Files verified:
-  - src/pages/NetworkDashboardPage.tsx - full Job Matches section implementation verified
+## Iteration 3 - US-003: Add credit check to analyze-job API
+- Added `company_id` (UUID) as required parameter to `JobAnalysisRequest` schema in `api/analyze-job.ts`
+- Added `checkCredits()` function to query `company_analysis_credits` table
+- Returns 402 with `{ error: 'No analysis credits remaining', code: 'CREDITS_EXHAUSTED' }` if no credits
+- Added `X-Credits-Remaining` header to streaming response via `toTextStreamResponse({ headers: {...} })`
+- Files changed: api/analyze-job.ts, PRD.md
 - Learnings for future iterations:
-  - US-027 is now fully complete - all acceptance criteria met
-  - The implementation already includes expandable match details with full job info and response buttons (partly overlaps with US-028)
+  - Supabase `single()` returns PGRST116 error code when no record found
+  - The AI SDK's `toTextStreamResponse()` accepts a `headers` option for custom response headers
+  - For streaming responses, add headers via the options object, not by creating a new Response
 ---
 
-## Iteration 4 - US-028: Create match detail view for members
-- What was implemented:
-  - Added company verified badge (blue BadgeCheck icon) next to company name when company.verified is true
-  - Most of US-028 functionality was already implemented in US-027 (expandable detail view, job description, match reasoning, response buttons)
-- Files changed:
-  - src/pages/NetworkDashboardPage.tsx (added verified badge display)
+## Iteration 4 - US-004: Deduct credits after successful analysis
+- Added `deductCredit()` function to deduct 1 credit after streaming completes
+- Deducts from `free_analyses_remaining` first (if > 0), else from `purchased_credits`
+- Creates entry in `analysis_usage_logs` with job_title and credit_type ('free' or 'purchased')
+- Updates `company_analysis_credits.updated_at` timestamp
+- Uses AI SDK `onFinish` callback in `streamText()` to trigger deduction after stream completion
+- Files changed: api/analyze-job.ts, PRD.md
 - Learnings for future iterations:
-  - Company type has `verified` boolean field for company verification status
-  - BadgeCheck icon with blue color (text-blue-400) used for verified badges
-  - Use title attribute for accessibility: `title="Verified Company"`
-  - JobMatchWithDetails type provides access to match.company.verified
+  - AI SDK `streamText()` accepts an `onFinish` callback that fires when streaming completes successfully
+  - For credit deduction, pass the current free balance to determine which type to deduct
+  - Errors in `onFinish` should be logged but not thrown (streaming already succeeded)
+  - Use sequential fetch-then-update approach for Supabase (no direct decrement operation)
 ---
 
-## Iteration 5 - US-029: Trigger profile enrichment on creation
-- What was implemented:
-  - Created new API endpoint `/api/enrich-profile.ts` for single profile enrichment
-  - Endpoint validates user owns the profile, generates OpenAI text-embedding-3-small embedding from profile data
-  - Modified `NetworkCreateProfilePage.tsx` to call enrichment endpoint after successful profile creation
-  - Added `isEnriching` and `enrichmentError` state for tracking enrichment status
-  - Added "Enhancing your profile with AI..." message with Sparkles icon during enrichment
-  - Added warning message if enrichment fails (graceful degradation - profile creation still succeeds)
-  - Enrichment runs in background after profile creation succeeds
-- Files created:
-  - api/enrich-profile.ts (new single-profile enrichment endpoint)
-- Files changed:
-  - src/pages/NetworkCreateProfilePage.tsx (added session import, enrichment state, enrichment call in handleSubmit, enrichment status UI)
+## Iteration 5 - US-005: Update useJobAnalysis hook for credit errors
+- Updated `src/hooks/useJobAnalysis.ts` to handle 402 status code with credits_exhausted error
+- Added typed error states: `CreditsExhaustedError` and `GenericError` with discriminated union `AnalysisError`
+- Added `creditsRemaining` state parsed from `X-Credits-Remaining` response header
+- Updated hook return type to include new `creditsRemaining` and typed `error` states
+- Also updated `src/pages/JobsPage.tsx` to use `error.message` instead of just `error` (breaking change)
+- Files changed: src/hooks/useJobAnalysis.ts, src/pages/JobsPage.tsx, PRD.md
 - Learnings for future iterations:
-  - Session comes from `useAuth()` hook and provides `access_token` for API authentication
-  - API calls to `/api/*` endpoints use `Authorization: Bearer ${session.access_token}` header
-  - Graceful degradation pattern: try/catch around enrichment, set error state but don't throw
-  - Sparkles icon with `animate-pulse` class for loading states
-  - AlertTriangle icon with amber colors for warnings
-  - Embedding is generated from: name, bio, skills, focus_areas, projects, location, enriched_content
+  - When changing hook return types, check all consumers (use Grep to find usages)
+  - The error type change from `string | null` to object broke JobsPage.tsx - always update consumers
+  - Use discriminated union types for error handling (`type: 'credits_exhausted' | 'generic'`)
+  - Response headers are accessed via `response.headers.get('Header-Name')`
 ---
 
-## Iteration 6 - US-030: Trigger profile enrichment on update
-- What was implemented:
-  - Added `session` from `useAuth()` hook for API authentication
-  - Added `isEnriching`, `enrichmentError`, and `originalUrls` state to track enrichment status and original URLs
-  - Stored original portfolioUrl and linkedinUrl when profile is fetched in useEffect
-  - Modified handleSubmit to check if URLs changed after successful update
-  - If URLs changed, calls `/api/enrich-profile` endpoint with profile ID
-  - Shows "Updating your AI profile..." message with Sparkles icon during enrichment
-  - Shows warning with AlertTriangle icon if enrichment fails (graceful degradation)
-  - Added Sparkles and AlertTriangle icons to imports
-- Files changed:
-  - src/pages/NetworkEditProfilePage.tsx (added enrichment state, URL tracking, enrichment call in handleSubmit, enrichment status UI in success screen)
+## Iteration 6 - US-006: Show "Buy More Credits" prompt when exhausted
+- Modified `src/pages/JobsPage.tsx` to show a custom alert when error.type === 'credits_exhausted'
+- Display message: "You've used all your analysis credits"
+- Added "Purchase More Credits" button using react-router-dom Link to `/company/purchase-credits`
+- Display current credit balance (0 free, 0 purchased) in a styled info box
+- Added imports: Link from react-router-dom, CreditCard and AlertCircle from lucide-react
+- Separated generic error display from credits_exhausted error display
+- Files changed: src/pages/JobsPage.tsx, PRD.md
 - Learnings for future iterations:
-  - Track original field values at load time to detect changes on submit
-  - Same enrichment pattern used in both create and edit flows for consistency
-  - The `/api/enrich-profile` endpoint handles both create and update scenarios
+  - Use discriminated union error types to render different UI for different error states
+  - Alert/modal styling follows project pattern: amber colors for warnings, bg-*/10 for backgrounds
+  - Link component from react-router-dom is preferred for internal navigation in modals
 ---
 
-## Iteration 7 - US-030: Browser verification
-- What was verified:
-  - TypeScript typecheck passes (npx tsc --noEmit)
-  - Vite production build succeeds without errors
-  - Profile enrichment on update implementation verified in NetworkEditProfilePage.tsx:
-    - Original URLs tracked at profile load time (lines 122-126)
-    - URL change detection after successful update (lines 284-287)
-    - Enrichment API call with session auth (lines 289-313)
-    - "Updating your AI profile..." loading state with Sparkles icon (lines 349-355)
-    - Warning message on enrichment failure with AlertTriangle icon (lines 358-365)
-    - Graceful degradation - profile update succeeds even if enrichment fails
-- Files verified:
-  - src/pages/NetworkEditProfilePage.tsx - full profile enrichment on update implementation verified
+## Iteration 7 - US-007: Add credits section to company dashboard
+- Created `api/company/credits.ts` endpoint that returns:
+  - Credit balance (free remaining, purchased, total)
+  - Total analyses used (count)
+  - Last 5 usage logs with job title, credit type, and date
+- Created `src/components/AnalysisCreditsCard.tsx` component displaying:
+  - 3-column grid showing free/purchased/total used
+  - Recent analyses list with formatted dates
+  - "Purchase More" button linking to `/company/purchase-credits`
+  - Low credits warning (when <= 2 credits) and no credits error states
+- Integrated into HirePage - card shows when `company_id` URL param is present
+- Files changed: api/company/credits.ts, src/components/AnalysisCreditsCard.tsx, src/pages/HirePage.tsx, PRD.md
 - Learnings for future iterations:
-  - US-030 is now fully complete - all acceptance criteria met
-  - Consistent enrichment patterns between create and edit pages
+  - No dedicated company dashboard page exists yet (CompanyDashboardPage.tsx was deleted)
+  - HirePage is the talent discovery feature, uses analyse-job (different from analyze-job with credits)
+  - Use URL params (company_id) to conditionally show company-specific UI
+  - API pattern: GET with query params for fetch endpoints, validate UUID format
+  - Supabase count query: `select('*', { count: 'exact', head: true })` returns only count
+  - Component styling follows project pattern: zinc-900/50 backgrounds, violet/emerald accents
 ---
 
-## Iteration 8 - US-031: Create job submission form
-- What was verified:
-  - Job submission form already fully implemented in CompanyDashboardPage.tsx
-  - Prominent "Submit New Job" button in header (lines 350-357)
-  - Form opens in modal (lines 588-814)
-  - Required fields: title, description, project_type (select), remote_preference (select)
-  - Optional fields: requirements (textarea), preferred_skills (TagInput), focus_areas (multi-select buttons), budget_range, location, timeline
-  - Form validation in validateJobForm function (lines 178-193)
-  - Submits to `/api/submit-job` endpoint with auth (lines 204-222)
-  - Success confirmation with "Pending Admin Review" message (lines 607-615)
-  - TypeScript typecheck passes
-  - Vite build succeeds
-- Files verified:
-  - src/pages/CompanyDashboardPage.tsx - complete job submission form implementation
+## Iteration 8 - US-008: Create credit bundle purchase page
+- Created `src/pages/PurchaseCreditsPage.tsx` with 3 bundle options:
+  - Starter: 10 analyses for $29 ($2.90/analysis)
+  - Growth: 25 analyses for $59 ($2.36/analysis) - marked as "Most Popular"
+  - Scale: 50 analyses for $99 ($1.98/analysis)
+- Each bundle card shows: name, credit count, price, price per analysis
+- Middle tier highlighted with "Most Popular" badge and violet border
+- "Buy Now" buttons with placeholder action (for US-010)
+- Added route `/company/purchase-credits` in App.tsx
+- Files changed: src/pages/PurchaseCreditsPage.tsx (new), src/App.tsx, PRD.md
 - Learnings for future iterations:
-  - US-031 was already implemented during earlier development
-  - JobFormData interface defines form state (lines 41-52)
-  - initialJobFormData provides defaults (lines 54-65)
-  - Form uses modal pattern with sticky header and scrollable content
-  - TagInput component with SUGGESTED_SKILLS for preferred skills
-  - Focus areas use button toggle pattern (multi-select)
----
-
-## Iteration 9 - US-032: Display company's submitted jobs list
-- What was implemented:
-  - Renamed section header from "Job Submissions" to "Your Job Submissions"
-  - Added match count display on job cards for matched jobs (shows "X matches" with Users icon)
-  - Added prefetch logic to load match counts for all matched jobs on initial data load
-  - Updated empty state message to match PRD exactly
-  - Jobs already sorted by most recent (`ascending: false`)
-  - Status badges already implemented with correct colors (yellow=Pending, blue=Under Review, green=Matched, gray=Closed)
-  - Click to expand/view details already implemented
-- Files changed:
-  - src/pages/CompanyDashboardPage.tsx (renamed section header, added match count display, prefetch logic for matches, updated empty state)
-- Learnings for future iterations:
-  - `getJobSubmissionsByCompany()` returns jobs sorted by most recent by default
-  - `getMatchesByJobId()` returns all matches, filter by `adminApproved === true` for company-visible matches
-  - Match count shown next to status badge: `{jobMatches[job.id].length} matches`
-  - Prefetch pattern: filter matched jobs, Promise.all on getMatchesByJobId calls, build matches map
----
-
-## Iteration 10 - US-033: Create job detail view with matches for companies
-- What was implemented:
-  - Created `JobMatchWithProfile` type extending `JobMatch` with profile info (fullName, profilePictureUrl, slug, location, bio)
-  - Created `getMatchesWithProfilesByJobId()` function that joins job_matches with network_profiles
-  - Updated CompanyDashboardPage to use new type and function
-  - Match cards now show: member profile picture (or placeholder), member name with link, match score, reasoning
-  - Profile picture and name are clickable links opening profile in new tab
-  - Added "Awaiting admin review" message with Clock icon for pending jobs
-  - Full job specification was already displayed in expandable detail view
-- Files changed:
-  - src/types/job-matching.ts (added JobMatchWithProfile interface)
-  - src/lib/supabase.ts (added getMatchesWithProfilesByJobId function, added import)
-  - src/pages/CompanyDashboardPage.tsx (updated imports, state type, fetchMatchesForJob, match card UI, added pending status message)
-- Learnings for future iterations:
-  - Supabase joins use `!inner` syntax: `network_profiles!inner (columns)`
-  - Profile picture fallback: show Users icon in circular placeholder when no picture
-  - Link pattern for profiles: `/directory/profile/${match.profile.slug}`
-  - Use `target="_blank" rel="noopener noreferrer"` for external links
----
-
-## Iteration 11 - US-034: Create admin pending profiles section
-- What was implemented:
-  - Created `/api/admin/profiles.ts` endpoint to fetch profiles where `approved = false`
-  - Endpoint returns profiles sorted by `created_at` ascending (FIFO - oldest first)
-  - Added `PendingProfile` interface to AdminDashboardPage
-  - Added state: `pendingProfiles`, `loadingProfiles`, `expandedProfileId`
-  - Added `fetchPendingProfiles` callback to fetch from API
-  - Created "Pending Profiles" section with count badge in yellow
-  - Profile rows show: picture, name, email, location, focus areas (max 3), submission date
-  - Click to expand shows: bio, skills, focus areas (full), portfolio/LinkedIn links, projects
-  - Added Refresh button for pending profiles
-  - Empty state shows green checkmark with "All caught up" message
-- Files created:
-  - api/admin/profiles.ts (admin profiles endpoint)
-- Files changed:
-  - src/pages/AdminDashboardPage.tsx (added icons, PendingProfile type, state, fetchPendingProfiles, Pending Profiles section UI)
-- Learnings for future iterations:
-  - Admin API pattern: verify auth, check isAdmin, use service role key
-  - FIFO review pattern: order by created_at ascending
-  - Profile row pattern: expandable with chevron, compact info on row, full details on expand
-  - Added icons: UserCircle, Calendar, Linkedin, Globe
----
-
-## Iteration 12 - US-035: Implement profile approval/rejection actions
-- What was implemented:
-  - Created `/api/admin/profiles/approve.ts` endpoint that sets approved=true, approved_at, approved_by
-  - Created `/api/admin/profiles/reject.ts` endpoint that deletes the profile record
-  - Added Approve and Reject buttons to expanded pending profiles in AdminDashboardPage
-  - Added rejection confirmation dialog with optional reason textarea
-  - Added toast notifications showing "Profile approved" or "Profile rejected" after actions
-  - Profile removed from pending list immediately after action
-- Files created:
-  - api/admin/profiles/approve.ts (profile approval endpoint)
-  - api/admin/profiles/reject.ts (profile rejection endpoint)
-- Files changed:
-  - src/pages/AdminDashboardPage.tsx (added state for approval/rejection actions, approveProfile/rejectProfile functions, action buttons, rejection dialog, toast notifications)
-  - PRD.md (marked US-035 as complete)
-- Learnings for future iterations:
-  - API endpoints go in api/admin/profiles/ folder structure
-  - Toast state pattern: `{ message: string; type: 'success' | 'error' } | null` with setTimeout to clear
-  - Dialog pattern: state for profile being acted on (`rejectDialogProfile`), backdrop click to close
-  - Rejection deletes profile record (no soft delete)
-  - Use X icon from lucide for close buttons
-  - Approval updates: approved=true, approved_at=now(), approved_by=admin user id
----
-
-## Iteration 13 - US-036: Create admin pending jobs section
-- What was implemented:
-  - Added "Pending Jobs" section to AdminDashboardPage above Pending Profiles section
-  - Section has yellow count badge showing number of pending jobs
-  - Lists all jobs where `status = 'pending'`, sorted by oldest first (FIFO review)
-  - Each row shows: title, company name, project type, remote preference, submission date with Calendar icon
-  - Expandable detail view shows: full description, requirements, preferred skills, focus areas, budget range, timeline
-  - "Run Matching" button in expanded view to trigger AI matching
-  - Empty state with green checkmark: "No pending jobs to review. All caught up!"
-- Files changed:
-  - src/pages/AdminDashboardPage.tsx (added Pending Jobs section above Pending Profiles)
-  - PRD.md (marked US-036 as complete)
-- Learnings for future iterations:
-  - Jobs data already fetched via `fetchJobs()` - filter client-side for pending status
-  - FIFO sort pattern: `sort((a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime())`
-  - Reuse same expandable card pattern from Job Submissions section
-  - Use Calendar icon for submission date display in job rows
-  - JobSubmissionWithDetails already has preferredSkills, focusAreas, budgetRange, timeline for expanded view
----
-
-## Iteration 14 - US-037: Implement job approval and trigger matching
-- What was implemented:
-  - Created `/api/admin/jobs/reject.ts` endpoint that sets job status='rejected' with admin_notes
-  - Added Approve (green) and Reject (red) buttons to pending jobs section in AdminDashboardPage
-  - Approve button triggers existing `/api/match-job` endpoint and shows "Running AI matching..." loading state
-  - On successful matching, shows success toast with match count: "Job approved - X candidates matched"
-  - Job rejection dialog with optional reason textarea (similar pattern to profile rejection)
-  - Toast shows success/error messages using existing toast state
-- Files created:
-  - api/admin/jobs/reject.ts (job rejection endpoint)
-- Files changed:
-  - src/pages/AdminDashboardPage.tsx (added job action states, rejectJob function, Approve/Reject buttons, job rejection dialog, updated runMatching to show toast)
-  - PRD.md (marked US-037 as complete)
-- Learnings for future iterations:
-  - Reuse existing `/api/match-job` endpoint for approval - it handles status update to 'matched' internally
-  - Match job endpoint returns `matches` array with count for success toast
-  - Job rejection follows same dialog pattern as profile rejection with state: rejectDialogJob, rejectJobReason, rejectingJobId
-  - Toast message for approval includes dynamic match count: `${matchCount} candidate${matchCount !== 1 ? 's' : ''} matched`
-  - API endpoints in api/admin/jobs/ folder for job admin operations
----
-
-## Iteration 15 - US-038: Create admin match review section
-- What was implemented:
-  - Created `/api/admin/pending-matches.ts` endpoint to fetch matches where `admin_approved IS NULL`, grouped by job
-  - Endpoint returns matches with profile details, sorted by job creation date (FIFO) and match score (descending)
-  - Added "Pending Matches" section to AdminDashboardPage between Pending Jobs and Pending Profiles
-  - Section shows yellow count badge with total pending matches
-  - Each job group is expandable to show member matches
-  - Each match card shows: profile picture, member name, match score, reasoning preview, skills
-  - Individual Approve/Reject buttons per match with loading states
-  - Bulk "Approve All" button per job for approving all matches at once
-  - Approve sets `admin_approved = true` via existing `/api/review-match` endpoint
-  - Reject sets `admin_approved = false`
-  - Toast notifications for success/error feedback
-  - Only approved matches visible to companies (per existing logic)
-- Files created:
-  - api/admin/pending-matches.ts (pending matches endpoint with grouping by job)
-- Files changed:
-  - src/pages/AdminDashboardPage.tsx (added new icons CheckCheck/Link2, pending match types, state, fetch functions, approve/reject handlers, Pending Matches section UI)
-  - PRD.md (marked US-038 as complete)
-- Learnings for future iterations:
-  - Pending matches grouped by job use `PendingMatchGroup` with `job` and `matches` arrays
-  - Supabase `.is('admin_approved', null)` filters for null values
-  - Approve All uses sequential API calls to avoid race conditions
-  - Link2 icon from lucide used for match-related sections
-  - CheckCheck icon used for bulk approve operations
-  - Same toast state pattern reused for new actions
----
-
-## Iteration 16 - US-039: Create admin company verification section
-- What was implemented:
-  - Created `/api/admin/companies.ts` endpoint to fetch all registered companies
-  - Created `/api/admin/companies/verify.ts` endpoint to toggle company verification status
-  - Added "Companies" section to AdminDashboardPage after Pending Profiles
-  - Section shows all companies with count badge, sorted by most recent first
-  - Each row displays: company name, verified badge, contact email, industry, registration date
-  - Expandable detail view shows: contact info, phone, website, company size, industry
-  - Verify button (blue) for unverified companies, Unverify button (gray) for verified companies
-  - Toggle updates `verified` field and `updated_at` timestamp
-  - Toast notifications for success/error feedback
-  - Added BadgeCheck, Mail, Phone icons
-- Files created:
-  - api/admin/companies.ts (admin companies list endpoint)
-  - api/admin/companies/verify.ts (company verification toggle endpoint)
-- Files changed:
-  - src/pages/AdminDashboardPage.tsx (added AdminCompany type, companies state, fetchCompanies, toggleCompanyVerification functions, Companies section UI)
-  - PRD.md (marked US-039 as complete)
-- Learnings for future iterations:
-  - Company verification uses simple boolean toggle pattern
-  - BadgeCheck icon with blue colors for verified status badges
-  - Verify button uses blue-500 colors, Unverify uses zinc-700 (gray)
-  - Companies sorted by created_at descending (most recent first)
-  - API pattern: update record and return updated data in single query using .select().single()
----
-
-## Iteration 17 - US-040: Create messages database table
-- What was implemented:
-  - Created migration `009_create_messages.sql` for messages table
-  - Table columns: id (UUID PK), match_id (FK to job_matches), sender_type ('company'/'member'), sender_id (UUID), content (TEXT), created_at (TIMESTAMP), read_at (TIMESTAMP nullable)
-  - Added index on match_id for fast conversation loading
-  - Added indexes on sender_id and created_at
-  - RLS policies for:
-    - Companies: view/insert messages for matches on their jobs, update read_at on member messages
-    - Members: view/insert messages for their matches, update read_at on company messages
-  - Comments documenting each column's purpose
-- Files created:
-  - supabase/migrations/009_create_messages.sql
-- Files changed:
-  - PRD.md (marked US-040 as complete)
-- Learnings for future iterations:
-  - Migration pattern: CREATE TABLE, CREATE INDEX, ALTER TABLE ENABLE RLS, DO $$ for policies
-  - RLS for messages requires checking match participation via joins to job_matches/job_submissions/companies/network_profiles
-  - Message read tracking: read_at column, null = unread, recipient can update only messages sent TO them
-  - sender_type + sender_id pattern allows polymorphic sender reference
-  - ON DELETE CASCADE on match_id ensures messages are deleted when match is deleted
----
-
-## Iteration 18 - US-041: Create send message API endpoint
-- What was implemented:
-  - Created `/api/messages/send.ts` edge function for sending messages between match participants
-  - Accepts `matchId` and `content` in request body with Zod validation
-  - Validates sender is participant in the match by checking:
-    - If user is company owner (via job_submissions.companies.user_id)
-    - If user is member (via job_matches.network_profiles.user_id)
-  - Automatically determines sender_type ('company' or 'member') and sender_id from auth context
-  - Creates message record with sender info and content
-  - Returns created message with id, matchId, senderType, senderId, content, createdAt, readAt
-  - Returns 403 if sender not authorized for the match
-  - Returns 401 for missing/invalid auth, 404 for match not found, 400 for invalid request data
-- Files created:
-  - api/messages/send.ts (send message API endpoint)
-- Files changed:
-  - PRD.md (marked US-041 as complete)
-- Learnings for future iterations:
-  - Message API pattern: determine sender type/id from authenticated user by checking match relations
-  - Supabase nested select syntax: `job_submissions!inner ( ..., companies!inner ( ... ) )` for deep joins
-  - Messages folder structure: api/messages/send.ts, api/messages/conversation.ts etc.
-  - MessageResponse type with camelCase properties converted from snake_case database columns
-  - Return 201 status for successful resource creation
----
-
-## Iteration 19 - US-042: Create get conversation API endpoint
-- What was implemented:
-  - Created `/api/messages/conversation.ts` edge function for fetching conversation history
-  - Accepts `matchId` as query parameter with Zod validation
-  - Validates requester is participant in the match (same pattern as send.ts)
-  - Determines requester type ('company' or 'member') from auth context
-  - Returns all messages for the match sorted by created_at ascending
-  - Marks unread messages as read by setting read_at timestamp
-    - Only marks messages from the OTHER party (company reads member messages, member reads company messages)
-  - Returns 403 if requester not authorized for the match
-  - Returns 401 for missing/invalid auth, 404 for match not found, 400 for invalid matchId
-  - Response includes { success: true, messages: MessageResponse[], markedAsRead: number }
-- Files created:
-  - api/messages/conversation.ts (get conversation API endpoint)
-- Files changed:
-  - PRD.md (marked US-042 as complete)
-- Learnings for future iterations:
-  - GET endpoint uses query parameters vs POST using request body
-  - Parse query params: `new URL(req.url).searchParams.get('matchId')`
-  - Unread messages filter: `read_at === null && sender_type === otherSenderType`
-  - Update multiple rows: `supabase.update({...}).in('id', arrayOfIds)`
-  - Response includes markedAsRead count for client-side tracking
----
-
-## Iteration 20 - US-043: Create unread message count API endpoint
-- What was implemented:
-  - Created `/api/messages/unread-count.ts` edge function for fetching unread message count
-  - Returns total unread message count for current authenticated user
-  - For companies: counts messages where sender_type='member' and read_at is null across all their job matches
-  - For members: counts messages where sender_type='company' and read_at is null across their matches
-  - Returns { count: number } response
-  - Uses Supabase count query with `{ count: 'exact', head: true }` for efficient counting
-  - Handles users with no company or profile gracefully (returns count: 0)
-- Files created:
-  - api/messages/unread-count.ts (unread message count endpoint)
-- Files changed:
-  - PRD.md (marked US-043 as complete)
-- Learnings for future iterations:
-  - Supabase count query pattern: `.select('*', { count: 'exact', head: true })` returns only count, no rows
-  - For company matches, need to join job_matches -> job_submissions via company_id
-  - For member matches, simple filter on profile_id
-  - Pattern to check user type: try company first, then member, fallback to count: 0
-  - `.is('read_at', null)` for filtering null values in Supabase queries
----
-
-## Iteration 21 - US-044: Add messaging UI to company match view
-- What was implemented:
-  - Added Message interface type with id, matchId, senderType, senderId, content, createdAt, readAt fields
-  - Added messaging state: expandedMessagingMatchId, conversations, loadingConversations, messageInputs, sendingMessages, messagesEndRef
-  - Created fetchConversation callback to fetch messages from /api/messages/conversation endpoint
-  - Created sendMessage callback to send messages via /api/messages/send endpoint
-  - Added useEffect to load conversation when messaging section is expanded
-  - Added useEffect to auto-scroll to newest messages when conversation changes or opens
-  - Added "Messages" button on each match card that toggles messaging section
-  - Messages section displays:
-    - Header with MessageSquare icon and conversation title
-    - Conversation history in scrollable container (max 256px height)
-    - Loading state with spinner
-    - Empty state with message prompt
-    - Company messages aligned right (pink bg), member messages aligned left (zinc bg)
-    - Timestamps and sender labels above each message
-    - Text input with Enter key support and Send button
-    - Sending state with disabled input and spinner
-  - Added MessageSquare and Send icons from lucide-react
-- Files changed:
-  - src/pages/CompanyDashboardPage.tsx (added imports, Message interface, messaging state, fetchConversation/sendMessage callbacks, Messages section UI in match cards)
-  - PRD.md (marked US-044 as complete)
-- Learnings for future iterations:
-  - Message alignment pattern: company messages use `ml-auto items-end`, member messages use default `items-start`
-  - Message bubble colors: company=pink-500/20, member=zinc-800
-  - useRef with Record type for managing refs per-item: `useRef<Record<string, HTMLDivElement | null>>({})` with callback ref setter
-  - Auto-scroll pattern: use setTimeout(100ms) after adding message to allow DOM update before scrolling
-  - Enter key handling: check `!e.shiftKey` to allow Shift+Enter for newlines in future
-  - Conversation API returns { success: true, messages: Message[], markedAsRead: number }
----
-
-## Iteration 22 - US-045: Add messaging UI to member match view
-- What was implemented:
-  - Added Message interface type to NetworkDashboardPage (same as CompanyDashboardPage)
-  - Added session from useAuth() for API authentication
-  - Added messaging state: expandedMessagingMatchId, conversations, loadingConversations, messageInputs, sendingMessages, messagesEndRef
-  - Created fetchConversation callback to fetch messages from /api/messages/conversation endpoint
-  - Created sendMessage callback to send messages via /api/messages/send endpoint
-  - Added useEffect hooks to load conversation when messaging section is expanded and auto-scroll
-  - Added "Messages" section in expanded match view below "Already Responded" section
-  - Messaging only enabled when memberResponse === 'interested'
-  - If not responded as interested, shows disabled message: "Respond to this match to start messaging"
-  - Messages section displays:
-    - Toggle button to show/hide messages
-    - Conversation history with company name header
-    - Loading state with spinner
-    - Empty state prompting to start conversation
-    - Member messages aligned right (pink bg), company messages aligned left (zinc bg)
-    - Timestamps and sender labels
-    - Text input with Enter key support and Send button
-  - Added MessageSquare and Send icons from lucide-react
-- Files changed:
-  - src/pages/NetworkDashboardPage.tsx (added imports, Message interface, messaging state, fetchConversation/sendMessage callbacks, messaging UI in expanded match view)
-  - PRD.md (marked US-045 as complete)
-- Learnings for future iterations:
-  - Member messaging mirrors company messaging pattern but with reversed sender alignment
-  - Conditional rendering based on memberResponse: only enable messaging for 'interested' responses
-  - Same API endpoints work for both member and company - authentication determines sender type
-  - Pattern: disabled messaging section with explanatory text when preconditions not met
----
-
-## Iteration 23 - US-046: Show unread message indicators on dashboards
-- What was implemented:
-  - Created `/api/messages/unread-status.ts` endpoint to check unread status per match without marking messages as read
-  - Member dashboard: Added totalUnreadCount and matchUnreadStatus state
-  - Member dashboard: Added fetchUnreadCount callback using `/api/messages/unread-count` endpoint
-  - Member dashboard: Added fetchMatchUnreadStatus callback using new `/api/messages/unread-status` endpoint
-  - Member dashboard: Added red badge with unread count next to "Job Matches" header
-  - Member dashboard: Added blue dot indicator on match cards with unread messages
-  - Company dashboard: Added same unread state and fetch functions
-  - Company dashboard: Added red badge with unread count next to "Your Job Submissions" header
-  - Company dashboard: Added blue dot indicator on match cards with unread messages
-  - Both dashboards: fetchConversation now updates matchUnreadStatus and refreshes totalUnreadCount when messages are marked as read
-- Files created:
-  - api/messages/unread-status.ts (new endpoint to check unread status per match without side effects)
-- Files changed:
-  - src/pages/NetworkDashboardPage.tsx (added unread state, fetch functions, red badge on header, blue dot on match cards)
-  - src/pages/CompanyDashboardPage.tsx (added unread state, fetch functions, red badge on header, blue dot on match cards)
-- Learnings for future iterations:
-  - Red badge styling: `bg-red-500 text-white text-xs font-secondary rounded-full min-w-[20px] text-center`
-  - Blue dot styling: `absolute w-2.5 h-2.5 bg-blue-500 rounded-full` with `title="Unread messages"`
-  - Need separate endpoint to check unread status without marking as read (conversation endpoint has side effects)
-  - Pattern: POST endpoint with matchIds array to batch check unread status
-  - `/api/messages/unread-count` returns total unread, `/api/messages/unread-status` returns per-match boolean map
-  - Match cards need `relative` class for absolute positioned blue dot
----
-
-## Iteration 24 - US-046: Browser verification
-- What was verified:
-  - TypeScript typecheck passes (npx tsc --noEmit)
-  - Vite production build succeeds without errors
-  - Unread message indicators implementation verified:
-    - Member dashboard: red badge next to "Job Matches" header showing total unread count
-    - Company dashboard: red badge next to "Your Job Submissions" header showing total unread count
-    - Blue dot indicator on individual match cards with unread messages
-    - Counts update after viewing conversation (fetchUnreadCount called after fetchConversation marks messages as read)
-    - API endpoints: /api/messages/unread-count.ts and /api/messages/unread-status.ts
-- Files verified:
-  - src/pages/NetworkDashboardPage.tsx - member dashboard unread indicators
-  - src/pages/CompanyDashboardPage.tsx - company dashboard unread indicators
-  - api/messages/unread-count.ts - total unread count endpoint
-  - api/messages/unread-status.ts - per-match unread status endpoint
-- Learnings for future iterations:
-  - US-046 is now fully complete - all acceptance criteria met
-  - Next tasks are in PHASE 2E: Directory & Polish (US-047 onwards)
----
-
-## Iteration 25 - US-047: Add search to directory page
-- What was implemented:
-  - Added debounced search functionality with 300ms delay
-  - Added URL param sync for search query (`?q=searchterm`) for shareability
-  - Added clear button (X icon) inside search input that appears when text is entered
-  - Search filters by name, location, skills, and bio content (already existed)
-  - URL updates only after debounce completes to avoid excessive history entries
-  - Uses `replace: true` on setSearchParams to avoid cluttering browser history
-  - Search state initializes from URL params on page load
-- Files changed:
-  - src/pages/NetworkDirectoryPage.tsx (added useSearchParams, debounce effect, URL sync effect, clear button)
-- Learnings for future iterations:
-  - Debounce pattern: useEffect with setTimeout and cleanup function to clear timer
-  - URL param sync pattern: separate effect that updates params only when debounced value changes
-  - Use `new URLSearchParams(searchParams)` to create mutable copy for modification
-  - Use `setSearchParams(newParams, { replace: true })` to avoid history spam
-  - Search param convention: use 'q' for search queries
-  - Check `newParams.toString() !== searchParams.toString()` to avoid unnecessary updates
----
-
-## Iteration 26 - US-048: Add filters to directory page
-- What was implemented:
-  - Changed focus areas from single-select dropdown to multi-select toggle buttons
-  - Focus areas use FOCUS_AREAS constant with toggle button pattern (white bg when selected, border when not)
-  - Availability dropdown simplified to: All, Open to Work, Open to Collaborations
-  - Added URL param persistence for filters: `?focus=area1,area2&availability=value`
-  - Filters combine with AND logic - profile must match ALL selected focus areas
-  - Updated result count text to "Showing X creative technologists"
-  - Clear Filters button resets all filters including focus areas array
-- Files changed:
-  - src/pages/NetworkDirectoryPage.tsx (changed selectedFocusArea to selectedFocusAreas array, added toggleFocusArea function, updated URL sync effect, changed filter UI)
-- Learnings for future iterations:
-  - Multi-select state: use array with toggle function that adds/removes items
-  - URL param for multi-select: use comma-separated values (e.g., `?focus=area1,area2`)
-  - Parse multi-select from URL: `param.split(',').filter(v => valid)` with validation
-  - Toggle function pattern: `prev.includes(item) ? prev.filter(a => a !== item) : [...prev, item]`
-  - Multi-select AND logic: `selectedItems.every(item => profile.items.includes(item))`
-  - Button toggle styling: selected=`bg-white text-black`, unselected=`border border-zinc-700 text-zinc-300`
----
-
-## Iteration 27 - US-048: Browser verification
-- What was verified:
-  - TypeScript typecheck passes (npx tsc --noEmit)
-  - Vite production build succeeds without errors
-  - Directory page filters implementation verified:
-    - Focus areas as multi-select toggle buttons using FOCUS_AREAS constant
-    - Availability dropdown with "All", "Open to Work", "Open to Collaborations" options
-    - Filter state persists in URL params (?focus=area1,area2&availability=value)
-    - Filters combine with AND logic - profile must match ALL selected focus areas
-    - "Clear Filters" button resets all filters
-    - Shows result count: "Showing X creative technologists"
-- Files verified:
-  - src/pages/NetworkDirectoryPage.tsx - complete filter implementation
-- Learnings for future iterations:
-  - US-048 is now fully complete - all acceptance criteria met
-  - Next task is US-049: Enhance public profile page display
+  - Bundle IDs are typed as 'basic' | 'popular' | 'pro' for US-009 checkout endpoint
+  - Use consistent card styling: gradient backgrounds, hover scale effect, color-coded icons
+  - Back link uses /discover-talent as there's no company dashboard yet
+  - Bundle prices are: 2900, 5900, 9900 cents (needed for Stripe in US-009)
 ---

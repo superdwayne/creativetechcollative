@@ -43,10 +43,11 @@ import NetworkProfilePage from './pages/NetworkProfilePage';
 import NetworkAuthPage from './pages/NetworkAuthPage';
 import NetworkDashboardPage from './pages/NetworkDashboardPage';
 import NetworkEditProfilePage from './pages/NetworkEditProfilePage';
-import CompanyAuthPage from './pages/CompanyAuthPage';
-import CompanyRegisterPage from './pages/CompanyRegisterPage';
-import CompanyDashboardPage from './pages/CompanyDashboardPage';
+import AuthCallbackPage from './pages/AuthCallbackPage';
+import HirePage from './pages/HirePage';
 import AdminDashboardPage from './pages/AdminDashboardPage';
+import PurchaseCreditsPage from './pages/PurchaseCreditsPage';
+import { usePageTracking } from './hooks/usePageTracking';
 
 // Helper function to get appropriate icon for category/tag
 const getCategoryIcon = (name: string): string => {
@@ -88,6 +89,9 @@ function App() {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [showCubeIcon, setShowCubeIcon] = useState(true);
   const location = useLocation();
+
+  // Track page views on route changes for Google Analytics
+  usePageTracking();
 
 
   // Handle scroll effects
@@ -448,28 +452,29 @@ function App() {
                 </div>
               }
             />
-            {/* Company Portal routes */}
+            {/* Auth callback route for OAuth (Google) and magic links */}
             <Route
-              path="/company/auth"
+              path="/directory/auth/callback"
               element={
                 <div className="w-full">
-                  <CompanyAuthPage />
+                  <AuthCallbackPage />
                 </div>
               }
             />
             <Route
-              path="/company/register"
+              path="/auth/callback"
               element={
                 <div className="w-full">
-                  <CompanyRegisterPage />
+                  <AuthCallbackPage />
                 </div>
               }
             />
+            {/* Discover Talent / Job Matching route */}
             <Route
-              path="/company/dashboard"
+              path="/discover-talent"
               element={
                 <div className="w-full">
-                  <CompanyDashboardPage />
+                  <HirePage />
                 </div>
               }
             />
@@ -479,6 +484,15 @@ function App() {
               element={
                 <div className="w-full">
                   <AdminDashboardPage />
+                </div>
+              }
+            />
+            {/* Company Purchase Credits route */}
+            <Route
+              path="/company/purchase-credits"
+              element={
+                <div className="w-full">
+                  <PurchaseCreditsPage />
                 </div>
               }
             />
