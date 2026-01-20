@@ -42,7 +42,7 @@ export function CookieNotice({ onAccept, onDecline }: CookieNoticeProps) {
   if (!isVisible) return null;
 
   return (
-    <div className="fixed bottom-4 right-4 z-[200] animate-in slide-in-from-bottom duration-500">
+    <div className="fixed bottom-4 right-4 z-50 animate-in slide-in-from-bottom duration-200">
       <Alert
         className="min-w-[350px] max-w-[400px] border-zinc-700"
         layout="complex"

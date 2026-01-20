@@ -1,5 +1,5 @@
 import React, { useEffect, useState, useCallback } from 'react';
-import { motion, AnimatePresence } from 'framer-motion';
+import { motion, AnimatePresence } from 'motion/react';
 import { Loader2, ChevronLeft, ChevronRight } from 'lucide-react';
 import { getWebhookUrl } from '@/utils/webhookUtils';
 import { useNavigate } from 'react-router-dom';

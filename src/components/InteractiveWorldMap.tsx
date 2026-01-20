@@ -296,7 +296,7 @@ const InteractiveWorldMap: React.FC = () => {
       <div ref={mapRef} className="w-full h-full" />
       
       {/* Total members counter */}
-      <div className="absolute top-4 right-4 bg-black/80 backdrop-blur-sm rounded-lg p-3 text-white border border-gray-700 z-[1000]">
+      <div className="absolute top-4 right-4 bg-black/80 backdrop-blur-sm rounded-lg p-3 text-white border border-gray-700 z-40">
         <div className="text-center">
           <div className="text-2xl font-bold text-red-400">
             {isLoadingData ? '...' : memberData.reduce((sum, location) => sum + location.members, 0)}
@@ -307,7 +307,7 @@ const InteractiveWorldMap: React.FC = () => {
       
       {/* Loading indicator */}
       {isLoadingData && (
-        <div className="absolute bottom-4 right-4 bg-black/80 backdrop-blur-sm rounded-lg p-3 text-white border border-gray-700 z-[1000]">
+        <div className="absolute bottom-4 right-4 bg-black/80 backdrop-blur-sm rounded-lg p-3 text-white border border-gray-700 z-40">
           <div className="text-sm text-gray-300">Loading member data...</div>
         </div>
       )}

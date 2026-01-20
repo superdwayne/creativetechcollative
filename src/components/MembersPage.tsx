@@ -768,7 +768,7 @@ const MembersPage: React.FC = () => {
   }
 
   return (
-    <div className="relative w-full h-screen overflow-hidden bg-black">
+    <div className="relative w-full h-dvh overflow-hidden bg-black">
       {/* Loading Screen */}
       {isLoading && (
         <div className="absolute inset-0 z-50 bg-black flex flex-col items-center justify-center">

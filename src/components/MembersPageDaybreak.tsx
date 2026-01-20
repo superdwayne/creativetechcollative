@@ -1,5 +1,5 @@
 import React, { useEffect, useState, useRef } from 'react';
-import { motion, useScroll, useTransform, AnimatePresence } from 'framer-motion';
+import { motion, useScroll, useTransform, AnimatePresence } from 'motion/react';
 import { Loader2, ArrowRight, Mail, Globe, Linkedin, Github } from 'lucide-react';
 import Footer from './ui/footer';
 import { getWebhookUrl } from '@/utils/webhookUtils';

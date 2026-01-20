@@ -16,7 +16,7 @@ const alertVariants = cva("relative rounded-lg border", {
       lg: "p-4",
     },
     isNotification: {
-      true: "z-[100] max-w-[400px] shadow-lg shadow-black/20",
+      true: "z-50 max-w-[400px] shadow-lg shadow-black/20",
       false: "",
     },
   },

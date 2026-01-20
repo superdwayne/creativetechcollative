@@ -281,7 +281,7 @@ const VortexEntry: React.FC<VortexEntryProps> = ({ onComplete }) => {
   if (!isAnimating) return null;
 
   return (
-    <div className={`fixed inset-0 z-[9999] bg-black transition-opacity duration-500 ${isAnimating ? 'opacity-100' : 'opacity-0'}`}>
+    <div className={`fixed inset-0 z-50 bg-black transition-opacity duration-200 ${isAnimating ? 'opacity-100' : 'opacity-0'}`}>
       <canvas ref={canvasRef} className="w-full h-full" />
       
       {/* Skip button */}

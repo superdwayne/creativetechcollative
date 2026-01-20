@@ -129,7 +129,7 @@ const SplashPage: React.FC<SplashPageProps> = ({ onComplete }) => {
 
   return (
     <div 
-      className={`fixed inset-0 z-[9999] bg-black flex items-center justify-center cursor-pointer transition-opacity duration-1000 ${
+      className={`fixed inset-0 z-50 bg-black flex items-center justify-center cursor-pointer transition-opacity duration-200 ${
         isExiting ? 'opacity-0' : 'opacity-100'
       }`}
       onClick={handleClick}

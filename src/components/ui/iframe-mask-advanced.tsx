@@ -42,7 +42,7 @@ export const AdvancedIframeMask: React.FC<AdvancedIframeMaskProps> = ({
     <div className={`relative w-full h-full ${className}`}>
       {/* Masked Iframe */}
       <div 
-        className={`transition-all duration-1000 ${animated ? 'animate-pulse' : ''}`}
+        className={`transition-all duration-200 ${animated ? 'animate-pulse' : ''}`}
         style={{
           clipPath: getMaskShape(),
           transform: isVisible ? 'scale(1)' : 'scale(0.8)',

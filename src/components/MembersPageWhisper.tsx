@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { motion } from 'framer-motion';
+import { motion } from 'motion/react';
 import { Loader2, Github, Linkedin, Mail, Globe } from 'lucide-react';
 import { getWebhookUrl } from '@/utils/webhookUtils';
 import { useNavigate } from 'react-router-dom';

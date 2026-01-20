@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { motion, useScroll, useTransform } from 'framer-motion';
+import { motion, useScroll, useTransform } from 'motion/react';
 import { Loader2, ArrowLeft, ArrowRight } from 'lucide-react';
 import { getWebhookUrl } from '@/utils/webhookUtils';
 import { useNavigate } from 'react-router-dom';
@@ -279,14 +279,14 @@ const MembersPageSimple: React.FC = () => {
               {/* Navigation Arrows */}
               <button
                 onClick={prevMember}
-                className="absolute left-4 top-1/2 transform -translate-y-1/2 bg-white/90 backdrop-blur-sm p-3 rounded-full shadow-lg hover:bg-white transition-all duration-300 hover:scale-110"
+                className="absolute left-4 top-1/2 transform -translate-y-1/2 bg-white/90 backdrop-blur-sm p-3 rounded-full shadow-lg hover:bg-white transition-all duration-200 hover:scale-110"
               >
                 <ArrowLeft className="w-6 h-6 text-gray-600" />
               </button>
               
               <button
                 onClick={nextMember}
-                className="absolute right-4 top-1/2 transform -translate-y-1/2 bg-white/90 backdrop-blur-sm p-3 rounded-full shadow-lg hover:bg-white transition-all duration-300 hover:scale-110"
+                className="absolute right-4 top-1/2 transform -translate-y-1/2 bg-white/90 backdrop-blur-sm p-3 rounded-full shadow-lg hover:bg-white transition-all duration-200 hover:scale-110"
               >
                 <ArrowRight className="w-6 h-6 text-gray-600" />
               </button>
@@ -297,7 +297,7 @@ const MembersPageSimple: React.FC = () => {
                   <button
                     key={index}
                     onClick={() => goToMember(index)}
-                    className={`w-3 h-3 rounded-full transition-all duration-300 ${
+                    className={`w-3 h-3 rounded-full transition-all duration-200 ${
                       index === currentIndex ? 'bg-gray-600 scale-125' : 'bg-gray-300 hover:bg-gray-400'
                     }`}
                   />
@@ -312,7 +312,7 @@ const MembersPageSimple: React.FC = () => {
       <div className="fixed top-4 left-4 z-50">
         <button
           onClick={() => navigate('/')}
-          className="text-white/60 hover:text-white transition-colors duration-300 text-sm font-light"
+          className="text-white/60 hover:text-white transition-colors duration-200 text-sm font-light"
         >
           ← Back to Home
         </button>

@@ -271,7 +271,6 @@ const MembersPage: React.FC = () => {
             font-size: clamp(3rem, 10vw, 8rem);
             line-height: 0.9;
             font-weight: 400;
-            letter-spacing: -0.04em;
             margin: 0;
             white-space: nowrap;
             text-transform: none;
@@ -287,8 +286,7 @@ const MembersPage: React.FC = () => {
             margin-bottom: 8px;
             color: rgba(255, 255, 255, 0.9);
             text-transform: uppercase;
-            letter-spacing: 0.1em;
-            text-shadow: 
+            text-shadow:
               -1px -1px 0 #000,
               1px -1px 0 #000,
               -1px 1px 0 #000,
@@ -307,7 +305,6 @@ const MembersPage: React.FC = () => {
             padding-top: 10px;
             display: block;
             text-transform: uppercase;
-            letter-spacing: 0.08em;
             line-height: 1.4;
             padding-left: 80px;
           `;
@@ -788,7 +785,7 @@ const MembersPage: React.FC = () => {
   }
 
   return (
-    <div ref={containerRef} className="relative w-full h-screen overflow-hidden bg-black">
+    <div ref={containerRef} className="relative w-full h-dvh overflow-hidden bg-black">
       {/* Loading Screen */}
       {isLoading && (
         <div className="absolute inset-0 z-50 bg-black flex flex-col items-center justify-center">

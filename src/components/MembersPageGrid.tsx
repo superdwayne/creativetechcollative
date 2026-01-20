@@ -52,7 +52,7 @@ const MembersPageGrid: React.FC = () => {
   }
 
   return (
-    <div className="relative w-full h-screen overflow-hidden bg-black">
+    <div className="relative w-full h-dvh overflow-hidden bg-black">
       {loading ? (
         <div className="absolute inset-0 z-50 bg-black text-white flex items-center justify-center">Loading…</div>
       ) : (

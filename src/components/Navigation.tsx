@@ -168,6 +168,7 @@ const Navigation: React.FC<NavigationProps> = ({
             <button
               onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
               className="md:hidden p-2 text-zinc-300 hover:text-white transition-colors"
+              aria-label="Toggle mobile menu"
             >
               {mobileMenuOpen ? <X className="w-6 h-6" /> : <Menu className="w-6 h-6" />}
             </button>
@@ -177,7 +178,7 @@ const Navigation: React.FC<NavigationProps> = ({
 
       {/* Full-Screen Mobile Menu */}
       {mobileMenuOpen && (
-        <div className="fixed inset-0 z-[100] bg-black md:hidden">
+        <div className="fixed inset-0 z-50 bg-black md:hidden">
           <div className="flex flex-col h-full">
             {/* Header with close button */}
             <div className="flex justify-between items-center p-6">
