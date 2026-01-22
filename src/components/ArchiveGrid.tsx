@@ -10,31 +10,33 @@ interface ArchiveGridProps {
 }
 
 /**
- * HAU.studio Archive Grid (100% match)
+ * HAU.studio-inspired Archive Grid
  *
- * Layout: Multiple vertical columns scrolling horizontally with parallax
- * - Columns are flex-direction: column (items stack vertically)
- * - Columns arranged in a horizontal row
- * - Each column scrolls at different speed (parallax)
- * - 386px wide columns, 480px tall images, 40px gap
+ * Features:
+ * - 2D infinite canvas panning (drag/scroll in any direction)
+ * - Multiple columns with parallax effect
+ * - Dark theme matching site design
+ * - 386px × 480px cards, 40px gap
  */
 
 const ArchiveGrid: React.FC<ArchiveGridProps> = ({ profiles, onClose, isLoading = false }) => {
   const containerRef = useRef<HTMLDivElement>(null);
 
-  // Scroll position (0-1 normalized)
-  const [scrollProgress, setScrollProgress] = useState(0);
+  // 2D position state
+  const [translateX, setTranslateX] = useState(0);
+  const [translateY, setTranslateY] = useState(0);
+  const [targetX, setTargetX] = useState(0);
+  const [targetY, setTargetY] = useState(0);
   const [hoveredId, setHoveredId] = useState<string | null>(null);
   const [isReady, setIsReady] = useState(false);
   const [isScrolling, setIsScrolling] = useState(false);
   const scrollTimeoutRef = useRef<NodeJS.Timeout | null>(null);
-  const scrollAccumulator = useRef(0);
 
-  // HAU.studio exact dimensions
+  // Dimensions
   const CARD_WIDTH = 386;
   const CARD_HEIGHT = 480;
   const GAP = 40;
-  const NUM_COLUMNS = 5;
+  const NUM_COLUMNS = 6;
 
   // Distribute profiles into columns
   const columns = useMemo(() => {
@@ -43,20 +45,49 @@ const ArchiveGrid: React.FC<ArchiveGridProps> = ({ profiles, onClose, isLoading 
     return cols;
   }, [profiles]);
 
-  // Parallax speeds for each column (HAU-style differential movement)
-  const parallaxSpeeds = [0.6, 0.8, 1.0, 0.75, 0.65];
+  // Parallax speeds for each column
+  const parallaxSpeeds = [0.7, 0.85, 1.0, 0.9, 0.75, 0.8];
 
-  // Column Y offsets for staggered start positions
-  const columnOffsets = [0, 60, 120, 40, 80];
+  // Column Y offsets for staggered start
+  const columnOffsets = [80, 0, 120, 40, 100, 60];
 
-  // Calculate max scroll based on content
-  const maxColumnItems = Math.max(...columns.map(c => c.length));
-  const maxScrollDistance = maxColumnItems * (CARD_HEIGHT + GAP) + 200;
+  // Canvas bounds
+  const canvasWidth = NUM_COLUMNS * (CARD_WIDTH + GAP) + 400;
+  const maxColumnItems = Math.max(...columns.map(c => c.length), 1);
+  const canvasHeight = maxColumnItems * (CARD_HEIGHT + GAP) + Math.max(...columnOffsets) + 400;
 
+  const maxX = Math.max(0, canvasWidth - (typeof window !== 'undefined' ? window.innerWidth : 1920));
+  const maxY = Math.max(0, canvasHeight - (typeof window !== 'undefined' ? window.innerHeight : 1080));
+
+  // Start position - centered-ish
   useEffect(() => {
+    const startX = -maxX * 0.15;
+    const startY = -maxY * 0.1;
+    setTargetX(startX);
+    setTargetY(startY);
+    setTranslateX(startX);
+    setTranslateY(startY);
     const timer = setTimeout(() => setIsReady(true), 100);
     return () => clearTimeout(timer);
-  }, []);
+  }, [maxX, maxY]);
+
+  // Smooth animation loop
+  useEffect(() => {
+    let raf: number;
+    const animate = () => {
+      setTranslateX(prev => {
+        const diff = targetX - prev;
+        return Math.abs(diff) < 0.5 ? targetX : prev + diff * 0.1;
+      });
+      setTranslateY(prev => {
+        const diff = targetY - prev;
+        return Math.abs(diff) < 0.5 ? targetY : prev + diff * 0.1;
+      });
+      raf = requestAnimationFrame(animate);
+    };
+    raf = requestAnimationFrame(animate);
+    return () => cancelAnimationFrame(raf);
+  }, [targetX, targetY]);
 
   const markScrolling = useCallback(() => {
     setIsScrolling(true);
@@ -64,38 +95,28 @@ const ArchiveGrid: React.FC<ArchiveGridProps> = ({ profiles, onClose, isLoading 
     scrollTimeoutRef.current = setTimeout(() => setIsScrolling(false), 150);
   }, []);
 
-  // Handle wheel - accumulate scroll and convert to progress
+  // Wheel - 2D scroll
   const handleWheel = useCallback((e: WheelEvent) => {
     e.preventDefault();
     markScrolling();
 
-    const delta = e.deltaY || e.deltaX;
-    scrollAccumulator.current += delta * 0.5;
+    // Support both axes
+    const dx = e.deltaX || (e.shiftKey ? e.deltaY : 0);
+    const dy = e.shiftKey ? 0 : e.deltaY;
 
-    // Clamp to valid range
-    scrollAccumulator.current = Math.max(0, Math.min(maxScrollDistance, scrollAccumulator.current));
+    setTargetX(prev => Math.max(-maxX, Math.min(0, prev - dx * 1.2)));
+    setTargetY(prev => Math.max(-maxY, Math.min(0, prev - dy * 1.2)));
+  }, [maxX, maxY, markScrolling]);
 
-    // Convert to 0-1 progress
-    setScrollProgress(scrollAccumulator.current / maxScrollDistance);
-  }, [maxScrollDistance, markScrolling]);
-
-  // Keyboard
+  // Keyboard - 2D navigation
   const handleKeyDown = useCallback((e: KeyboardEvent) => {
     if (e.key === 'Escape' && onClose) { onClose(); return; }
-    const step = 100;
-    if (e.key === 'ArrowDown' || e.key === 'ArrowRight') {
-      e.preventDefault();
-      markScrolling();
-      scrollAccumulator.current = Math.min(maxScrollDistance, scrollAccumulator.current + step);
-      setScrollProgress(scrollAccumulator.current / maxScrollDistance);
-    }
-    if (e.key === 'ArrowUp' || e.key === 'ArrowLeft') {
-      e.preventDefault();
-      markScrolling();
-      scrollAccumulator.current = Math.max(0, scrollAccumulator.current - step);
-      setScrollProgress(scrollAccumulator.current / maxScrollDistance);
-    }
-  }, [maxScrollDistance, onClose, markScrolling]);
+    const step = 300;
+    if (e.key === 'ArrowRight') { e.preventDefault(); markScrolling(); setTargetX(prev => Math.max(-maxX, prev - step)); }
+    if (e.key === 'ArrowLeft') { e.preventDefault(); markScrolling(); setTargetX(prev => Math.min(0, prev + step)); }
+    if (e.key === 'ArrowDown') { e.preventDefault(); markScrolling(); setTargetY(prev => Math.max(-maxY, prev - step)); }
+    if (e.key === 'ArrowUp') { e.preventDefault(); markScrolling(); setTargetY(prev => Math.min(0, prev + step)); }
+  }, [maxX, maxY, onClose, markScrolling]);
 
   useEffect(() => {
     const c = containerRef.current;
@@ -109,83 +130,72 @@ const ArchiveGrid: React.FC<ArchiveGridProps> = ({ profiles, onClose, isLoading 
     };
   }, [handleWheel, handleKeyDown]);
 
-  // Drag
+  // Drag - 2D panning
   const [isDragging, setIsDragging] = useState(false);
-  const dragStart = useRef({ y: 0, scroll: 0 });
+  const dragStart = useRef({ x: 0, y: 0, tx: 0, ty: 0 });
 
   const handlePointerDown = useCallback((e: React.PointerEvent) => {
     if (e.pointerType === 'mouse' && e.button !== 0) return;
     setIsDragging(true);
     markScrolling();
-    dragStart.current = { y: e.clientY, scroll: scrollAccumulator.current };
+    dragStart.current = { x: e.clientX, y: e.clientY, tx: targetX, ty: targetY };
     (e.target as HTMLElement).setPointerCapture(e.pointerId);
-  }, [markScrolling]);
+  }, [targetX, targetY, markScrolling]);
 
   const handlePointerMove = useCallback((e: React.PointerEvent) => {
     if (!isDragging) return;
-    const dy = dragStart.current.y - e.clientY;
-    scrollAccumulator.current = Math.max(0, Math.min(maxScrollDistance, dragStart.current.scroll + dy));
-    setScrollProgress(scrollAccumulator.current / maxScrollDistance);
-  }, [isDragging, maxScrollDistance]);
+    const dx = e.clientX - dragStart.current.x;
+    const dy = e.clientY - dragStart.current.y;
+    setTargetX(Math.max(-maxX, Math.min(0, dragStart.current.tx + dx)));
+    setTargetY(Math.max(-maxY, Math.min(0, dragStart.current.ty + dy)));
+  }, [isDragging, maxX, maxY]);
 
   const handlePointerUp = useCallback(() => setIsDragging(false), []);
 
   const isEmpty = profiles.length === 0 && !isLoading;
 
+  // Calculate normalized scroll progress for parallax
+  const scrollProgressY = maxY > 0 ? Math.abs(translateY) / maxY : 0;
+
   return (
     <div
       ref={containerRef}
-      className="fixed inset-0 overflow-hidden z-50"
-      style={{
-        backgroundColor: '#fff',
-        cursor: isDragging ? 'grabbing' : 'grab'
-      }}
+      className="fixed inset-0 overflow-hidden z-50 bg-black"
+      style={{ cursor: isDragging ? 'grabbing' : 'grab' }}
       onPointerDown={handlePointerDown}
       onPointerMove={handlePointerMove}
       onPointerUp={handlePointerUp}
       onPointerLeave={handlePointerUp}
     >
-      {/* Back button */}
+      {/* Back button - site style */}
       {onClose && (
         <button
           onClick={onClose}
-          className="fixed top-8 left-10 z-50 pointer-events-auto"
+          className="fixed top-8 left-10 z-50 pointer-events-auto text-zinc-500 hover:text-white transition-colors duration-300"
           style={{
             fontSize: '11px',
             fontWeight: 500,
             letterSpacing: '0.2em',
             textTransform: 'uppercase',
-            color: 'rgba(30,30,30,0.4)',
-            transition: 'color 0.3s ease',
           }}
-          onMouseEnter={(e) => e.currentTarget.style.color = 'rgba(30,30,30,1)'}
-          onMouseLeave={(e) => e.currentTarget.style.color = 'rgba(30,30,30,0.4)'}
         >
           ← Back
         </button>
       )}
 
-      {/* Archive count */}
-      <div
-        className="fixed top-8 right-10 z-50 text-right pointer-events-none"
-        style={{ color: '#1e1e1e' }}
-      >
-        <div style={{
-          fontSize: '10px',
-          fontWeight: 500,
-          letterSpacing: '0.35em',
-          textTransform: 'uppercase',
-          color: 'rgba(30,30,30,0.4)',
-          marginBottom: '4px'
-        }}>
+      {/* Archive count - site style */}
+      <div className="fixed top-8 right-10 z-50 text-right pointer-events-none">
+        <div className="text-[10px] font-medium tracking-[0.35em] uppercase text-zinc-600 mb-1">
           Archive
         </div>
-        <div style={{
-          fontSize: 'clamp(48px, 5vw, 72px)',
-          fontWeight: 200,
-          lineHeight: 0.9,
-          letterSpacing: '-0.02em'
-        }}>
+        <div
+          className="text-white font-light"
+          style={{
+            fontSize: 'clamp(48px, 5vw, 72px)',
+            lineHeight: 0.9,
+            letterSpacing: '-0.02em'
+          }}
+        >
           {profiles.length.toString().padStart(2, '0')}
         </div>
       </div>
@@ -193,41 +203,45 @@ const ArchiveGrid: React.FC<ArchiveGridProps> = ({ profiles, onClose, isLoading 
       {/* Loading */}
       {isLoading && (
         <div className="absolute inset-0 flex items-center justify-center">
-          <div className="w-6 h-6 border border-neutral-200 border-t-neutral-400 rounded-full animate-spin" />
+          <div className="w-6 h-6 border border-zinc-700 border-t-zinc-400 rounded-full animate-spin" />
         </div>
       )}
 
       {/* Empty state */}
       {isEmpty && (
         <div className="absolute inset-0 flex items-center justify-center">
-          <p style={{ color: 'rgba(30,30,30,0.4)', fontSize: '14px' }}>No profiles yet</p>
+          <p className="text-zinc-600 text-sm">No profiles yet</p>
         </div>
       )}
 
-      {/* Multi-column parallax grid */}
+      {/* 2D Canvas with parallax columns */}
       {!isEmpty && !isLoading && (
         <div
           className={cn(
-            "absolute inset-0",
+            "absolute will-change-transform",
             isReady ? "opacity-100" : "opacity-0"
           )}
-          style={{ transition: 'opacity 0.4s ease' }}
+          style={{
+            transform: `translate3d(${translateX}px, 0, 0)`,
+            width: canvasWidth,
+            height: '100vh',
+            transition: 'opacity 0.4s ease',
+          }}
         >
-          {/* Columns container - horizontal flex */}
+          {/* Columns with parallax */}
           <div
             style={{
               display: 'flex',
               flexDirection: 'row',
               gap: GAP,
-              paddingLeft: 80,
-              paddingRight: 80,
+              paddingLeft: 120,
+              paddingRight: 120,
               height: '100%',
-              justifyContent: 'center',
             }}
           >
             {columns.map((column, colIndex) => {
-              // Calculate parallax offset for this column
-              const parallaxOffset = scrollProgress * maxScrollDistance * parallaxSpeeds[colIndex];
+              // Parallax: each column moves at different speed based on Y scroll
+              const parallaxY = translateY * parallaxSpeeds[colIndex];
 
               return (
                 <div
@@ -236,9 +250,8 @@ const ArchiveGrid: React.FC<ArchiveGridProps> = ({ profiles, onClose, isLoading 
                   style={{
                     width: CARD_WIDTH,
                     gap: GAP,
-                    paddingTop: columnOffsets[colIndex] + 100,
-                    transform: `translateY(${-parallaxOffset}px)`,
-                    transition: 'transform 0.1s linear',
+                    paddingTop: columnOffsets[colIndex] + 80,
+                    transform: `translateY(${parallaxY}px)`,
                   }}
                 >
                   {column.map((profile, rowIndex) => {
@@ -273,10 +286,7 @@ const ArchiveGrid: React.FC<ArchiveGridProps> = ({ profiles, onClose, isLoading 
                           onClick={(e) => { if (isDragging || isScrolling) e.preventDefault(); }}
                           draggable={false}
                         >
-                          <div
-                            className="absolute inset-0"
-                            style={{ backgroundColor: '#f5f5f5' }}
-                          >
+                          <div className="absolute inset-0 bg-zinc-900">
                             {profile.profilePictureUrl ? (
                               <img
                                 src={profile.profilePictureUrl}
@@ -285,25 +295,30 @@ const ArchiveGrid: React.FC<ArchiveGridProps> = ({ profiles, onClose, isLoading 
                                 style={{
                                   transform: isHovered ? 'scale(1.05)' : 'scale(1)',
                                   transition: 'transform 0.3s ease',
+                                  opacity: isHovered ? 1 : 0.85,
                                 }}
                                 draggable={false}
                               />
                             ) : (
-                              <div
-                                className="absolute inset-0 flex items-center justify-center"
-                                style={{ backgroundColor: '#f0f0f0' }}
-                              >
-                                <span style={{
-                                  fontSize: '140px',
-                                  fontWeight: 200,
-                                  color: 'rgba(0,0,0,0.04)',
-                                  userSelect: 'none'
-                                }}>
+                              <div className="absolute inset-0 flex items-center justify-center bg-zinc-900">
+                                <span
+                                  className="text-zinc-800 select-none"
+                                  style={{ fontSize: '140px', fontWeight: 200 }}
+                                >
                                   {profile.fullName.charAt(0)}
                                 </span>
                               </div>
                             )}
                           </div>
+
+                          {/* Hover overlay */}
+                          <div
+                            className="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-transparent"
+                            style={{
+                              opacity: isHovered ? 1 : 0,
+                              transition: 'opacity 0.3s ease',
+                            }}
+                          />
                         </Link>
 
                         {/* Text below - appears on hover */}
@@ -312,26 +327,26 @@ const ArchiveGrid: React.FC<ArchiveGridProps> = ({ profiles, onClose, isLoading 
                           style={{ top: CARD_HEIGHT + 12 }}
                         >
                           <p
+                            className="text-white uppercase tracking-wider"
                             style={{
-                              fontSize: 'clamp(12px, 1.3vw, 18px)',
+                              fontSize: 'clamp(11px, 1vw, 14px)',
                               fontWeight: 500,
-                              letterSpacing: '0.08em',
-                              textTransform: 'uppercase',
-                              color: '#1e1e1e',
+                              letterSpacing: '0.1em',
                               opacity: isHovered ? 1 : 0,
-                              transition: 'opacity 0.3s ease',
+                              transform: isHovered ? 'translateY(0)' : 'translateY(4px)',
+                              transition: 'opacity 0.3s ease, transform 0.3s ease',
                             }}
                           >
                             {profile.fullName}
                           </p>
                           <p
+                            className="text-zinc-500"
                             style={{
-                              fontSize: 'clamp(10px, 0.9vw, 14px)',
-                              fontWeight: 400,
-                              color: 'rgba(30,30,30,0.5)',
+                              fontSize: 'clamp(10px, 0.85vw, 12px)',
                               marginTop: '4px',
                               opacity: isHovered ? 1 : 0,
-                              transition: 'opacity 0.3s ease 0.05s',
+                              transform: isHovered ? 'translateY(0)' : 'translateY(4px)',
+                              transition: 'opacity 0.3s ease 0.05s, transform 0.3s ease 0.05s',
                             }}
                           >
                             {profile.location}
@@ -349,35 +364,22 @@ const ArchiveGrid: React.FC<ArchiveGridProps> = ({ profiles, onClose, isLoading 
 
       {/* Bottom hint */}
       <div
-        className="fixed bottom-8 left-10 z-50 pointer-events-none"
+        className="fixed bottom-8 left-10 z-50 pointer-events-none text-zinc-600"
         style={{
           fontSize: '10px',
           fontWeight: 500,
           letterSpacing: '0.2em',
           textTransform: 'uppercase',
-          color: 'rgba(30,30,30,0.25)',
         }}
       >
-        Scroll to explore
+        Drag or scroll to explore
       </div>
 
-      {/* Scroll progress indicator */}
-      <div
-        className="fixed bottom-8 right-10 z-50 pointer-events-none"
-        style={{
-          width: '60px',
-          height: '2px',
-          backgroundColor: 'rgba(30,30,30,0.1)',
-        }}
-      >
-        <div
-          style={{
-            width: `${scrollProgress * 100}%`,
-            height: '100%',
-            backgroundColor: 'rgba(30,30,30,0.4)',
-            transition: 'width 0.1s linear',
-          }}
-        />
+      {/* Navigation hint - bottom right */}
+      <div className="fixed bottom-8 right-10 z-50 pointer-events-none flex items-center gap-3">
+        <div className="flex items-center gap-1 text-zinc-600">
+          <span className="text-[10px] uppercase tracking-widest">←→↑↓</span>
+        </div>
       </div>
     </div>
   );
