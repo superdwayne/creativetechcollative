@@ -12,65 +12,51 @@ interface ArchiveGridProps {
 /**
  * HAU.studio Archive Grid (100% match)
  *
- * Exact layout from hau.studio/archive/:
- * - Single horizontal row (flex-direction: row, flex-wrap: nowrap)
- * - Items staggered vertically within the row
- * - Pure horizontal scrolling via transform
- * - 386px wide items, 40px gap
- * - Text hidden until hover, 0.3s transitions
+ * Layout: Multiple vertical columns scrolling horizontally with parallax
+ * - Columns are flex-direction: column (items stack vertically)
+ * - Columns arranged in a horizontal row
+ * - Each column scrolls at different speed (parallax)
+ * - 386px wide columns, 480px tall images, 40px gap
  */
 
 const ArchiveGrid: React.FC<ArchiveGridProps> = ({ profiles, onClose, isLoading = false }) => {
   const containerRef = useRef<HTMLDivElement>(null);
 
-  // Animation state
-  const [translateX, setTranslateX] = useState(0);
-  const [targetX, setTargetX] = useState(0);
+  // Scroll position (0-1 normalized)
+  const [scrollProgress, setScrollProgress] = useState(0);
   const [hoveredId, setHoveredId] = useState<string | null>(null);
   const [isReady, setIsReady] = useState(false);
   const [isScrolling, setIsScrolling] = useState(false);
   const scrollTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const scrollAccumulator = useRef(0);
 
   // HAU.studio exact dimensions
   const CARD_WIDTH = 386;
   const CARD_HEIGHT = 480;
   const GAP = 40;
+  const NUM_COLUMNS = 5;
 
-  // Generate staggered Y offsets for each profile (HAU-style vertical variance)
-  const yOffsets = useMemo(() => {
-    return profiles.map((_, i) => {
-      // Create a repeating pattern of Y offsets for visual rhythm
-      const patterns = [0, 80, 160, 60, 120, 40, 140, 20, 100, 180];
-      return patterns[i % patterns.length];
-    });
+  // Distribute profiles into columns
+  const columns = useMemo(() => {
+    const cols: NetworkProfile[][] = Array.from({ length: NUM_COLUMNS }, () => []);
+    profiles.forEach((p, i) => cols[i % NUM_COLUMNS].push(p));
+    return cols;
   }, [profiles]);
 
-  // Canvas width for horizontal scroll
-  const canvasWidth = profiles.length * (CARD_WIDTH + GAP) + 400;
-  const maxX = Math.max(0, canvasWidth - (typeof window !== 'undefined' ? window.innerWidth : 1920));
+  // Parallax speeds for each column (HAU-style differential movement)
+  const parallaxSpeeds = [0.6, 0.8, 1.0, 0.75, 0.65];
 
-  // Start slightly offset
+  // Column Y offsets for staggered start positions
+  const columnOffsets = [0, 60, 120, 40, 80];
+
+  // Calculate max scroll based on content
+  const maxColumnItems = Math.max(...columns.map(c => c.length));
+  const maxScrollDistance = maxColumnItems * (CARD_HEIGHT + GAP) + 200;
+
   useEffect(() => {
-    const startX = -maxX * 0.05;
-    setTargetX(startX);
-    setTranslateX(startX);
     const timer = setTimeout(() => setIsReady(true), 100);
     return () => clearTimeout(timer);
-  }, [maxX]);
-
-  // Smooth horizontal animation
-  useEffect(() => {
-    let raf: number;
-    const animate = () => {
-      setTranslateX(prev => {
-        const diff = targetX - prev;
-        return Math.abs(diff) < 0.5 ? targetX : prev + diff * 0.1;
-      });
-      raf = requestAnimationFrame(animate);
-    };
-    raf = requestAnimationFrame(animate);
-    return () => cancelAnimationFrame(raf);
-  }, [targetX]);
+  }, []);
 
   const markScrolling = useCallback(() => {
     setIsScrolling(true);
@@ -78,22 +64,38 @@ const ArchiveGrid: React.FC<ArchiveGridProps> = ({ profiles, onClose, isLoading 
     scrollTimeoutRef.current = setTimeout(() => setIsScrolling(false), 150);
   }, []);
 
-  // Wheel - pure horizontal scroll
+  // Handle wheel - accumulate scroll and convert to progress
   const handleWheel = useCallback((e: WheelEvent) => {
     e.preventDefault();
     markScrolling();
-    // Use both deltaX and deltaY for horizontal movement
-    const delta = e.deltaX !== 0 ? e.deltaX : e.deltaY;
-    setTargetX(prev => Math.max(-maxX, Math.min(0, prev - delta * 1.5)));
-  }, [maxX, markScrolling]);
 
-  // Keyboard - horizontal only
+    const delta = e.deltaY || e.deltaX;
+    scrollAccumulator.current += delta * 0.5;
+
+    // Clamp to valid range
+    scrollAccumulator.current = Math.max(0, Math.min(maxScrollDistance, scrollAccumulator.current));
+
+    // Convert to 0-1 progress
+    setScrollProgress(scrollAccumulator.current / maxScrollDistance);
+  }, [maxScrollDistance, markScrolling]);
+
+  // Keyboard
   const handleKeyDown = useCallback((e: KeyboardEvent) => {
     if (e.key === 'Escape' && onClose) { onClose(); return; }
-    const step = 400;
-    if (e.key === 'ArrowRight') { e.preventDefault(); markScrolling(); setTargetX(prev => Math.max(-maxX, prev - step)); }
-    if (e.key === 'ArrowLeft') { e.preventDefault(); markScrolling(); setTargetX(prev => Math.min(0, prev + step)); }
-  }, [maxX, onClose, markScrolling]);
+    const step = 100;
+    if (e.key === 'ArrowDown' || e.key === 'ArrowRight') {
+      e.preventDefault();
+      markScrolling();
+      scrollAccumulator.current = Math.min(maxScrollDistance, scrollAccumulator.current + step);
+      setScrollProgress(scrollAccumulator.current / maxScrollDistance);
+    }
+    if (e.key === 'ArrowUp' || e.key === 'ArrowLeft') {
+      e.preventDefault();
+      markScrolling();
+      scrollAccumulator.current = Math.max(0, scrollAccumulator.current - step);
+      setScrollProgress(scrollAccumulator.current / maxScrollDistance);
+    }
+  }, [maxScrollDistance, onClose, markScrolling]);
 
   useEffect(() => {
     const c = containerRef.current;
@@ -107,23 +109,24 @@ const ArchiveGrid: React.FC<ArchiveGridProps> = ({ profiles, onClose, isLoading 
     };
   }, [handleWheel, handleKeyDown]);
 
-  // Drag - horizontal only
+  // Drag
   const [isDragging, setIsDragging] = useState(false);
-  const dragStart = useRef({ x: 0, tx: 0 });
+  const dragStart = useRef({ y: 0, scroll: 0 });
 
   const handlePointerDown = useCallback((e: React.PointerEvent) => {
     if (e.pointerType === 'mouse' && e.button !== 0) return;
     setIsDragging(true);
     markScrolling();
-    dragStart.current = { x: e.clientX, tx: targetX };
+    dragStart.current = { y: e.clientY, scroll: scrollAccumulator.current };
     (e.target as HTMLElement).setPointerCapture(e.pointerId);
-  }, [targetX, markScrolling]);
+  }, [markScrolling]);
 
   const handlePointerMove = useCallback((e: React.PointerEvent) => {
     if (!isDragging) return;
-    const dx = e.clientX - dragStart.current.x;
-    setTargetX(Math.max(-maxX, Math.min(0, dragStart.current.tx + dx)));
-  }, [isDragging, maxX]);
+    const dy = dragStart.current.y - e.clientY;
+    scrollAccumulator.current = Math.max(0, Math.min(maxScrollDistance, dragStart.current.scroll + dy));
+    setScrollProgress(scrollAccumulator.current / maxScrollDistance);
+  }, [isDragging, maxScrollDistance]);
 
   const handlePointerUp = useCallback(() => setIsDragging(false), []);
 
@@ -142,7 +145,7 @@ const ArchiveGrid: React.FC<ArchiveGridProps> = ({ profiles, onClose, isLoading 
       onPointerUp={handlePointerUp}
       onPointerLeave={handlePointerUp}
     >
-      {/* Back button - HAU style */}
+      {/* Back button */}
       {onClose && (
         <button
           onClick={onClose}
@@ -162,7 +165,7 @@ const ArchiveGrid: React.FC<ArchiveGridProps> = ({ profiles, onClose, isLoading 
         </button>
       )}
 
-      {/* Archive count - HAU style */}
+      {/* Archive count */}
       <div
         className="fixed top-8 right-10 z-50 text-right pointer-events-none"
         style={{ color: '#1e1e1e' }}
@@ -201,131 +204,142 @@ const ArchiveGrid: React.FC<ArchiveGridProps> = ({ profiles, onClose, isLoading 
         </div>
       )}
 
-      {/* Horizontal scroll canvas - HAU style single row with staggered Y */}
+      {/* Multi-column parallax grid */}
       {!isEmpty && !isLoading && (
         <div
           className={cn(
-            "absolute will-change-transform",
+            "absolute inset-0",
             isReady ? "opacity-100" : "opacity-0"
           )}
-          style={{
-            transform: `translate3d(${translateX}px, 0, 0)`,
-            width: canvasWidth,
-            height: '100vh',
-            transition: 'opacity 0.4s ease',
-          }}
+          style={{ transition: 'opacity 0.4s ease' }}
         >
-          {/* Single horizontal row with flex */}
+          {/* Columns container - horizontal flex */}
           <div
             style={{
               display: 'flex',
               flexDirection: 'row',
-              flexWrap: 'nowrap',
               gap: GAP,
-              paddingLeft: 120,
-              paddingTop: 100,
-              alignItems: 'flex-start',
+              paddingLeft: 80,
+              paddingRight: 80,
+              height: '100%',
+              justifyContent: 'center',
             }}
           >
-            {profiles.map((profile, index) => {
-              const isHovered = hoveredId === profile.id;
-              const yOffset = yOffsets[index];
-              const delay = index * 30;
+            {columns.map((column, colIndex) => {
+              // Calculate parallax offset for this column
+              const parallaxOffset = scrollProgress * maxScrollDistance * parallaxSpeeds[colIndex];
 
               return (
                 <div
-                  key={profile.id}
-                  className={cn(
-                    "relative flex-shrink-0",
-                    isReady ? "opacity-100" : "opacity-0"
-                  )}
+                  key={colIndex}
+                  className="flex flex-col will-change-transform"
                   style={{
                     width: CARD_WIDTH,
-                    marginTop: yOffset,
-                    transform: isReady ? 'translateY(0)' : 'translateY(20px)',
-                    transition: `opacity 0.3s ease ${delay}ms, transform 0.3s ease ${delay}ms`,
+                    gap: GAP,
+                    paddingTop: columnOffsets[colIndex] + 100,
+                    transform: `translateY(${-parallaxOffset}px)`,
+                    transition: 'transform 0.1s linear',
                   }}
-                  onMouseEnter={() => !isScrolling && setHoveredId(profile.id)}
-                  onMouseLeave={() => setHoveredId(null)}
                 >
-                  {/* Image card */}
-                  <Link
-                    to={`/directory/profile/${profile.slug}`}
-                    className={cn(
-                      "block relative overflow-hidden",
-                      (isDragging || isScrolling) && "pointer-events-none"
-                    )}
-                    style={{
-                      width: CARD_WIDTH,
-                      height: CARD_HEIGHT,
-                    }}
-                    onClick={(e) => { if (isDragging || isScrolling) e.preventDefault(); }}
-                    draggable={false}
-                  >
-                    <div
-                      className="absolute inset-0"
-                      style={{ backgroundColor: '#f5f5f5' }}
-                    >
-                      {profile.profilePictureUrl ? (
-                        <img
-                          src={profile.profilePictureUrl}
-                          alt={profile.fullName}
-                          className="w-full h-full object-cover"
-                          style={{
-                            transform: isHovered ? 'scale(1.05)' : 'scale(1)',
-                            transition: 'transform 0.3s ease',
-                          }}
-                          draggable={false}
-                        />
-                      ) : (
-                        <div
-                          className="absolute inset-0 flex items-center justify-center"
-                          style={{ backgroundColor: '#f0f0f0' }}
-                        >
-                          <span style={{
-                            fontSize: '160px',
-                            fontWeight: 200,
-                            color: 'rgba(0,0,0,0.04)',
-                            userSelect: 'none'
-                          }}>
-                            {profile.fullName.charAt(0)}
-                          </span>
-                        </div>
-                      )}
-                    </div>
-                  </Link>
+                  {column.map((profile, rowIndex) => {
+                    const isHovered = hoveredId === profile.id;
+                    const delay = colIndex * 40 + rowIndex * 30;
 
-                  {/* Text below - HAU style: appears on hover */}
-                  <div
-                    className="absolute left-0 right-0"
-                    style={{ top: CARD_HEIGHT + 12 }}
-                  >
-                    <p
-                      style={{
-                        fontSize: '1.31944vw',
-                        fontWeight: 500,
-                        letterSpacing: '0.08em',
-                        textTransform: 'uppercase',
-                        color: '#1e1e1e',
-                        opacity: isHovered ? 1 : 0,
-                        transition: 'opacity 0.3s ease',
-                      }}
-                    >
-                      {profile.fullName}
-                    </p>
-                    <p
-                      style={{
-                        fontSize: '0.9vw',
-                        fontWeight: 400,
-                        color: 'rgba(30,30,30,0.5)',
-                        marginTop: '4px',
-                        opacity: isHovered ? 1 : 0,
-                        transition: 'opacity 0.3s ease 0.05s',
-                      }}
-                    >
-                      {profile.location}
-                    </p>
-                  </div>
+                    return (
+                      <div
+                        key={profile.id}
+                        className={cn(
+                          "relative flex-shrink-0",
+                          isReady ? "opacity-100" : "opacity-0"
+                        )}
+                        style={{
+                          transform: isReady ? 'translateY(0)' : 'translateY(30px)',
+                          transition: `opacity 0.4s ease ${delay}ms, transform 0.4s ease ${delay}ms`,
+                        }}
+                        onMouseEnter={() => !isScrolling && setHoveredId(profile.id)}
+                        onMouseLeave={() => setHoveredId(null)}
+                      >
+                        {/* Image card */}
+                        <Link
+                          to={`/directory/profile/${profile.slug}`}
+                          className={cn(
+                            "block relative overflow-hidden",
+                            (isDragging || isScrolling) && "pointer-events-none"
+                          )}
+                          style={{
+                            width: CARD_WIDTH,
+                            height: CARD_HEIGHT,
+                          }}
+                          onClick={(e) => { if (isDragging || isScrolling) e.preventDefault(); }}
+                          draggable={false}
+                        >
+                          <div
+                            className="absolute inset-0"
+                            style={{ backgroundColor: '#f5f5f5' }}
+                          >
+                            {profile.profilePictureUrl ? (
+                              <img
+                                src={profile.profilePictureUrl}
+                                alt={profile.fullName}
+                                className="w-full h-full object-cover"
+                                style={{
+                                  transform: isHovered ? 'scale(1.05)' : 'scale(1)',
+                                  transition: 'transform 0.3s ease',
+                                }}
+                                draggable={false}
+                              />
+                            ) : (
+                              <div
+                                className="absolute inset-0 flex items-center justify-center"
+                                style={{ backgroundColor: '#f0f0f0' }}
+                              >
+                                <span style={{
+                                  fontSize: '140px',
+                                  fontWeight: 200,
+                                  color: 'rgba(0,0,0,0.04)',
+                                  userSelect: 'none'
+                                }}>
+                                  {profile.fullName.charAt(0)}
+                                </span>
+                              </div>
+                            )}
+                          </div>
+                        </Link>
+
+                        {/* Text below - appears on hover */}
+                        <div
+                          className="absolute left-0 right-0"
+                          style={{ top: CARD_HEIGHT + 12 }}
+                        >
+                          <p
+                            style={{
+                              fontSize: 'clamp(12px, 1.3vw, 18px)',
+                              fontWeight: 500,
+                              letterSpacing: '0.08em',
+                              textTransform: 'uppercase',
+                              color: '#1e1e1e',
+                              opacity: isHovered ? 1 : 0,
+                              transition: 'opacity 0.3s ease',
+                            }}
+                          >
+                            {profile.fullName}
+                          </p>
+                          <p
+                            style={{
+                              fontSize: 'clamp(10px, 0.9vw, 14px)',
+                              fontWeight: 400,
+                              color: 'rgba(30,30,30,0.5)',
+                              marginTop: '4px',
+                              opacity: isHovered ? 1 : 0,
+                              transition: 'opacity 0.3s ease 0.05s',
+                            }}
+                          >
+                            {profile.location}
+                          </p>
+                        </div>
+                      </div>
+                    );
+                  })}
                 </div>
               );
             })}
@@ -345,6 +359,25 @@ const ArchiveGrid: React.FC<ArchiveGridProps> = ({ profiles, onClose, isLoading 
         }}
       >
         Scroll to explore
+      </div>
+
+      {/* Scroll progress indicator */}
+      <div
+        className="fixed bottom-8 right-10 z-50 pointer-events-none"
+        style={{
+          width: '60px',
+          height: '2px',
+          backgroundColor: 'rgba(30,30,30,0.1)',
+        }}
+      >
+        <div
+          style={{
+            width: `${scrollProgress * 100}%`,
+            height: '100%',
+            backgroundColor: 'rgba(30,30,30,0.4)',
+            transition: 'width 0.1s linear',
+          }}
+        />
       </div>
     </div>
   );
