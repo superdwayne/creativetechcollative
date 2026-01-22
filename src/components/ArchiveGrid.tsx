@@ -32,11 +32,11 @@ const ArchiveGrid: React.FC<ArchiveGridProps> = ({ profiles, onClose, isLoading 
   const [isScrolling, setIsScrolling] = useState(false);
   const scrollTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
-  // Dimensions
-  const CARD_WIDTH = 386;
-  const CARD_HEIGHT = 480;
-  const GAP = 40;
-  const NUM_COLUMNS = 6;
+  // Dimensions - smaller cards
+  const CARD_WIDTH = 280;
+  const CARD_HEIGHT = 350;
+  const GAP = 32;
+  const NUM_COLUMNS = 7;
 
   // Distribute profiles into columns
   const columns = useMemo(() => {
@@ -46,10 +46,10 @@ const ArchiveGrid: React.FC<ArchiveGridProps> = ({ profiles, onClose, isLoading 
   }, [profiles]);
 
   // Parallax speeds for each column
-  const parallaxSpeeds = [0.7, 0.85, 1.0, 0.9, 0.75, 0.8];
+  const parallaxSpeeds = [0.7, 0.85, 1.0, 0.9, 0.75, 0.8, 0.95];
 
   // Column Y offsets for staggered start
-  const columnOffsets = [80, 0, 120, 40, 100, 60];
+  const columnOffsets = [60, 0, 100, 30, 80, 50, 90];
 
   // Canvas bounds
   const canvasWidth = NUM_COLUMNS * (CARD_WIDTH + GAP) + 400;
@@ -167,38 +167,44 @@ const ArchiveGrid: React.FC<ArchiveGridProps> = ({ profiles, onClose, isLoading 
       onPointerUp={handlePointerUp}
       onPointerLeave={handlePointerUp}
     >
-      {/* Back button - site style */}
-      {onClose && (
-        <button
-          onClick={onClose}
-          className="fixed top-8 left-10 z-50 pointer-events-auto text-zinc-500 hover:text-white transition-colors duration-300"
-          style={{
-            fontSize: '11px',
-            fontWeight: 500,
-            letterSpacing: '0.2em',
-            textTransform: 'uppercase',
-          }}
-        >
-          ← Back
-        </button>
-      )}
+      {/* Header */}
+      <header className="fixed top-0 left-0 right-0 z-50 pointer-events-none">
+        <div className="max-w-7xl mx-auto px-6 md:px-12 py-6 md:py-8">
+          <div className="flex items-center justify-between pointer-events-auto">
+            {/* Left side - Back + Title */}
+            <div className="flex items-center gap-6">
+              {onClose && (
+                <button
+                  onClick={onClose}
+                  className="text-zinc-500 hover:text-white transition-colors duration-300 text-sm font-medium tracking-wide"
+                >
+                  ← Back
+                </button>
+              )}
+              <div>
+                <span className="text-[10px] font-medium tracking-[0.4em] text-zinc-600 uppercase block mb-1">
+                  The Creative Technology Collective
+                </span>
+                <h1 className="text-2xl md:text-3xl font-medium text-white tracking-tight">
+                  Archive
+                </h1>
+              </div>
+            </div>
 
-      {/* Archive count - site style */}
-      <div className="fixed top-8 right-10 z-50 text-right pointer-events-none">
-        <div className="text-[10px] font-medium tracking-[0.35em] uppercase text-zinc-600 mb-1">
-          Archive
+            {/* Right side - Count */}
+            <div className="text-right">
+              <div className="text-[10px] font-medium tracking-[0.3em] uppercase text-zinc-600 mb-1">
+                Members
+              </div>
+              <div className="text-3xl md:text-4xl font-light text-white tracking-tight">
+                {profiles.length.toString().padStart(2, '0')}
+              </div>
+            </div>
+          </div>
         </div>
-        <div
-          className="text-white font-light"
-          style={{
-            fontSize: 'clamp(48px, 5vw, 72px)',
-            lineHeight: 0.9,
-            letterSpacing: '-0.02em'
-          }}
-        >
-          {profiles.length.toString().padStart(2, '0')}
-        </div>
-      </div>
+        {/* Gradient fade */}
+        <div className="h-16 bg-gradient-to-b from-black to-transparent" />
+      </header>
 
       {/* Loading */}
       {isLoading && (
@@ -250,7 +256,7 @@ const ArchiveGrid: React.FC<ArchiveGridProps> = ({ profiles, onClose, isLoading 
                   style={{
                     width: CARD_WIDTH,
                     gap: GAP,
-                    paddingTop: columnOffsets[colIndex] + 80,
+                    paddingTop: columnOffsets[colIndex] + 140, // Account for header
                     transform: `translateY(${parallaxY}px)`,
                   }}
                 >
@@ -303,7 +309,7 @@ const ArchiveGrid: React.FC<ArchiveGridProps> = ({ profiles, onClose, isLoading 
                               <div className="absolute inset-0 flex items-center justify-center bg-zinc-900">
                                 <span
                                   className="text-zinc-800 select-none"
-                                  style={{ fontSize: '140px', fontWeight: 200 }}
+                                  style={{ fontSize: '100px', fontWeight: 200 }}
                                 >
                                   {profile.fullName.charAt(0)}
                                 </span>
