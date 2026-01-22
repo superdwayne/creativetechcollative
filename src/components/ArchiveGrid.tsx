@@ -12,13 +12,12 @@ interface ArchiveGridProps {
 /**
  * HAU.studio Archive Grid (100% match)
  *
- * Exact specifications from hau.studio/archive/:
- * - 5-column grid with 386px × 480px cards
- * - 40px gap between cards
- * - 0.3s ease transitions throughout
- * - Text hidden (opacity: 0) until hover
- * - Font sizes: 1.31944vw for titles
- * - Dark text (#1e1e1e) on white background
+ * Exact layout from hau.studio/archive/:
+ * - Single horizontal row (flex-direction: row, flex-wrap: nowrap)
+ * - Items staggered vertically within the row
+ * - Pure horizontal scrolling via transform
+ * - 386px wide items, 40px gap
+ * - Text hidden until hover, 0.3s transitions
  */
 
 const ArchiveGrid: React.FC<ArchiveGridProps> = ({ profiles, onClose, isLoading = false }) => {
@@ -26,9 +25,7 @@ const ArchiveGrid: React.FC<ArchiveGridProps> = ({ profiles, onClose, isLoading 
 
   // Animation state
   const [translateX, setTranslateX] = useState(0);
-  const [translateY, setTranslateY] = useState(0);
   const [targetX, setTargetX] = useState(0);
-  const [targetY, setTargetY] = useState(0);
   const [hoveredId, setHoveredId] = useState<string | null>(null);
   const [isReady, setIsReady] = useState(false);
   const [isScrolling, setIsScrolling] = useState(false);
@@ -37,37 +34,31 @@ const ArchiveGrid: React.FC<ArchiveGridProps> = ({ profiles, onClose, isLoading 
   // HAU.studio exact dimensions
   const CARD_WIDTH = 386;
   const CARD_HEIGHT = 480;
-  const GAP = 40; // HAU uses 40px gap
-  const COLUMNS = 5;
-  const COLUMN_OFFSETS = [0, 60, 100, 60, 0]; // Subtle stagger like HAU
+  const GAP = 40;
 
-  // Distribute profiles
-  const columns = useMemo(() => {
-    const cols: NetworkProfile[][] = Array.from({ length: COLUMNS }, () => []);
-    profiles.forEach((p, i) => cols[i % COLUMNS].push(p));
-    return cols;
+  // Generate staggered Y offsets for each profile (HAU-style vertical variance)
+  const yOffsets = useMemo(() => {
+    return profiles.map((_, i) => {
+      // Create a repeating pattern of Y offsets for visual rhythm
+      const patterns = [0, 80, 160, 60, 120, 40, 140, 20, 100, 180];
+      return patterns[i % patterns.length];
+    });
   }, [profiles]);
 
-  // Canvas size - tighter padding like HAU
-  const maxRows = Math.max(...columns.map(c => c.length), 1);
-  const canvasWidth = COLUMNS * CARD_WIDTH + (COLUMNS - 1) * GAP + 200;
-  const canvasHeight = maxRows * (CARD_HEIGHT + GAP + 60) + Math.max(...COLUMN_OFFSETS) + 200;
-  const maxX = Math.max(0, canvasWidth - window.innerWidth);
-  const maxY = Math.max(0, canvasHeight - window.innerHeight);
+  // Canvas width for horizontal scroll
+  const canvasWidth = profiles.length * (CARD_WIDTH + GAP) + 400;
+  const maxX = Math.max(0, canvasWidth - (typeof window !== 'undefined' ? window.innerWidth : 1920));
 
-  // Start slightly offset - not at corner
+  // Start slightly offset
   useEffect(() => {
-    const startX = -maxX * 0.15;
-    const startY = -maxY * 0.1;
+    const startX = -maxX * 0.05;
     setTargetX(startX);
-    setTargetY(startY);
     setTranslateX(startX);
-    setTranslateY(startY);
     const timer = setTimeout(() => setIsReady(true), 100);
     return () => clearTimeout(timer);
-  }, [maxX, maxY]);
+  }, [maxX]);
 
-  // HAU-style smooth animation - snappier lerp
+  // Smooth horizontal animation
   useEffect(() => {
     let raf: number;
     const animate = () => {
@@ -75,15 +66,11 @@ const ArchiveGrid: React.FC<ArchiveGridProps> = ({ profiles, onClose, isLoading 
         const diff = targetX - prev;
         return Math.abs(diff) < 0.5 ? targetX : prev + diff * 0.1;
       });
-      setTranslateY(prev => {
-        const diff = targetY - prev;
-        return Math.abs(diff) < 0.5 ? targetY : prev + diff * 0.1;
-      });
       raf = requestAnimationFrame(animate);
     };
     raf = requestAnimationFrame(animate);
     return () => cancelAnimationFrame(raf);
-  }, [targetX, targetY]);
+  }, [targetX]);
 
   const markScrolling = useCallback(() => {
     setIsScrolling(true);
@@ -91,26 +78,22 @@ const ArchiveGrid: React.FC<ArchiveGridProps> = ({ profiles, onClose, isLoading 
     scrollTimeoutRef.current = setTimeout(() => setIsScrolling(false), 150);
   }, []);
 
-  // Wheel - horizontal scroll by default
+  // Wheel - pure horizontal scroll
   const handleWheel = useCallback((e: WheelEvent) => {
     e.preventDefault();
     markScrolling();
-    const dx = e.deltaX || e.deltaY;
-    setTargetX(prev => Math.max(-maxX, Math.min(0, prev - dx * 1.5)));
-    if (e.shiftKey || Math.abs(e.deltaX) > 0) {
-      setTargetY(prev => Math.max(-maxY, Math.min(0, prev - e.deltaY * 1.5)));
-    }
-  }, [maxX, maxY, markScrolling]);
+    // Use both deltaX and deltaY for horizontal movement
+    const delta = e.deltaX !== 0 ? e.deltaX : e.deltaY;
+    setTargetX(prev => Math.max(-maxX, Math.min(0, prev - delta * 1.5)));
+  }, [maxX, markScrolling]);
 
-  // Keyboard
+  // Keyboard - horizontal only
   const handleKeyDown = useCallback((e: KeyboardEvent) => {
     if (e.key === 'Escape' && onClose) { onClose(); return; }
-    const step = 500;
+    const step = 400;
     if (e.key === 'ArrowRight') { e.preventDefault(); markScrolling(); setTargetX(prev => Math.max(-maxX, prev - step)); }
     if (e.key === 'ArrowLeft') { e.preventDefault(); markScrolling(); setTargetX(prev => Math.min(0, prev + step)); }
-    if (e.key === 'ArrowDown') { e.preventDefault(); markScrolling(); setTargetY(prev => Math.max(-maxY, prev - step)); }
-    if (e.key === 'ArrowUp') { e.preventDefault(); markScrolling(); setTargetY(prev => Math.min(0, prev + step)); }
-  }, [maxX, maxY, onClose, markScrolling]);
+  }, [maxX, onClose, markScrolling]);
 
   useEffect(() => {
     const c = containerRef.current;
@@ -124,25 +107,23 @@ const ArchiveGrid: React.FC<ArchiveGridProps> = ({ profiles, onClose, isLoading 
     };
   }, [handleWheel, handleKeyDown]);
 
-  // Drag
+  // Drag - horizontal only
   const [isDragging, setIsDragging] = useState(false);
-  const dragStart = useRef({ x: 0, y: 0, tx: 0, ty: 0 });
+  const dragStart = useRef({ x: 0, tx: 0 });
 
   const handlePointerDown = useCallback((e: React.PointerEvent) => {
     if (e.pointerType === 'mouse' && e.button !== 0) return;
     setIsDragging(true);
     markScrolling();
-    dragStart.current = { x: e.clientX, y: e.clientY, tx: targetX, ty: targetY };
+    dragStart.current = { x: e.clientX, tx: targetX };
     (e.target as HTMLElement).setPointerCapture(e.pointerId);
-  }, [targetX, targetY, markScrolling]);
+  }, [targetX, markScrolling]);
 
   const handlePointerMove = useCallback((e: React.PointerEvent) => {
     if (!isDragging) return;
     const dx = e.clientX - dragStart.current.x;
-    const dy = e.clientY - dragStart.current.y;
     setTargetX(Math.max(-maxX, Math.min(0, dragStart.current.tx + dx)));
-    setTargetY(Math.max(-maxY, Math.min(0, dragStart.current.ty + dy)));
-  }, [isDragging, maxX, maxY]);
+  }, [isDragging, maxX]);
 
   const handlePointerUp = useCallback(() => setIsDragging(false), []);
 
@@ -161,7 +142,7 @@ const ArchiveGrid: React.FC<ArchiveGridProps> = ({ profiles, onClose, isLoading 
       onPointerUp={handlePointerUp}
       onPointerLeave={handlePointerUp}
     >
-      {/* Minimal back - HAU style: barely there until needed */}
+      {/* Back button - HAU style */}
       {onClose && (
         <button
           onClick={onClose}
@@ -181,7 +162,7 @@ const ArchiveGrid: React.FC<ArchiveGridProps> = ({ profiles, onClose, isLoading 
         </button>
       )}
 
-      {/* Archive count - HAU style: large, light weight */}
+      {/* Archive count - HAU style */}
       <div
         className="fixed top-8 right-10 z-50 text-right pointer-events-none"
         style={{ color: '#1e1e1e' }}
@@ -206,23 +187,21 @@ const ArchiveGrid: React.FC<ArchiveGridProps> = ({ profiles, onClose, isLoading 
         </div>
       </div>
 
-      {/* Loading - subtle */}
+      {/* Loading */}
       {isLoading && (
         <div className="absolute inset-0 flex items-center justify-center">
-          <div
-            className="w-6 h-6 border border-neutral-200 border-t-neutral-400 rounded-full animate-spin"
-          />
+          <div className="w-6 h-6 border border-neutral-200 border-t-neutral-400 rounded-full animate-spin" />
         </div>
       )}
 
-      {/* Empty */}
+      {/* Empty state */}
       {isEmpty && (
         <div className="absolute inset-0 flex items-center justify-center">
           <p style={{ color: 'rgba(30,30,30,0.4)', fontSize: '14px' }}>No profiles yet</p>
         </div>
       )}
 
-      {/* Canvas */}
+      {/* Horizontal scroll canvas - HAU style single row with staggered Y */}
       {!isEmpty && !isLoading && (
         <div
           className={cn(
@@ -230,142 +209,131 @@ const ArchiveGrid: React.FC<ArchiveGridProps> = ({ profiles, onClose, isLoading 
             isReady ? "opacity-100" : "opacity-0"
           )}
           style={{
-            transform: `translate3d(${translateX}px, ${translateY}px, 0)`,
+            transform: `translate3d(${translateX}px, 0, 0)`,
             width: canvasWidth,
-            height: canvasHeight,
+            height: '100vh',
             transition: 'opacity 0.4s ease',
           }}
         >
-          {/* Grid - HAU style compact padding */}
+          {/* Single horizontal row with flex */}
           <div
-            className="flex"
             style={{
+              display: 'flex',
+              flexDirection: 'row',
+              flexWrap: 'nowrap',
+              gap: GAP,
+              paddingLeft: 120,
               paddingTop: 100,
-              paddingLeft: 80,
-              gap: GAP
+              alignItems: 'flex-start',
             }}
           >
-            {columns.map((column, colIndex) => (
-              <div
-                key={colIndex}
-                className="flex flex-col"
-                style={{
-                  width: CARD_WIDTH,
-                  gap: GAP,
-                  marginTop: COLUMN_OFFSETS[colIndex],
-                }}
-              >
-                {column.map((profile, rowIndex) => {
-                  const isHovered = hoveredId === profile.id;
-                  const delay = colIndex * 30 + rowIndex * 20;
+            {profiles.map((profile, index) => {
+              const isHovered = hoveredId === profile.id;
+              const yOffset = yOffsets[index];
+              const delay = index * 30;
 
-                  return (
+              return (
+                <div
+                  key={profile.id}
+                  className={cn(
+                    "relative flex-shrink-0",
+                    isReady ? "opacity-100" : "opacity-0"
+                  )}
+                  style={{
+                    width: CARD_WIDTH,
+                    marginTop: yOffset,
+                    transform: isReady ? 'translateY(0)' : 'translateY(20px)',
+                    transition: `opacity 0.3s ease ${delay}ms, transform 0.3s ease ${delay}ms`,
+                  }}
+                  onMouseEnter={() => !isScrolling && setHoveredId(profile.id)}
+                  onMouseLeave={() => setHoveredId(null)}
+                >
+                  {/* Image card */}
+                  <Link
+                    to={`/directory/profile/${profile.slug}`}
+                    className={cn(
+                      "block relative overflow-hidden",
+                      (isDragging || isScrolling) && "pointer-events-none"
+                    )}
+                    style={{
+                      width: CARD_WIDTH,
+                      height: CARD_HEIGHT,
+                    }}
+                    onClick={(e) => { if (isDragging || isScrolling) e.preventDefault(); }}
+                    draggable={false}
+                  >
                     <div
-                      key={profile.id}
-                      className={cn(
-                        "relative",
-                        isReady ? "opacity-100" : "opacity-0"
-                      )}
-                      style={{
-                        transform: isReady ? 'translateY(0)' : 'translateY(20px)',
-                        transition: `opacity 0.3s ease ${delay}ms, transform 0.3s ease ${delay}ms`,
-                      }}
-                      onMouseEnter={() => !isScrolling && setHoveredId(profile.id)}
-                      onMouseLeave={() => setHoveredId(null)}
+                      className="absolute inset-0"
+                      style={{ backgroundColor: '#f5f5f5' }}
                     >
-                      {/* Image card */}
-                      <Link
-                        to={`/directory/profile/${profile.slug}`}
-                        className={cn(
-                          "block relative overflow-hidden",
-                          (isDragging || isScrolling) && "pointer-events-none"
-                        )}
-                        style={{
-                          width: CARD_WIDTH,
-                          height: CARD_HEIGHT,
-                        }}
-                        onClick={(e) => { if (isDragging || isScrolling) e.preventDefault(); }}
-                        draggable={false}
-                      >
+                      {profile.profilePictureUrl ? (
+                        <img
+                          src={profile.profilePictureUrl}
+                          alt={profile.fullName}
+                          className="w-full h-full object-cover"
+                          style={{
+                            transform: isHovered ? 'scale(1.05)' : 'scale(1)',
+                            transition: 'transform 0.3s ease',
+                          }}
+                          draggable={false}
+                        />
+                      ) : (
                         <div
-                          className="absolute inset-0"
-                          style={{ backgroundColor: '#f5f5f5' }}
+                          className="absolute inset-0 flex items-center justify-center"
+                          style={{ backgroundColor: '#f0f0f0' }}
                         >
-                          {profile.profilePictureUrl ? (
-                            <img
-                              src={profile.profilePictureUrl}
-                              alt={profile.fullName}
-                              className="w-full h-full object-cover"
-                              style={{
-                                transform: isHovered ? 'scale(1.05)' : 'scale(1)',
-                                transition: 'transform 0.3s ease',
-                              }}
-                              draggable={false}
-                            />
-                          ) : (
-                            <div
-                              className="absolute inset-0 flex items-center justify-center"
-                              style={{ backgroundColor: '#f0f0f0' }}
-                            >
-                              <span style={{
-                                fontSize: '160px',
-                                fontWeight: 200,
-                                color: 'rgba(0,0,0,0.04)',
-                                userSelect: 'none'
-                              }}>
-                                {profile.fullName.charAt(0)}
-                              </span>
-                            </div>
-                          )}
+                          <span style={{
+                            fontSize: '160px',
+                            fontWeight: 200,
+                            color: 'rgba(0,0,0,0.04)',
+                            userSelect: 'none'
+                          }}>
+                            {profile.fullName.charAt(0)}
+                          </span>
                         </div>
-                      </Link>
-
-                      {/* Text below - HAU style: appears on hover with 0.3s transition */}
-                      <div
-                        className="absolute left-0 right-0"
-                        style={{
-                          top: CARD_HEIGHT + 12,
-                        }}
-                      >
-                        {/* Name - HAU style: uppercase, tracked */}
-                        <p
-                          style={{
-                            fontSize: '1.31944vw',
-                            fontWeight: 500,
-                            letterSpacing: '0.08em',
-                            textTransform: 'uppercase',
-                            color: '#1e1e1e',
-                            opacity: isHovered ? 1 : 0,
-                            transition: 'opacity 0.3s ease',
-                          }}
-                        >
-                          {profile.fullName}
-                        </p>
-
-                        {/* Location - HAU style: lighter, subtle */}
-                        <p
-                          style={{
-                            fontSize: '0.9vw',
-                            fontWeight: 400,
-                            color: 'rgba(30,30,30,0.5)',
-                            marginTop: '4px',
-                            opacity: isHovered ? 1 : 0,
-                            transition: 'opacity 0.3s ease 0.05s',
-                          }}
-                        >
-                          {profile.location}
-                        </p>
-                      </div>
+                      )}
                     </div>
-                  );
-                })}
-              </div>
-            ))}
+                  </Link>
+
+                  {/* Text below - HAU style: appears on hover */}
+                  <div
+                    className="absolute left-0 right-0"
+                    style={{ top: CARD_HEIGHT + 12 }}
+                  >
+                    <p
+                      style={{
+                        fontSize: '1.31944vw',
+                        fontWeight: 500,
+                        letterSpacing: '0.08em',
+                        textTransform: 'uppercase',
+                        color: '#1e1e1e',
+                        opacity: isHovered ? 1 : 0,
+                        transition: 'opacity 0.3s ease',
+                      }}
+                    >
+                      {profile.fullName}
+                    </p>
+                    <p
+                      style={{
+                        fontSize: '0.9vw',
+                        fontWeight: 400,
+                        color: 'rgba(30,30,30,0.5)',
+                        marginTop: '4px',
+                        opacity: isHovered ? 1 : 0,
+                        transition: 'opacity 0.3s ease 0.05s',
+                      }}
+                    >
+                      {profile.location}
+                    </p>
+                  </div>
+                </div>
+              );
+            })}
           </div>
         </div>
       )}
 
-      {/* Bottom hint - barely visible */}
+      {/* Bottom hint */}
       <div
         className="fixed bottom-8 left-10 z-50 pointer-events-none"
         style={{
