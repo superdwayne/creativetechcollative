@@ -89,9 +89,10 @@ async function runJobMatching(
   openaiApiKey: string,
   anthropicApiKey: string
 ): Promise<MatchingResult> {
-  const VECTOR_SEARCH_LIMIT = 20;
-  const CLAUDE_ANALYSIS_LIMIT = 10;
-  const SIMILARITY_THRESHOLD = 0.3;
+  // Reduced limits to save API costs
+  const VECTOR_SEARCH_LIMIT = 15;  // Was 20
+  const CLAUDE_ANALYSIS_LIMIT = 8;  // Was 10
+  const SIMILARITY_THRESHOLD = 0.35; // Was 0.3 - slightly higher to filter out weaker matches
 
   try {
     // Step 1: Fetch job submission from database
@@ -278,6 +279,12 @@ Return your analysis as a JSON object with this exact structure:
 
 Order candidates by matchScore descending (best matches first). Include all candidates in your response.`;
 
+    // Use Claude Haiku for cost efficiency (much cheaper than Sonnet)
+    // Set USE_CLAUDE_SONNET=true in env for higher quality matching
+    const useClaudeSonnet = process.env.USE_CLAUDE_SONNET === 'true';
+    const claudeModel = useClaudeSonnet ? 'claude-sonnet-4-20250514' : 'claude-3-5-haiku-20241022';
+    console.log(`[MatchJob] Using model: ${claudeModel}`);
+
     const claudeResponse = await fetch('https://api.anthropic.com/v1/messages', {
       method: 'POST',
       headers: {
@@ -286,7 +293,7 @@ Order candidates by matchScore descending (best matches first). Include all cand
         'anthropic-version': '2023-06-01',
       },
       body: JSON.stringify({
-        model: 'claude-sonnet-4-20250514',
+        model: claudeModel,
         max_tokens: 4096,
         messages: [
           {
@@ -427,7 +434,7 @@ export default async function handler(req: Request) {
   }
 
   // Check for required environment variables
-  const supabaseUrl = process.env.VITE_SUPABASE_URL;
+  const supabaseUrl = process.env.SUPABASE_URL;
   const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
   const openaiApiKey = process.env.OPENAI_API_KEY;
   const anthropicApiKey = process.env.ANTHROPIC_API_KEY;

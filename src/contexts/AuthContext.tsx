@@ -8,6 +8,7 @@ interface AuthContextType {
   loading: boolean;
   signUp: (email: string, password: string) => Promise<{ error: Error | null }>;
   signIn: (email: string, password: string) => Promise<{ error: Error | null }>;
+  signInWithGoogle: (returnTo?: string) => Promise<{ error: Error | null }>;
   signOut: () => Promise<void>;
 }
 
@@ -55,12 +56,30 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const signIn = async (email: string, password: string) => {
     if (!supabase) return { error: new Error('Database not configured') };
-    
+
     const { error } = await supabase.auth.signInWithPassword({
       email,
       password,
     });
     return { error };
+  };
+
+  const signInWithGoogle = async (returnTo?: string) => {
+    if (!supabase) return { error: new Error('Database not configured') };
+
+    // Build the callback URL with optional returnTo parameter
+    const callbackUrl = new URL(`${window.location.origin}/auth/callback`);
+    if (returnTo) {
+      callbackUrl.searchParams.set('returnTo', returnTo);
+    }
+
+    const { error } = await supabase.auth.signInWithOAuth({
+      provider: 'google',
+      options: {
+        redirectTo: callbackUrl.toString(),
+      },
+    });
+    return { error: error as Error | null };
   };
 
   const signOut = async () => {
@@ -69,7 +88,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   };
 
   return (
-    <AuthContext.Provider value={{ user, session, loading, signUp, signIn, signOut }}>
+    <AuthContext.Provider value={{ user, session, loading, signUp, signIn, signInWithGoogle, signOut }}>
       {children}
     </AuthContext.Provider>
   );

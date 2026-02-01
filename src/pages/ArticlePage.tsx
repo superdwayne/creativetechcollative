@@ -70,6 +70,17 @@ const parseMarkdown = (content: string): string => {
       continue;
     }
     
+    // Images - ![alt](url) or ![alt](url "caption")
+    const imageMatch = line.match(/^!\[(.*?)\]\((.*?)(?:\s+"(.*?)")?\)$/);
+    if (imageMatch) {
+      if (inList) { html += listType === 'ul' ? '</ul>' : '</ol>'; inList = false; }
+      const alt = imageMatch[1];
+      const src = imageMatch[2];
+      const caption = imageMatch[3];
+      html += `<figure class="article-image"><img src="${src}" alt="${alt}" />${caption ? `<figcaption>${caption}</figcaption>` : ''}</figure>`;
+      continue;
+    }
+    
     // Regular paragraph
     if (inList) { html += listType === 'ul' ? '</ul>' : '</ol>'; inList = false; }
     line = line.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>');
@@ -260,6 +271,9 @@ const ArticlePage: React.FC = () => {
                 [&_strong]:text-white [&_strong]:font-medium
                 [&_em]:text-zinc-200
                 [&_a]:text-white [&_a]:underline [&_a]:underline-offset-4 hover:[&_a]:text-zinc-300
+                [&>figure]:my-10 [&>figure]:mx-0
+                [&>figure>img]:w-full [&>figure>img]:rounded-lg [&>figure>img]:border [&>figure>img]:border-zinc-800
+                [&>figure>figcaption]:text-center [&>figure>figcaption]:text-sm [&>figure>figcaption]:text-zinc-500 [&>figure>figcaption]:font-secondary [&>figure>figcaption]:mt-3 [&>figure>figcaption]:italic
               "
             />
           </div>

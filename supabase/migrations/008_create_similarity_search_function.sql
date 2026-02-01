@@ -71,10 +71,8 @@ BEGIN
   WHERE
     -- Only include profiles with embeddings
     np.embedding IS NOT NULL
-    -- Only include approved profiles
+    -- Only include approved profiles (profiles must be approved by admin to be matched)
     AND np.approved = true
-    -- Only include available profiles (open-to-work or open-to-collaborations)
-    AND np.availability IN ('open-to-work', 'open-to-collaborations')
     -- Apply similarity threshold (1 - threshold because <=> returns distance)
     AND (1 - (np.embedding <=> query_embedding)) >= similarity_threshold
   ORDER BY
@@ -84,4 +82,4 @@ END;
 $$;
 
 -- Add comment for documentation
-COMMENT ON FUNCTION find_similar_profiles IS 'Find network profiles similar to a given embedding vector using cosine similarity. Only returns approved profiles that are available for work or collaborations.';
+COMMENT ON FUNCTION find_similar_profiles IS 'Find network profiles similar to a given embedding vector using cosine similarity. Only returns approved profiles (all availability statuses are included).';

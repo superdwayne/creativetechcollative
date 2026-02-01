@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { Input } from '../components/ui/input';
 import { Textarea } from '../components/ui/textarea';
 import { Checkbox } from '../components/ui/checkbox';
@@ -20,14 +20,18 @@ import {
   AlertCircle,
   ArrowRight,
   Sparkles,
-  AlertTriangle
+  AlertTriangle,
+  Search,
+  Wand2,
+  Linkedin,
+  Globe,
+  Zap
 } from 'lucide-react';
 import { 
   ProfileFormData, 
   Project, 
-  FocusArea,
   AvailabilityStatus,
-  FOCUS_AREAS, 
+  SUGGESTED_FOCUS_AREAS, 
   AVAILABILITY_OPTIONS, 
   SUGGESTED_SKILLS 
 } from '@/types/network-profile';
@@ -52,6 +56,7 @@ const createEmptyProject = (): Project => ({
 
 const NetworkCreateProfilePage: React.FC = () => {
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
   const { user, session, loading: authLoading } = useAuth();
   const [currentStep, setCurrentStep] = useState(1);
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -61,6 +66,18 @@ const NetworkCreateProfilePage: React.FC = () => {
   const [checkingProfile, setCheckingProfile] = useState(true);
   const [isEnriching, setIsEnriching] = useState(false);
   const [enrichmentError, setEnrichmentError] = useState('');
+  const [isAutoFilling, setIsAutoFilling] = useState(false);
+  const [autoFillError, setAutoFillError] = useState('');
+  const [autoFillSuccess, setAutoFillSuccess] = useState(false);
+  
+  // Generate mode state
+  const isGenerateMode = searchParams.get('mode') === 'generate';
+  const [showGenerateModal, setShowGenerateModal] = useState(isGenerateMode);
+  const [generateName, setGenerateName] = useState('');
+  const [generateLinkedIn, setGenerateLinkedIn] = useState('');
+  const [generatePortfolio, setGeneratePortfolio] = useState('');
+  const [isGenerating, setIsGenerating] = useState(false);
+  const [generateError, setGenerateError] = useState('');
 
   useEffect(() => {
     if (!authLoading && !user) {
@@ -75,6 +92,52 @@ const NetworkCreateProfilePage: React.FC = () => {
           navigate('/directory/dashboard');
         } else {
           setCheckingProfile(false);
+          
+          // Pre-fill name from URL param
+          const nameParam = searchParams.get('name');
+          if (nameParam) {
+            setFormData(prev => ({ ...prev, fullName: nameParam, email: user.email || '' }));
+          }
+          
+          // Apply enrichment data if passed from dashboard
+          const enrichmentParam = searchParams.get('enrichment');
+          if (enrichmentParam) {
+            try {
+              const data = JSON.parse(decodeURIComponent(enrichmentParam));
+              setFormData(prev => {
+                const updates: Partial<ProfileFormData> = {};
+                
+                if (data.additionalSkills?.length > 0) {
+                  updates.skills = data.additionalSkills.slice(0, 15);
+                }
+                
+                if (data.enrichedBio) {
+                  updates.bio = data.enrichedBio.substring(0, 300);
+                }
+                
+                if (data.discoveredProjects?.length > 0) {
+                  const projects = data.discoveredProjects.slice(0, 5).map((p: any) => ({
+                    id: crypto.randomUUID(),
+                    title: p.title || 'Untitled Project',
+                    description: p.description || '',
+                    link: p.url || '',
+                    imageUrl: '',
+                  }));
+                  while (projects.length < 2) {
+                    projects.push(createEmptyProject());
+                  }
+                  updates.projects = projects;
+                }
+                
+                return { ...prev, ...updates };
+              });
+              
+              setAutoFillSuccess(true);
+              setTimeout(() => setAutoFillSuccess(false), 5000);
+            } catch (e) {
+              console.error('Failed to parse enrichment data:', e);
+            }
+          }
         }
       }
     };
@@ -82,7 +145,7 @@ const NetworkCreateProfilePage: React.FC = () => {
     if (user) {
       checkExistingProfile();
     }
-  }, [user, authLoading, navigate]);
+  }, [user, authLoading, navigate, searchParams]);
   
   const [formData, setFormData] = useState<ProfileFormData>({
     fullName: '',
@@ -143,14 +206,221 @@ const NetworkCreateProfilePage: React.FC = () => {
     }
   };
 
-  const toggleFocusArea = (area: FocusArea) => {
-    setFormData(prev => {
-      const current = prev.focusAreas;
-      if (current.includes(area)) {
-        return { ...prev, focusAreas: current.filter(a => a !== area) };
+
+  // Auto-fill profile from web search
+  const handleAutoFill = async () => {
+    if (!formData.fullName.trim()) {
+      setAutoFillError('Please enter your full name first');
+      return;
+    }
+
+    setIsAutoFilling(true);
+    setAutoFillError('');
+    setAutoFillSuccess(false);
+
+    try {
+      // Use the enrich-profile-search API which does comprehensive web search + URL fetching
+      const response = await fetch('/api/enrich-profile-search', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          fullName: formData.fullName.trim(),
+          currentSkills: formData.skills,
+          currentBio: formData.bio,
+          // Include URLs if already filled in - these provide much better enrichment
+          linkedinUrl: formData.linkedinUrl?.trim() || '',
+          portfolioUrl: formData.portfolioUrl?.trim() || '',
+          // Include additional context for smarter search
+          location: formData.location?.trim() || '',
+          focusAreas: formData.focusAreas || [],
+          existingProjects: formData.projects.filter(p => p.title.trim()),
+        }),
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data.error || 'Failed to auto-fill profile');
       }
-      return { ...prev, focusAreas: [...current, area] };
-    });
+
+      if (data.success) {
+        // Update form data with discovered information
+        setFormData(prev => {
+          const updates: Partial<ProfileFormData> = {};
+
+          // Add discovered skills
+          if (data.additionalSkills && data.additionalSkills.length > 0) {
+            const mergedSkills = [...new Set([...prev.skills, ...data.additionalSkills])];
+            updates.skills = mergedSkills.slice(0, 20);
+          }
+
+          // Add discovered projects
+          if (data.discoveredProjects && data.discoveredProjects.length > 0) {
+            const newProjects = data.discoveredProjects.slice(0, 5).map((p: any) => ({
+              id: crypto.randomUUID(),
+              title: p.title || '',
+              description: p.description || '',
+              imageUrl: '',
+              link: p.url || '',
+            }));
+
+            // Fill empty project slots first
+            const existingProjects = [...prev.projects];
+            let projectIndex = 0;
+
+            for (const newProject of newProjects) {
+              // Find an empty slot or add new
+              while (projectIndex < existingProjects.length && existingProjects[projectIndex].title) {
+                projectIndex++;
+              }
+
+              if (projectIndex < existingProjects.length) {
+                existingProjects[projectIndex] = newProject;
+              } else if (existingProjects.length < 5) {
+                existingProjects.push(newProject);
+              }
+              projectIndex++;
+            }
+
+            updates.projects = existingProjects;
+          }
+
+          // Update bio if empty or short
+          if (data.enrichedBio && (!prev.bio || prev.bio.length < 50)) {
+            updates.bio = data.enrichedBio.substring(0, 300);
+          }
+
+          return { ...prev, ...updates };
+        });
+
+        setAutoFillSuccess(true);
+        setTimeout(() => setAutoFillSuccess(false), 5000);
+      } else if (data.error) {
+        setAutoFillError(data.error);
+      }
+    } catch (err) {
+      console.error('Auto-fill error:', err);
+      setAutoFillError(err instanceof Error ? err.message : 'Auto-fill failed. Please fill in manually.');
+    } finally {
+      setIsAutoFilling(false);
+    }
+  };
+
+  // Generate profile from LinkedIn/Portfolio URL
+  const handleGenerateProfile = async () => {
+    if (!generateName.trim()) {
+      setGenerateError('Please enter your full name');
+      return;
+    }
+
+    if (!generateLinkedIn.trim() && !generatePortfolio.trim()) {
+      setGenerateError('Please enter at least your LinkedIn URL or portfolio URL');
+      return;
+    }
+
+    setIsGenerating(true);
+    setGenerateError('');
+
+    try {
+      // Use the comprehensive search endpoint for better profile generation
+      const response = await fetch('/api/enrich-profile-search', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          fullName: generateName.trim(),
+          linkedinUrl: generateLinkedIn.trim(),
+          portfolioUrl: generatePortfolio.trim(),
+          currentSkills: [],
+          currentBio: '',
+          location: '',
+          focusAreas: [],
+          existingProjects: [],
+        }),
+      });
+
+      // Handle timeout/network errors
+      if (response.status === 504) {
+        throw new Error('The request took too long. Please try with just your name, or fill in manually.');
+      }
+
+      if (response.status >= 500) {
+        throw new Error('Server error. Please try again or fill in manually.');
+      }
+
+      // Safely parse JSON
+      let data;
+      try {
+        const text = await response.text();
+        if (!text || text.trim().length === 0) {
+          throw new Error('Empty response from server');
+        }
+        data = JSON.parse(text);
+      } catch (parseError) {
+        console.error('JSON parse error:', parseError);
+        throw new Error('Invalid response from server. Please try again or fill in manually.');
+      }
+
+      if (!response.ok) {
+        throw new Error(data.error || 'Failed to generate profile');
+      }
+
+      if (data.success) {
+        // Pre-fill the form with generated data
+        const updates: Partial<ProfileFormData> = {
+          fullName: generateName.trim(),
+          linkedinUrl: generateLinkedIn.trim(),
+          portfolioUrl: generatePortfolio.trim(),
+          email: user?.email || '',
+        };
+
+        // Add discovered skills
+        if (data.additionalSkills && data.additionalSkills.length > 0) {
+          updates.skills = data.additionalSkills.slice(0, 15);
+        }
+
+        // Add enriched bio
+        if (data.enrichedBio) {
+          updates.bio = data.enrichedBio.substring(0, 300);
+        }
+
+        // Add location if found
+        if (data.location) {
+          updates.location = data.location;
+        }
+
+        // Add discovered projects
+        if (data.discoveredProjects && data.discoveredProjects.length > 0) {
+          const projects = data.discoveredProjects.slice(0, 5).map((p: any) => ({
+            id: crypto.randomUUID(),
+            title: p.title || 'Untitled Project',
+            description: p.description || '',
+            link: p.url || '',
+            imageUrl: '',
+          }));
+          // Pad with empty projects if less than 2
+          while (projects.length < 2) {
+            projects.push(createEmptyProject());
+          }
+          updates.projects = projects;
+        }
+
+        setFormData(prev => ({ ...prev, ...updates }));
+        setShowGenerateModal(false);
+        setAutoFillSuccess(true);
+        setTimeout(() => setAutoFillSuccess(false), 5000);
+      } else if (data.error) {
+        setGenerateError(data.error);
+      }
+    } catch (err) {
+      console.error('Generate profile error:', err);
+      setGenerateError(err instanceof Error ? err.message : 'Failed to generate profile. Please try manually.');
+    } finally {
+      setIsGenerating(false);
+    }
   };
 
   const isValidEmail = (email: string): boolean => {
@@ -205,20 +475,21 @@ const NetworkCreateProfilePage: React.FC = () => {
     }
 
     if (step === 3) {
-      const validProjects = formData.projects.filter(p => 
-        p.title.trim() && p.imageUrl.trim() && p.description.trim()
+      // Projects need title and description - image is optional
+      const validProjects = formData.projects.filter(p =>
+        p.title.trim() && p.description.trim()
       );
       if (validProjects.length < 2) {
-        newErrors.projects = 'Please complete at least 2 projects (title, image, and description required)';
+        newErrors.projects = 'Please complete at least 2 projects with title and description';
       }
       formData.projects.forEach((project, index) => {
-        if (project.title.trim() || project.imageUrl.trim() || project.description.trim()) {
+        // Only validate if project has some content
+        if (project.title.trim() || project.description.trim()) {
           if (!project.title.trim()) {
             newErrors[`project_${index}_title`] = 'Title is required';
           }
-          if (!project.imageUrl.trim()) {
-            newErrors[`project_${index}_imageUrl`] = 'Image URL is required';
-          } else if (!isValidUrl(project.imageUrl)) {
+          // Image URL is optional, but validate format if provided
+          if (project.imageUrl.trim() && !isValidUrl(project.imageUrl)) {
             newErrors[`project_${index}_imageUrl`] = 'Please enter a valid URL';
           }
           if (!project.description.trim()) {
@@ -261,18 +532,32 @@ const NetworkCreateProfilePage: React.FC = () => {
     setEnrichmentError('');
 
     try {
+      // Projects need title and description - image is optional
       const cleanedProjects = formData.projects.filter(p =>
-        p.title.trim() && p.imageUrl.trim() && p.description.trim()
+        p.title.trim() && p.description.trim()
       );
 
-      const result = await createProfile({
-        ...formData,
-        projects: cleanedProjects,
-      }, user.id);
+      const result = await createProfile(
+        {
+          ...formData,
+          projects: cleanedProjects,
+        }, 
+        user.id,
+        session?.access_token
+      );
 
       if (result.success && result.profile) {
         setSubmitSuccess(true);
         setCreatedSlug(result.profile.slug);
+
+        // Generate embedding so profile appears in job matching
+        try {
+          await fetch(`/api/generate-embeddings?profileId=${result.profile.id}`, {
+            method: 'POST',
+          });
+        } catch (embeddingErr) {
+          console.warn('Embedding generation failed:', embeddingErr);
+        }
 
         // Trigger profile enrichment in the background (graceful degradation)
         if (session?.access_token) {
@@ -388,6 +673,127 @@ const NetworkCreateProfilePage: React.FC = () => {
 
   return (
     <div className="min-h-screen bg-black text-white overflow-hidden">
+      {/* Generate Profile Modal */}
+      {showGenerateModal && (
+        <div className="fixed inset-0 bg-black/90 backdrop-blur-sm flex items-center justify-center z-50 p-4 animate-in fade-in duration-200">
+          <div className="bg-zinc-900 border border-zinc-800 rounded-2xl p-8 max-w-lg w-full animate-in zoom-in-95 duration-200">
+            {/* Header */}
+            <div className="flex items-center gap-4 mb-6">
+              <div className="w-14 h-14 rounded-2xl bg-gradient-to-br from-violet-500/20 to-fuchsia-500/20 flex items-center justify-center border border-violet-500/20">
+                <Zap className="h-7 w-7 text-violet-400" />
+              </div>
+              <div>
+                <h2 className="text-2xl font-bold text-white">Generate Profile</h2>
+                <p className="text-sm text-zinc-400">Let AI build your profile from the web</p>
+              </div>
+            </div>
+
+            {/* Description */}
+            <div className="mb-6 p-4 bg-gradient-to-br from-violet-500/10 to-fuchsia-500/10 rounded-xl border border-violet-500/20">
+              <p className="text-sm text-zinc-300 leading-relaxed">
+                We'll search the web for your professional information, projects, and skills using your LinkedIn or portfolio. You can review and edit everything before publishing.
+              </p>
+            </div>
+
+            {/* Form Fields */}
+            <div className="space-y-4 mb-6">
+              <div>
+                <label className="block text-sm font-medium text-zinc-300 mb-2">
+                  Full Name <span className="text-red-400">*</span>
+                </label>
+                <div className="relative">
+                  <User className="absolute left-4 top-1/2 -translate-y-1/2 h-4 w-4 text-zinc-500" />
+                  <input
+                    type="text"
+                    value={generateName}
+                    onChange={(e) => setGenerateName(e.target.value)}
+                    placeholder="Your full name"
+                    className="w-full pl-11 pr-4 py-3 bg-zinc-800/50 border border-zinc-700/50 rounded-xl text-white placeholder:text-zinc-500 focus:outline-none focus:border-violet-500/50 focus:ring-1 focus:ring-violet-500/20 transition-all"
+                  />
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-zinc-300 mb-2">
+                  LinkedIn Profile URL
+                </label>
+                <div className="relative">
+                  <Linkedin className="absolute left-4 top-1/2 -translate-y-1/2 h-4 w-4 text-zinc-500" />
+                  <input
+                    type="url"
+                    value={generateLinkedIn}
+                    onChange={(e) => setGenerateLinkedIn(e.target.value)}
+                    placeholder="https://linkedin.com/in/yourprofile"
+                    className="w-full pl-11 pr-4 py-3 bg-zinc-800/50 border border-zinc-700/50 rounded-xl text-white placeholder:text-zinc-500 focus:outline-none focus:border-violet-500/50 focus:ring-1 focus:ring-violet-500/20 transition-all"
+                  />
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-zinc-300 mb-2">
+                  Portfolio / Website URL
+                </label>
+                <div className="relative">
+                  <Globe className="absolute left-4 top-1/2 -translate-y-1/2 h-4 w-4 text-zinc-500" />
+                  <input
+                    type="url"
+                    value={generatePortfolio}
+                    onChange={(e) => setGeneratePortfolio(e.target.value)}
+                    placeholder="https://yourwebsite.com"
+                    className="w-full pl-11 pr-4 py-3 bg-zinc-800/50 border border-zinc-700/50 rounded-xl text-white placeholder:text-zinc-500 focus:outline-none focus:border-violet-500/50 focus:ring-1 focus:ring-violet-500/20 transition-all"
+                  />
+                </div>
+              </div>
+            </div>
+
+            {/* Error Message */}
+            {generateError && (
+              <div className="mb-4 p-3 bg-red-500/10 border border-red-500/20 rounded-xl flex items-center gap-2 text-red-400 text-sm">
+                <AlertCircle className="h-4 w-4 flex-shrink-0" />
+                {generateError}
+              </div>
+            )}
+
+            {/* Action Buttons */}
+            <div className="flex gap-3">
+              <button
+                onClick={() => {
+                  setShowGenerateModal(false);
+                  // Clear the mode param from URL
+                  navigate('/directory/create', { replace: true });
+                }}
+                disabled={isGenerating}
+                className="flex-1 px-4 py-3 bg-zinc-800/50 hover:bg-zinc-800 rounded-xl text-sm font-medium transition-colors"
+              >
+                Fill Manually
+              </button>
+              <button
+                onClick={handleGenerateProfile}
+                disabled={isGenerating || !generateName.trim()}
+                className="flex-1 px-4 py-3 bg-gradient-to-r from-violet-500 to-fuchsia-500 hover:from-violet-600 hover:to-fuchsia-600 text-white rounded-xl text-sm font-medium transition-all flex items-center justify-center gap-2 shadow-lg shadow-violet-500/20 disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                {isGenerating ? (
+                  <>
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                    <span className="animate-pulse">Generating...</span>
+                  </>
+                ) : (
+                  <>
+                    <Sparkles className="h-4 w-4" />
+                    Generate Profile
+                  </>
+                )}
+              </button>
+            </div>
+
+            {/* Privacy Note */}
+            <p className="text-xs text-zinc-500 text-center mt-4">
+              We only search publicly available information
+            </p>
+          </div>
+        </div>
+      )}
+
       <div className="max-w-4xl mx-auto px-8 md:px-16 py-20 lg:py-24">
         {/* Small Label */}
         <div className="mb-6">
@@ -487,15 +893,60 @@ const NetworkCreateProfilePage: React.FC = () => {
                 <label className="block text-sm font-medium text-zinc-300 mb-2 font-secondary">
                   Full Name *
                 </label>
-                <Input
-                  value={formData.fullName}
-                  onChange={(e) => updateField('fullName', e.target.value)}
-                  placeholder="Your full name"
-                  className={cn("h-12", errors.fullName && "border-red-500")}
-                />
+                <div className="flex gap-3">
+                  <Input
+                    value={formData.fullName}
+                    onChange={(e) => updateField('fullName', e.target.value)}
+                    placeholder="Your full name"
+                    className={cn("h-12 flex-1", errors.fullName && "border-red-500")}
+                  />
+                  <button
+                    type="button"
+                    onClick={handleAutoFill}
+                    disabled={isAutoFilling || !formData.fullName.trim()}
+                    className={cn(
+                      "px-4 py-2 flex items-center gap-2 font-secondary text-sm tracking-wide transition-all whitespace-nowrap",
+                      isAutoFilling
+                        ? "bg-purple-500/20 text-purple-400 border border-purple-500/30"
+                        : autoFillSuccess
+                        ? "bg-green-500/20 text-green-400 border border-green-500/30"
+                        : "bg-purple-500/10 text-purple-400 border border-purple-500/20 hover:bg-purple-500/20 hover:border-purple-500/40",
+                      (!formData.fullName.trim() && !isAutoFilling) && "opacity-50 cursor-not-allowed"
+                    )}
+                    title="AI searches your portfolio, LinkedIn, and public profiles to auto-fill your skills, bio, and projects"
+                  >
+                    {isAutoFilling ? (
+                      <>
+                        <Loader2 className="h-4 w-4 animate-spin" />
+                        Searching the web...
+                      </>
+                    ) : autoFillSuccess ? (
+                      <>
+                        <CheckCircle2 className="h-4 w-4" />
+                        Found!
+                      </>
+                    ) : (
+                      <>
+                        <Wand2 className="h-4 w-4" />
+                        Auto-fill with AI
+                      </>
+                    )}
+                  </button>
+                </div>
                 {errors.fullName && (
                   <p className="text-red-400 text-sm mt-1">{errors.fullName}</p>
                 )}
+                {autoFillError && (
+                  <p className="text-amber-400 text-sm mt-1">{autoFillError}</p>
+                )}
+                {autoFillSuccess && (
+                  <p className="text-green-400 text-sm mt-1">
+                    Profile auto-filled! Review the information below and make any adjustments.
+                  </p>
+                )}
+                <p className="text-zinc-500 text-xs mt-1">
+                  AI searches your portfolio, LinkedIn, and public profiles to populate your skills, bio, work history, and projects
+                </p>
               </div>
 
               <div>
@@ -587,6 +1038,7 @@ const NetworkCreateProfilePage: React.FC = () => {
                   <p className="text-red-400 text-sm mt-1">{errors.bio}</p>
                 )}
               </div>
+
             </div>
           )}
 
@@ -596,30 +1048,15 @@ const NetworkCreateProfilePage: React.FC = () => {
               <div>
                 <h2 className="text-xl font-primary text-white mb-2">Focus Areas</h2>
                 <p className="text-zinc-400 text-sm font-secondary mb-4">
-                  Select all areas that describe your work ({formData.focusAreas.length} selected)
+                  Add at least 1 focus area that describes your work (type to search or add your own)
                 </p>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                  {FOCUS_AREAS.map((area) => {
-                    const isSelected = formData.focusAreas.includes(area.value);
-                    
-                    return (
-                      <button
-                        key={area.value}
-                        type="button"
-                        onClick={() => toggleFocusArea(area.value)}
-                        className={cn(
-                          "p-4 rounded-lg border text-left transition-all",
-                          isSelected 
-                            ? "border-pink-500 bg-pink-500/10 text-white" 
-                            : "border-zinc-700 bg-zinc-900/50 text-zinc-300 hover:border-zinc-600"
-                        )}
-                      >
-                        <div className="font-medium text-sm">{area.label}</div>
-                        <div className="text-xs text-zinc-500 mt-1">{area.description}</div>
-                      </button>
-                    );
-                  })}
-                </div>
+                <TagInput
+                  tags={formData.focusAreas}
+                  onTagsChange={(tags) => updateField('focusAreas', tags)}
+                  suggestions={SUGGESTED_FOCUS_AREAS}
+                  placeholder="Type a focus area and press Enter..."
+                  className={cn(errors.focusAreas && "border-red-500")}
+                />
                 {errors.focusAreas && (
                   <p className="text-red-400 text-sm mt-2">{errors.focusAreas}</p>
                 )}

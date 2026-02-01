@@ -1,4 +1,41 @@
 {
+  "framework": "vite",
+  "devCommand": "vite --port $PORT --host",
+  "functions": {
+    "api/admin/[[...path]].ts": {
+      "maxDuration": 120
+    },
+    "api/messages/[[...path]].ts": {
+      "maxDuration": 30
+    },
+    "api/beta/[[...path]].ts": {
+      "maxDuration": 30
+    },
+    "api/jobs/[[...path]].ts": {
+      "maxDuration": 60
+    },
+    "api/company/[[...path]].ts": {
+      "maxDuration": 30
+    },
+    "api/profiles/[[...path]].ts": {
+      "maxDuration": 60
+    },
+    "api/match-job.ts": {
+      "maxDuration": 120
+    },
+    "api/generate-embeddings.ts": {
+      "maxDuration": 300
+    },
+    "api/enrich-profiles.ts": {
+      "maxDuration": 300
+    },
+    "api/enrich-profile-search.ts": {
+      "maxDuration": 120
+    },
+    "api/webhooks/stripe.ts": {
+      "maxDuration": 30
+    }
+  },
   "rewrites": [
     {
       "source": "/api/(.*)",

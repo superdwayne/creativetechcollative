@@ -1,9 +1,8 @@
-import React, { useEffect, useState, useCallback, useRef } from 'react';
+import React, { useEffect, useState, useCallback } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import {
   User,
   Edit,
-  Trash2,
   ExternalLink,
   LogOut,
   Loader2,
@@ -13,105 +12,60 @@ import {
   BadgeCheck,
   Sparkles,
   Building2,
-  DollarSign,
-  Calendar,
   CheckCircle2,
-  XCircle,
-  ChevronDown,
-  ChevronUp,
   Clock,
+  Wand2,
+  Plus,
+  X,
+  Search,
+  FolderOpen,
+  Globe,
+  Linkedin,
+  Link2,
+  Mail,
+  ArrowUpRight,
+  Zap,
   MessageSquare,
-  Send,
 } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
+import { usePresence } from '@/hooks/usePresence';
 import { NetworkProfile, FOCUS_AREAS, AVAILABILITY_OPTIONS } from '@/types/network-profile';
-import { getProfileByUserId, deleteProfile, getMatchesForMember, updateMemberResponse, JobMatchWithDetails } from '@/lib/supabase';
+import { getProfileByUserId, deleteProfile } from '@/lib/supabase';
 import { cn } from '@/lib/utils';
-import ImageCube from '../components/ImageCube';
-import { PROJECT_TYPES, REMOTE_PREFERENCES, MemberResponse } from '@/types/job-matching';
-
-interface Message {
-  id: string;
-  matchId: string;
-  senderType: 'company' | 'member';
-  senderId: string;
-  content: string;
-  createdAt: string;
-  readAt: string | null;
-}
 
 const NetworkDashboardPage: React.FC = () => {
+  // Track user presence to avoid sending email notifications when they're active
+  usePresence();
   const navigate = useNavigate();
   const { user, session, signOut, loading: authLoading } = useAuth();
   const [profile, setProfile] = useState<NetworkProfile | null>(null);
-  const [jobMatches, setJobMatches] = useState<JobMatchWithDetails[]>([]);
   const [loading, setLoading] = useState(true);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
   const [error, setError] = useState('');
-  const [expandedMatchId, setExpandedMatchId] = useState<string | null>(null);
-  const [respondingMatchId, setRespondingMatchId] = useState<string | null>(null);
+  const [isEnriching, setIsEnriching] = useState(false);
+  const [enrichmentSuccess, setEnrichmentSuccess] = useState(false);
+  const [enrichmentMessage, setEnrichmentMessage] = useState('');
+  const [unreadMessageCount, setUnreadMessageCount] = useState(0);
+  
+  // New profile creation flow state
+  const [firstName, setFirstName] = useState('');
+  const [showNameStep, setShowNameStep] = useState(false);
+  const [isGenerating, setIsGenerating] = useState(false);
+  const [generateError, setGenerateError] = useState('');
 
-  // Messaging state
-  const [expandedMessagingMatchId, setExpandedMessagingMatchId] = useState<string | null>(null);
-  const [conversations, setConversations] = useState<Record<string, Message[]>>({});
-  const [loadingConversations, setLoadingConversations] = useState<Record<string, boolean>>({});
-  const [messageInputs, setMessageInputs] = useState<Record<string, string>>({});
-  const [sendingMessages, setSendingMessages] = useState<Record<string, boolean>>({});
-  const messagesEndRef = useRef<Record<string, HTMLDivElement | null>>({});
-
-  // Unread message state
-  const [totalUnreadCount, setTotalUnreadCount] = useState(0);
-  const [matchUnreadStatus, setMatchUnreadStatus] = useState<Record<string, boolean>>({});
-
-  // Fetch total unread count
-  const fetchUnreadCount = useCallback(async () => {
-    if (!session) return;
-
-    try {
-      const response = await fetch('/api/messages/unread-count', {
-        headers: {
-          Authorization: `Bearer ${session.access_token}`,
-        },
-      });
-      const data = await response.json();
-      if (response.ok) {
-        setTotalUnreadCount(data.count);
-      }
-    } catch (error) {
-      console.error('Error fetching unread count:', error);
-    }
-  }, [session]);
-
-  // Fetch unread status per match
-  const fetchMatchUnreadStatus = useCallback(
-    async (matches: JobMatchWithDetails[]) => {
-      if (!session || matches.length === 0) return;
-
-      // Only check matches where member has responded 'interested'
-      const interestedMatches = matches.filter((m) => m.memberResponse === 'interested');
-      if (interestedMatches.length === 0) return;
-
-      try {
-        const response = await fetch('/api/messages/unread-status', {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            Authorization: `Bearer ${session.access_token}`,
-          },
-          body: JSON.stringify({ matchIds: interestedMatches.map((m) => m.id) }),
-        });
-        const data = await response.json();
-        if (response.ok && data.success) {
-          setMatchUnreadStatus(data.unreadStatus);
-        }
-      } catch (error) {
-        console.error('Error fetching match unread status:', error);
-      }
-    },
-    [session]
-  );
-
+  // Enrichment preview modal state
+  const [showEnrichmentPreview, setShowEnrichmentPreview] = useState(false);
+  const [enrichmentData, setEnrichmentData] = useState<{
+    discoveredProjects: Array<{ title: string; description: string; url?: string; client?: string; selected: boolean }>;
+    additionalSkills: Array<{ name: string; selected: boolean }>;
+    workHistory: Array<{ company: string; role: string; duration?: string; description?: string; selected: boolean }>;
+    enrichedBio: string;
+    useBio: boolean;
+  } | null>(null);
+  const [customSkill, setCustomSkill] = useState('');
+  const [customProject, setCustomProject] = useState({ title: '', description: '', url: '' });
+  const [isApplying, setIsApplying] = useState(false);
 
   const fetchData = useCallback(async () => {
     if (!user) return;
@@ -119,22 +73,12 @@ const NetworkDashboardPage: React.FC = () => {
     try {
       const profileData = await getProfileByUserId(user.id);
       setProfile(profileData);
-
-      // Fetch job matches if profile exists
-      if (profileData) {
-        const matches = await getMatchesForMember(profileData.id);
-        setJobMatches(matches);
-        // Fetch unread status for matches after getting them
-        if (session) {
-          fetchMatchUnreadStatus(matches);
-        }
-      }
     } catch (err) {
       console.error('Error fetching data:', err);
     } finally {
       setLoading(false);
     }
-  }, [user, session, fetchMatchUnreadStatus]);
+  }, [user]);
 
   useEffect(() => {
     if (!authLoading && !user) {
@@ -147,127 +91,31 @@ const NetworkDashboardPage: React.FC = () => {
     }
   }, [user, authLoading, navigate, fetchData]);
 
-  // Fetch unread count when session is available
+  // Fetch unread message count
   useEffect(() => {
-    if (session) {
+    const fetchUnreadCount = async () => {
+      if (!session?.access_token) return;
+      
+      try {
+        const response = await fetch('/api/messages/unread-count', {
+          headers: {
+            Authorization: `Bearer ${session.access_token}`,
+          },
+        });
+        
+        if (response.ok) {
+          const data = await response.json();
+          setUnreadMessageCount(data.count || 0);
+        }
+      } catch (err) {
+        console.error('Error fetching unread count:', err);
+      }
+    };
+
+    if (session?.access_token) {
       fetchUnreadCount();
     }
-  }, [session, fetchUnreadCount]);
-
-  const handleRespondToMatch = async (matchId: string, response: MemberResponse) => {
-    setRespondingMatchId(matchId);
-    try {
-      const result = await updateMemberResponse(matchId, response);
-      if (result.success) {
-        // Update local state
-        setJobMatches((prev) =>
-          prev.map((m) =>
-            m.id === matchId ? { ...m, memberResponse: response } : m
-          )
-        );
-      }
-    } catch (err) {
-      console.error('Error responding to match:', err);
-    } finally {
-      setRespondingMatchId(null);
-    }
-  };
-
-  // Fetch conversation for a match
-  const fetchConversation = useCallback(
-    async (matchId: string) => {
-      if (!session) return;
-
-      setLoadingConversations((prev) => ({ ...prev, [matchId]: true }));
-
-      try {
-        const response = await fetch(`/api/messages/conversation?matchId=${matchId}`, {
-          headers: {
-            Authorization: `Bearer ${session.access_token}`,
-          },
-        });
-
-        const data = await response.json();
-
-        if (response.ok && data.success) {
-          setConversations((prev) => ({ ...prev, [matchId]: data.messages }));
-          // Update unread status for this match (now read)
-          setMatchUnreadStatus((prev) => ({ ...prev, [matchId]: false }));
-          // If messages were marked as read, refresh total unread count
-          if (data.markedAsRead > 0) {
-            fetchUnreadCount();
-          }
-        } else {
-          console.error('Failed to fetch conversation:', data.error);
-        }
-      } catch (error) {
-        console.error('Error fetching conversation:', error);
-      } finally {
-        setLoadingConversations((prev) => ({ ...prev, [matchId]: false }));
-      }
-    },
-    [session, fetchUnreadCount]
-  );
-
-  // Load conversation when messaging section is expanded
-  useEffect(() => {
-    if (expandedMessagingMatchId && !conversations[expandedMessagingMatchId]) {
-      fetchConversation(expandedMessagingMatchId);
-    }
-  }, [expandedMessagingMatchId, conversations, fetchConversation]);
-
-  // Auto-scroll to newest messages when conversation changes or messaging opens
-  useEffect(() => {
-    if (expandedMessagingMatchId && messagesEndRef.current[expandedMessagingMatchId]) {
-      messagesEndRef.current[expandedMessagingMatchId]?.scrollIntoView({ behavior: 'smooth' });
-    }
-  }, [expandedMessagingMatchId, conversations]);
-
-  // Send a message
-  const sendMessage = useCallback(
-    async (matchId: string) => {
-      if (!session) return;
-
-      const content = messageInputs[matchId]?.trim();
-      if (!content) return;
-
-      setSendingMessages((prev) => ({ ...prev, [matchId]: true }));
-
-      try {
-        const response = await fetch('/api/messages/send', {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            Authorization: `Bearer ${session.access_token}`,
-          },
-          body: JSON.stringify({ matchId, content }),
-        });
-
-        const data = await response.json();
-
-        if (response.ok && data.success) {
-          // Add the new message to the conversation
-          setConversations((prev) => ({
-            ...prev,
-            [matchId]: [...(prev[matchId] || []), data.message],
-          }));
-          // Clear the input
-          setMessageInputs((prev) => ({ ...prev, [matchId]: '' }));
-          // Scroll to the new message
-          setTimeout(() => {
-            messagesEndRef.current[matchId]?.scrollIntoView({ behavior: 'smooth' });
-          }, 100);
-        } else {
-          console.error('Failed to send message:', data.error);
-        }
-      } catch (error) {
-        console.error('Error sending message:', error);
-      } finally {
-        setSendingMessages((prev) => ({ ...prev, [matchId]: false }));
-      }
-    },
-    [session, messageInputs]
-  );
+  }, [session?.access_token]);
 
   const handleSignOut = async () => {
     await signOut();
@@ -276,20 +124,241 @@ const NetworkDashboardPage: React.FC = () => {
 
   const handleDelete = async () => {
     if (!profile) return;
-    
+
     setIsDeleting(true);
     setError('');
 
     const result = await deleteProfile(profile.id);
-    
+
     if (result.success) {
       setProfile(null);
       setShowDeleteConfirm(false);
     } else {
       setError(result.error || 'Failed to delete profile');
     }
-    
+
     setIsDeleting(false);
+  };
+
+  // Enrich profile with web data - shows preview first
+  const handleEnrichProfile = async () => {
+    if (!profile) return;
+
+    setIsEnriching(true);
+    setEnrichmentSuccess(false);
+    setEnrichmentMessage('');
+    setError('');
+
+    try {
+      const response = await fetch('/api/enrich-profile-search', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          fullName: profile.fullName,
+          currentSkills: profile.skills || [],
+          currentBio: profile.bio || '',
+          linkedinUrl: profile.linkedinUrl || '',
+          portfolioUrl: profile.portfolioUrl || '',
+          location: profile.location || '',
+          focusAreas: profile.focusAreas || [],
+          existingProjects: profile.projects || [],
+        }),
+      });
+
+      // Handle timeout and server errors
+      if (response.status === 504) {
+        throw new Error('The search took too long. Please try again or add information manually.');
+      }
+
+      if (response.status >= 500) {
+        throw new Error('Server error. Please try again later.');
+      }
+
+      // Safely parse JSON
+      let data;
+      try {
+        data = await response.json();
+      } catch {
+        throw new Error('Invalid response from server. Please try again.');
+      }
+
+      if (!response.ok) {
+        throw new Error(data.error || 'Failed to search for profile data');
+      }
+
+      if (data.success) {
+        const hasData =
+          (data.discoveredProjects?.length > 0) ||
+          (data.additionalSkills?.length > 0) ||
+          (data.workHistory?.length > 0) ||
+          data.enrichedBio;
+
+        setEnrichmentData({
+          discoveredProjects: (data.discoveredProjects || []).map((p: any) => ({
+            ...p,
+            selected: true,
+          })),
+          additionalSkills: (data.additionalSkills || []).map((s: string) => ({
+            name: s,
+            selected: true,
+          })),
+          workHistory: (data.workHistory || []).map((w: any) => ({
+            ...w,
+            selected: true,
+          })),
+          enrichedBio: data.enrichedBio || '',
+          useBio: !profile.bio || profile.bio.length < 100,
+        });
+
+        setShowEnrichmentPreview(true);
+
+        if (!hasData) {
+          setEnrichmentMessage('No new information found automatically. You can add custom skills and projects below.');
+        }
+      } else if (data.error) {
+        setError(data.error);
+      }
+    } catch (err) {
+      console.error('Enrichment error:', err);
+      setError(err instanceof Error ? err.message : 'Failed to search for profile data');
+    } finally {
+      setIsEnriching(false);
+    }
+  };
+
+  // Apply selected enrichment data to profile
+  const applyEnrichment = async () => {
+    if (!profile || !enrichmentData) return;
+
+    setIsApplying(true);
+
+    try {
+      const selectedProjects = enrichmentData.discoveredProjects
+        .filter(p => p.selected)
+        .map(p => ({
+          id: crypto.randomUUID(),
+          title: p.title,
+          description: `${p.description}${p.client ? ` (Client: ${p.client})` : ''}`,
+          imageUrl: '',
+          link: p.url || '',
+        }));
+
+      const selectedSkills = enrichmentData.additionalSkills
+        .filter(s => s.selected)
+        .map(s => s.name);
+
+      const selectedWorkHistory = enrichmentData.workHistory
+        .filter(w => w.selected);
+
+      const updates: Record<string, any> = {};
+
+      if (selectedSkills.length > 0) {
+        const existingSkills = profile.skills || [];
+        updates.skills = [...new Set([...existingSkills, ...selectedSkills])].slice(0, 30);
+      }
+
+      if (selectedProjects.length > 0) {
+        const existingProjects = profile.projects || [];
+        const existingTitles = new Set(existingProjects.map(p => p.title?.toLowerCase()));
+        const newProjects = selectedProjects.filter(p => !existingTitles.has(p.title?.toLowerCase()));
+        updates.projects = [...existingProjects, ...newProjects].slice(0, 10);
+      }
+
+      if (enrichmentData.useBio && enrichmentData.enrichedBio) {
+        updates.bio = enrichmentData.enrichedBio.substring(0, 300);
+      }
+
+      if (selectedWorkHistory.length > 0) {
+        updates.enriched_content = JSON.stringify({
+          workHistory: selectedWorkHistory,
+          lastEnriched: new Date().toISOString(),
+        });
+      }
+
+      const response = await fetch('/api/update-profile-enrichment', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${session?.access_token}`,
+        },
+        body: JSON.stringify({
+          profileId: profile.id,
+          updates,
+        }),
+      });
+
+      const result = await response.json();
+
+      if (!response.ok || !result.success) {
+        throw new Error(result.error || 'Failed to apply enrichment');
+      }
+
+      const updatedProfile = await getProfileByUserId(user!.id);
+      if (updatedProfile) {
+        setProfile(updatedProfile);
+      }
+
+      // Regenerate embedding so profile appears in job matching
+      try {
+        await fetch(`/api/generate-embeddings?profileId=${profile.id}`, {
+          method: 'POST',
+        });
+      } catch (embeddingErr) {
+        console.error('Embedding regeneration failed:', embeddingErr);
+        // Don't fail the whole operation if embedding fails
+      }
+
+      setEnrichmentSuccess(true);
+      const parts = [];
+      if (selectedProjects.length) parts.push(`${selectedProjects.length} project${selectedProjects.length > 1 ? 's' : ''}`);
+      if (selectedSkills.length) parts.push(`${selectedSkills.length} skill${selectedSkills.length > 1 ? 's' : ''}`);
+      if (selectedWorkHistory.length) parts.push(`${selectedWorkHistory.length} work experience${selectedWorkHistory.length > 1 ? 's' : ''}`);
+      setEnrichmentMessage(parts.length > 0 ? `Added ${parts.join(', ')} to your profile!` : 'Profile updated!');
+
+      setShowEnrichmentPreview(false);
+      setEnrichmentData(null);
+
+      setTimeout(() => {
+        setEnrichmentSuccess(false);
+        setEnrichmentMessage('');
+      }, 10000);
+    } catch (err) {
+      console.error('Apply enrichment error:', err);
+      setError(err instanceof Error ? err.message : 'Failed to apply changes');
+    } finally {
+      setIsApplying(false);
+    }
+  };
+
+  const addCustomSkill = () => {
+    if (!customSkill.trim() || !enrichmentData) return;
+    setEnrichmentData({
+      ...enrichmentData,
+      additionalSkills: [
+        ...enrichmentData.additionalSkills,
+        { name: customSkill.trim(), selected: true },
+      ],
+    });
+    setCustomSkill('');
+  };
+
+  const addCustomProject = () => {
+    if (!customProject.title.trim() || !enrichmentData) return;
+    setEnrichmentData({
+      ...enrichmentData,
+      discoveredProjects: [
+        ...enrichmentData.discoveredProjects,
+        {
+          title: customProject.title.trim(),
+          description: customProject.description.trim(),
+          url: customProject.url.trim(),
+          selected: true,
+        },
+      ],
+    });
+    setCustomProject({ title: '', description: '', url: '' });
   };
 
   const getAvailabilityLabel = (status: string) => {
@@ -299,9 +368,9 @@ const NetworkDashboardPage: React.FC = () => {
   const getAvailabilityColor = (status: string) => {
     switch (status) {
       case 'open-to-work':
-        return 'bg-green-500/20 text-green-400 border-green-500/30';
+        return 'bg-emerald-500/20 text-emerald-400 border-emerald-500/30';
       case 'open-to-collaborations':
-        return 'bg-blue-500/20 text-blue-400 border-blue-500/30';
+        return 'bg-sky-500/20 text-sky-400 border-sky-500/30';
       default:
         return 'bg-zinc-500/20 text-zinc-400 border-zinc-500/30';
     }
@@ -311,664 +380,846 @@ const NetworkDashboardPage: React.FC = () => {
     return FOCUS_AREAS.find(f => f.value === value)?.label || value;
   };
 
+  const getFocusAreaColor = (value: string) => {
+    const colors: Record<string, string> = {
+      'immersive-experiences': 'bg-violet-500/20 text-violet-300 border-violet-500/30',
+      'interactive-web': 'bg-sky-500/20 text-sky-300 border-sky-500/30',
+      'generative-design': 'bg-fuchsia-500/20 text-fuchsia-300 border-fuchsia-500/30',
+      'creative-automation': 'bg-amber-500/20 text-amber-300 border-amber-500/30',
+      'physical-computing': 'bg-emerald-500/20 text-emerald-300 border-emerald-500/30',
+      'realtime-visuals': 'bg-cyan-500/20 text-cyan-300 border-cyan-500/30',
+    };
+    return colors[value] || 'bg-zinc-500/20 text-zinc-300 border-zinc-500/30';
+  };
+
   if (authLoading || loading) {
     return (
       <div className="min-h-screen bg-black text-white flex items-center justify-center">
-        <Loader2 className="h-8 w-8 animate-spin text-white" />
+        <div className="flex flex-col items-center gap-4">
+          <div className="relative">
+            <div className="w-12 h-12 rounded-full border-2 border-zinc-800 border-t-white animate-spin" />
+          </div>
+          <p className="text-zinc-500 text-sm">Loading your dashboard...</p>
+        </div>
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen bg-black text-white overflow-hidden">
-      <div className="flex flex-col lg:flex-row min-h-screen">
-        {/* Left Side - Dashboard Content */}
-        <div className="flex-1 px-8 md:px-16 lg:px-24 py-20 lg:py-24">
-          {/* Small Label */}
-          <div className="mb-6">
-            <span className="text-xs font-secondary tracking-[0.3em] text-zinc-500 uppercase">
+    <div className="min-h-screen bg-black text-white relative overflow-hidden">
+      {/* Background atmosphere */}
+      <div className="fixed inset-0 pointer-events-none">
+        <div className="absolute top-0 left-1/4 w-96 h-96 bg-violet-500/5 rounded-full blur-3xl" />
+        <div className="absolute bottom-0 right-1/4 w-96 h-96 bg-fuchsia-500/5 rounded-full blur-3xl" />
+      </div>
+
+      {/* Header */}
+      <header className="relative border-b border-zinc-800/50 backdrop-blur-sm bg-black/50 sticky top-0 z-40">
+        <div className="max-w-6xl mx-auto px-6 py-4 flex items-center justify-between">
+          <div className="flex items-center gap-3">
+            <Link to="/directory" className="text-xs font-medium tracking-[0.2em] text-zinc-500 uppercase hover:text-zinc-300 transition-colors">
               CTC Network
-            </span>
+            </Link>
+            <span className="text-zinc-700">/</span>
+            <span className="text-sm font-medium text-white">Dashboard</span>
           </div>
-{/* Header */}
-           <div className="flex items-start justify-between mb-10">
-             <div>
-               <h1 className="text-3xl md:text-4xl lg:text-5xl font-primary font-medium leading-[0.95] tracking-tight">
-                 <span className="block">Welcome back</span>
-                 <span className="block text-zinc-500">to your dashboard</span>
-               </h1>
-               <p className="mt-3 text-sm font-secondary text-zinc-400 max-w-md">
-                 Manage your profile and visibility in the CTC Network.
-               </p>
-             </div>
-             <button
-               onClick={handleSignOut}
-               className="flex items-center gap-2 px-6 py-3 border border-zinc-700 text-white font-secondary text-sm tracking-wide hover:border-zinc-500 transition-colors"
-             >
-               <LogOut className="h-4 w-4" />
-               Sign Out
-             </button>
-           </div>
+          <button
+            onClick={handleSignOut}
+            className="flex items-center gap-2 px-4 py-2 text-zinc-400 hover:text-white text-sm transition-all hover:bg-zinc-800/50 rounded-lg"
+          >
+            <LogOut className="h-4 w-4" />
+            Sign Out
+          </button>
+        </div>
+      </header>
 
-{/* Account Info */}
-           <div className="border-b border-zinc-800 pb-6 mb-4">
-            <p className="text-sm font-secondary text-zinc-400">
-              Logged in as <span className="text-white">{user?.email}</span>
-            </p>
-</div>
-           {profile && (
-             <div className="mb-6">
-               {/* Approval Status Badge and Message */}
-               {profile.approved ? (
-                 <>
-                   <div className="flex items-center gap-2 mb-2">
-                     <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-green-500/20 text-green-400 text-sm font-medium border border-green-500/30">
-                       <CheckCircle2 className="h-4 w-4" />
-                       Approved
-                     </span>
-                   </div>
-                   <p className="text-sm font-secondary text-green-400 mb-4">
-                     Your profile is live in the directory.{' '}
-                     <Link
-                       to={`/directory/profile/${profile.slug}`}
-                       className="underline hover:text-green-300 transition-colors"
-                     >
-                       View your public profile
-                     </Link>
-                   </p>
-                 </>
-               ) : (
-                 <>
-                   <div className="flex items-center gap-2 mb-2">
-                     <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-yellow-500/20 text-yellow-400 text-sm font-medium border border-yellow-500/30">
-                       <Clock className="h-4 w-4" />
-                       Pending Review
-                     </span>
-                   </div>
-                   <p className="text-sm font-secondary text-yellow-400">
-                     Your profile is under review and will appear in the directory once approved.
-                   </p>
-                 </>
-               )}
-               <div className="mt-4 p-4 border border-zinc-800 rounded-lg bg-zinc-900/50 max-w-md">
-                 <p className="text-sm font-secondary text-white mb-2">Getting started</p>
-                 <ul className="text-sm font-secondary text-zinc-400 space-y-1">
-                   <li>• Review your bio and skills</li>
-                   <li>• Set availability so others know how to reach out</li>
-                   <li>• Browse the directory and connect</li>
-                 </ul>
-               </div>
-             </div>
-           )}
+      <main className="relative max-w-6xl mx-auto px-6 py-12">
+        {error && (
+          <div className="mb-8 p-4 bg-red-500/10 border border-red-500/20 rounded-xl flex items-center gap-3 text-red-400 animate-in fade-in slide-in-from-top-2 duration-300">
+            <AlertCircle className="h-5 w-5 flex-shrink-0" />
+            <p className="text-sm">{error}</p>
+            <button onClick={() => setError('')} className="ml-auto p-1 hover:bg-red-500/20 rounded transition-colors">
+              <X className="h-4 w-4" />
+            </button>
+          </div>
+        )}
 
-           {error && (
-             <div aria-live="polite" className="mb-6 p-4 border border-red-500/30 flex items-center gap-2 text-red-400 font-secondary text-sm">
-              <AlertCircle className="h-5 w-5 flex-shrink-0" />
-              {error}
+        {!profile ? (
+          /* No Profile State - Two Step Flow */
+          <div className="text-center py-20 animate-in fade-in duration-500">
+            <div className="w-24 h-24 rounded-2xl bg-gradient-to-br from-violet-500/20 to-fuchsia-500/20 flex items-center justify-center mx-auto mb-8 border border-white/5">
+              <User className="h-12 w-12 text-zinc-500" />
             </div>
-          )}
+            
+            {!showNameStep ? (
+              /* Initial View - Get Started */
+              <>
+                <h1 className="text-4xl font-bold text-white mb-4 tracking-tight">Create Your Profile</h1>
+                <p className="text-zinc-400 mb-10 max-w-md mx-auto text-lg leading-relaxed">
+                  Join the CTC Network directory and connect with the creative technology community.
+                </p>
+                
+                <button
+                  onClick={() => setShowNameStep(true)}
+                  className="group px-8 py-4 bg-white text-black font-medium text-sm tracking-wide hover:bg-zinc-100 transition-all rounded-xl inline-flex items-center gap-2 shadow-lg shadow-white/10"
+                >
+                  Get Started
+                  <ArrowUpRight className="w-4 h-4 group-hover:translate-x-0.5 group-hover:-translate-y-0.5 transition-transform" />
+                </button>
+              </>
+            ) : (
+              /* Step 2 - Enter Name and Choose Path */
+              <>
+                <h1 className="text-4xl font-bold text-white mb-4 tracking-tight">Let's build your profile</h1>
+                <p className="text-zinc-400 mb-8 max-w-md mx-auto text-lg leading-relaxed">
+                  Enter your name and we'll search the web to auto-fill your profile with your public work, skills, and bio.
+                </p>
+                
+                <div className="max-w-sm mx-auto mb-8">
+                  <input
+                    type="text"
+                    value={firstName}
+                    onChange={(e) => {
+                      setFirstName(e.target.value);
+                      setGenerateError('');
+                    }}
+                    placeholder="Your full name"
+                    autoFocus
+                    className="w-full px-6 py-4 bg-zinc-900/50 border border-zinc-700/50 rounded-xl text-white text-center text-lg placeholder:text-zinc-500 focus:outline-none focus:border-violet-500/50 focus:ring-2 focus:ring-violet-500/20 transition-all"
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter' && firstName.trim()) {
+                        navigate(`/directory/create?name=${encodeURIComponent(firstName.trim())}`);
+                      }
+                    }}
+                  />
+                </div>
 
-          {!profile ? (
-            /* No Profile State */
-            <div className="py-12">
-              <User className="h-16 w-16 text-zinc-700 mb-6" />
-              <h2 className="text-2xl font-primary text-white mb-3">No Profile Yet</h2>
-              <p className="text-zinc-400 font-secondary mb-8 max-w-md">
-                Create your profile to appear in the CTC Network directory and connect with the community.
-              </p>
+                {/* Error Message */}
+                {generateError && (
+                  <div className="max-w-sm mx-auto mb-6 p-3 bg-red-500/10 border border-red-500/20 rounded-xl flex items-center justify-center gap-2 text-red-400 text-sm">
+                    <AlertCircle className="h-4 w-4 flex-shrink-0" />
+                    {generateError}
+                  </div>
+                )}
+                
+                {/* Action Buttons - Show when name entered */}
+                {firstName.trim() && (
+                  <div className="flex flex-col sm:flex-row items-center justify-center gap-4 animate-in fade-in slide-in-from-bottom-2 duration-300">
+                    <button
+                      onClick={async () => {
+                        if (!firstName.trim()) return;
+                        setIsGenerating(true);
+                        setGenerateError('');
+                        
+                        try {
+                          const response = await fetch('/api/enrich-profile-by-name', {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({
+                              fullName: firstName.trim(),
+                              currentSkills: [],
+                              currentBio: '',
+                            }),
+                          });
+                          
+                          if (response.status === 504) {
+                            throw new Error('Request timed out. Please try again.');
+                          }
+                          
+                          const text = await response.text();
+                          if (!text) {
+                            throw new Error('Empty response. Please try again.');
+                          }
+                          
+                          const data = JSON.parse(text);
+                          
+                          if (data.success) {
+                            // Encode the data and pass to create page
+                            const enrichmentData = encodeURIComponent(JSON.stringify(data));
+                            navigate(`/directory/create?name=${encodeURIComponent(firstName.trim())}&enrichment=${enrichmentData}`);
+                          } else {
+                            // Still navigate but without enrichment
+                            navigate(`/directory/create?name=${encodeURIComponent(firstName.trim())}`);
+                          }
+                        } catch (err) {
+                          console.error('Generate error:', err);
+                          setGenerateError(err instanceof Error ? err.message : 'Failed to generate. Try manual entry.');
+                        } finally {
+                          setIsGenerating(false);
+                        }
+                      }}
+                      disabled={isGenerating}
+                      className="group px-8 py-4 bg-gradient-to-r from-violet-500 to-fuchsia-500 hover:from-violet-600 hover:to-fuchsia-600 text-white font-medium text-sm tracking-wide transition-all rounded-xl inline-flex items-center gap-2 shadow-lg shadow-violet-500/20 disabled:opacity-50 disabled:cursor-not-allowed"
+                    >
+                      {isGenerating ? (
+                        <>
+                          <Loader2 className="w-4 h-4 animate-spin" />
+                          <span className="animate-pulse">Searching the web...</span>
+                        </>
+                      ) : (
+                        <>
+                          <Sparkles className="w-4 h-4 group-hover:rotate-12 transition-transform" />
+                          Auto-fill with AI
+                        </>
+                      )}
+                    </button>
+                    
+                    <span className="text-zinc-600 text-sm">or</span>
+                    
+                    <button
+                      onClick={() => navigate(`/directory/create?name=${encodeURIComponent(firstName.trim())}`)}
+                      disabled={isGenerating}
+                      className="group px-8 py-4 bg-zinc-800/50 text-white font-medium text-sm tracking-wide hover:bg-zinc-800 transition-all rounded-xl inline-flex items-center gap-2 border border-zinc-700/50 hover:border-zinc-600 disabled:opacity-50"
+                    >
+                      Fill in Manually
+                      <ArrowUpRight className="w-4 h-4 group-hover:translate-x-0.5 group-hover:-translate-y-0.5 transition-transform" />
+                    </button>
+                  </div>
+                )}
+                
+                {/* Back button */}
+                <button
+                  onClick={() => {
+                    setShowNameStep(false);
+                    setFirstName('');
+                    setGenerateError('');
+                  }}
+                  className="mt-8 text-sm text-zinc-500 hover:text-zinc-300 transition-colors"
+                >
+                  ← Back
+                </button>
+                
+                <p className="text-zinc-500 text-xs mt-6 max-w-md mx-auto leading-relaxed">
+                  AI auto-fill searches your portfolio, LinkedIn, and public profiles to populate your skills, bio, work history, and projects. You can review and edit everything before saving.
+                </p>
+              </>
+            )}
+          </div>
+        ) : (
+          <div className="space-y-10">
+            {/* Profile Header Card */}
+            <div className="relative bg-gradient-to-br from-zinc-900/80 to-zinc-900/40 border border-zinc-800/50 rounded-2xl p-8 backdrop-blur-sm animate-in fade-in slide-in-from-bottom-4 duration-500">
+              {/* Decorative gradient */}
+              <div className="absolute inset-0 rounded-2xl bg-gradient-to-br from-violet-500/5 via-transparent to-fuchsia-500/5 pointer-events-none" />
+
+              <div className="relative flex flex-col lg:flex-row gap-8">
+                {/* Avatar */}
+                <div className="flex-shrink-0">
+                  <div className="relative group">
+                    {profile.profilePictureUrl ? (
+                      <img
+                        src={profile.profilePictureUrl}
+                        alt={profile.fullName}
+                        className="w-32 h-32 rounded-2xl object-cover ring-2 ring-zinc-800 group-hover:ring-zinc-700 transition-all"
+                      />
+                    ) : (
+                      <div className="w-32 h-32 rounded-2xl bg-gradient-to-br from-violet-500 to-fuchsia-600 flex items-center justify-center text-4xl font-bold text-white shadow-lg shadow-violet-500/20">
+                        {profile.fullName.charAt(0).toUpperCase()}
+                      </div>
+                    )}
+                    {profile.isCtcMember && (
+                      <div className="absolute -bottom-2 -right-2 w-8 h-8 bg-fuchsia-500 rounded-lg flex items-center justify-center shadow-lg shadow-fuchsia-500/30">
+                        <BadgeCheck className="h-5 w-5 text-white" />
+                      </div>
+                    )}
+                  </div>
+                </div>
+
+                <div className="flex-1 min-w-0">
+                  {/* Name & Status Row */}
+                  <div className="flex flex-wrap items-start justify-between gap-4 mb-4">
+                    <div>
+                      <h1 className="text-3xl font-bold text-white tracking-tight mb-2">{profile.fullName}</h1>
+                      <div className="flex flex-wrap items-center gap-4 text-sm text-zinc-400">
+                        {profile.location && (
+                          <span className="flex items-center gap-1.5">
+                            <MapPin className="h-4 w-4 text-zinc-500" />
+                            {profile.location}
+                          </span>
+                        )}
+                        <span className="flex items-center gap-1.5">
+                          <Mail className="h-4 w-4 text-zinc-500" />
+                          {profile.email}
+                        </span>
+                      </div>
+                    </div>
+
+                    {/* Status Badges */}
+                    <div className="flex flex-col items-end gap-2">
+                      {profile.approved ? (
+                        <span className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-emerald-500/15 text-emerald-400 text-xs font-medium border border-emerald-500/20">
+                          <CheckCircle2 className="h-3.5 w-3.5" />
+                          Live in Directory
+                        </span>
+                      ) : (
+                        <span className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-amber-500/15 text-amber-400 text-xs font-medium border border-amber-500/20">
+                          <Clock className="h-3.5 w-3.5" />
+                          Pending Review
+                        </span>
+                      )}
+                      <span className={cn(
+                        "inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium border",
+                        getAvailabilityColor(profile.availability)
+                      )}>
+                        <Briefcase className="h-3.5 w-3.5" />
+                        {getAvailabilityLabel(profile.availability)}
+                      </span>
+                    </div>
+                  </div>
+
+                  {/* Bio */}
+                  {profile.bio && (
+                    <p className="text-zinc-300 leading-relaxed mb-6 max-w-2xl">
+                      {profile.bio}
+                    </p>
+                  )}
+
+                  {/* Action Buttons */}
+                  <div className="flex flex-wrap gap-3">
+                    <button
+                      onClick={() => navigate('/directory/edit')}
+                      className="group flex items-center gap-2 px-5 py-2.5 bg-white text-black rounded-xl text-sm font-medium hover:bg-zinc-100 transition-all shadow-lg shadow-white/5"
+                    >
+                      <Edit className="h-4 w-4" />
+                      Edit Profile
+                    </button>
+                    <button
+                      onClick={handleEnrichProfile}
+                      disabled={isEnriching}
+                      className={cn(
+                        "group relative flex items-center gap-2 px-5 py-2.5 rounded-xl text-sm font-medium transition-all border overflow-hidden",
+                        isEnriching
+                          ? "bg-gradient-to-r from-violet-500/20 to-fuchsia-500/20 text-violet-300 border-violet-500/30 cursor-wait"
+                          : enrichmentSuccess
+                          ? "bg-emerald-500/10 text-emerald-400 border-emerald-500/20"
+                          : "bg-zinc-800/50 text-white border-zinc-700/50 hover:bg-zinc-800 hover:border-zinc-600"
+                      )}
+                    >
+                      {/* Animated shimmer on loading */}
+                      {isEnriching && (
+                        <div className="absolute inset-0 shimmer" />
+                      )}
+                      <span className="relative flex items-center gap-2">
+                        {isEnriching ? (
+                          <>
+                            <div className="relative">
+                              <Search className="h-4 w-4 animate-pulse" />
+                              <div className="absolute inset-0 animate-ping">
+                                <Search className="h-4 w-4 text-violet-400/50" />
+                              </div>
+                            </div>
+                            <span className="animate-gradient-text">Searching the web...</span>
+                          </>
+                        ) : enrichmentSuccess ? (
+                          <>
+                            <CheckCircle2 className="h-4 w-4 animate-[scale-pulse_0.5s_ease-out]" />
+                            Enriched!
+                          </>
+                        ) : (
+                          <>
+                            <Wand2 className="h-4 w-4 group-hover:rotate-12 group-hover:scale-110 transition-transform duration-300" />
+                            Enrich with AI
+                          </>
+                        )}
+                      </span>
+                    </button>
+                    <Link
+                      to={`/directory/profile/${profile.slug}`}
+                      className="group flex items-center gap-2 px-5 py-2.5 bg-zinc-800/50 text-white rounded-xl text-sm font-medium border border-zinc-700/50 hover:bg-zinc-800 hover:border-zinc-600 transition-all"
+                    >
+                      <ExternalLink className="h-4 w-4" />
+                      View Public Profile
+                      <ArrowUpRight className="w-3.5 h-3.5 opacity-0 -ml-1 group-hover:opacity-100 group-hover:ml-0 transition-all" />
+                    </Link>
+                    <Link
+                      to="/messages"
+                      className="group relative flex items-center gap-2 px-5 py-2.5 bg-pink-500/10 text-pink-400 rounded-xl text-sm font-medium border border-pink-500/20 hover:bg-pink-500/20 hover:border-pink-500/30 transition-all"
+                    >
+                      <MessageSquare className="h-4 w-4" />
+                      Messages
+                      {unreadMessageCount > 0 && (
+                        <span className="absolute -top-1.5 -right-1.5 w-5 h-5 bg-pink-500 text-white text-xs rounded-full flex items-center justify-center font-medium">
+                          {unreadMessageCount > 9 ? '9+' : unreadMessageCount}
+                        </span>
+                      )}
+                    </Link>
+                  </div>
+
+                  {/* Enrichment Success Message */}
+                  {enrichmentSuccess && enrichmentMessage && (
+                    <div className="mt-4 flex items-center gap-2 p-3 bg-emerald-500/10 border border-emerald-500/20 rounded-xl animate-in fade-in slide-in-from-bottom-2 duration-300">
+                      <Sparkles className="h-5 w-5 text-emerald-400 flex-shrink-0" />
+                      <p className="text-sm text-emerald-400">{enrichmentMessage}</p>
+                    </div>
+                  )}
+                </div>
+              </div>
+            </div>
+
+            {/* Links Section */}
+            {(profile.portfolioUrl || profile.linkedinUrl || (profile.otherSocialLinks && profile.otherSocialLinks.length > 0)) && (
+              <div className="flex flex-wrap gap-3 animate-in fade-in slide-in-from-bottom-4 duration-500 delay-100">
+                {profile.portfolioUrl && (
+                  <a
+                    href={profile.portfolioUrl}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="group flex items-center gap-2 px-4 py-2.5 bg-zinc-900/50 border border-zinc-800/50 rounded-xl text-sm text-zinc-300 hover:border-zinc-600 hover:bg-zinc-800/50 transition-all"
+                  >
+                    <Globe className="h-4 w-4 text-zinc-500 group-hover:text-white transition-colors" />
+                    Portfolio
+                    <ArrowUpRight className="w-3.5 h-3.5 opacity-0 group-hover:opacity-100 transition-opacity" />
+                  </a>
+                )}
+                {profile.linkedinUrl && (
+                  <a
+                    href={profile.linkedinUrl}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="group flex items-center gap-2 px-4 py-2.5 bg-zinc-900/50 border border-zinc-800/50 rounded-xl text-sm text-zinc-300 hover:border-zinc-600 hover:bg-zinc-800/50 transition-all"
+                  >
+                    <Linkedin className="h-4 w-4 text-zinc-500 group-hover:text-[#0A66C2] transition-colors" />
+                    LinkedIn
+                    <ArrowUpRight className="w-3.5 h-3.5 opacity-0 group-hover:opacity-100 transition-opacity" />
+                  </a>
+                )}
+                {profile.otherSocialLinks?.map((link, idx) => {
+                  let hostname = link;
+                  try {
+                    hostname = new URL(link).hostname.replace('www.', '');
+                  } catch {
+                    hostname = link.substring(0, 30);
+                  }
+                  return (
+                    <a
+                      key={idx}
+                      href={link}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="group flex items-center gap-2 px-4 py-2.5 bg-zinc-900/50 border border-zinc-800/50 rounded-xl text-sm text-zinc-300 hover:border-zinc-600 hover:bg-zinc-800/50 transition-all"
+                    >
+                      <Link2 className="h-4 w-4 text-zinc-500 group-hover:text-white transition-colors" />
+                      {hostname}
+                      <ArrowUpRight className="w-3.5 h-3.5 opacity-0 group-hover:opacity-100 transition-opacity" />
+                    </a>
+                  );
+                })}
+              </div>
+            )}
+
+            {/* Focus Areas */}
+            <section className="animate-in fade-in slide-in-from-bottom-4 duration-500 delay-150">
+              <h2 className="text-xs font-semibold tracking-[0.2em] text-zinc-500 uppercase mb-4 flex items-center gap-2">
+                <Zap className="w-4 h-4" />
+                Focus Areas
+              </h2>
+              <div className="flex flex-wrap gap-2">
+                {profile.focusAreas.map((area) => (
+                  <span
+                    key={area}
+                    className={cn(
+                      "px-4 py-2 rounded-xl text-sm font-medium border transition-all hover:scale-105",
+                      getFocusAreaColor(area)
+                    )}
+                  >
+                    {getFocusAreaLabel(area)}
+                  </span>
+                ))}
+              </div>
+            </section>
+
+            {/* Skills */}
+            <section className="animate-in fade-in slide-in-from-bottom-4 duration-500 delay-200">
+              <h2 className="text-xs font-semibold tracking-[0.2em] text-zinc-500 uppercase mb-4 flex items-center gap-2">
+                <Sparkles className="w-4 h-4" />
+                Skills
+                <span className="text-zinc-600">({profile.skills.length})</span>
+              </h2>
+              <div className="flex flex-wrap gap-2">
+                {profile.skills.map((skill, index) => (
+                  <span
+                    key={index}
+                    className="px-3 py-1.5 bg-zinc-900/50 border border-zinc-800/50 rounded-full text-sm text-zinc-300 hover:border-zinc-600 hover:bg-zinc-800/50 transition-all cursor-default"
+                  >
+                    {skill}
+                  </span>
+                ))}
+              </div>
+            </section>
+
+            {/* Projects */}
+            {profile.projects && profile.projects.length > 0 && (
+              <section className="animate-in fade-in slide-in-from-bottom-4 duration-500 delay-300">
+                <h2 className="text-xs font-semibold tracking-[0.2em] text-zinc-500 uppercase mb-4 flex items-center gap-2">
+                  <FolderOpen className="w-4 h-4" />
+                  Projects
+                  <span className="text-zinc-600">({profile.projects.length})</span>
+                </h2>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  {profile.projects.map((project) => (
+                    <div
+                      key={project.id}
+                      className="group relative p-5 bg-zinc-900/30 border border-zinc-800/50 rounded-xl hover:border-zinc-700 hover:bg-zinc-900/50 transition-all"
+                    >
+                      <div className="absolute inset-0 rounded-xl bg-gradient-to-br from-violet-500/5 to-transparent opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none" />
+                      <h3 className="relative font-medium text-white mb-2 group-hover:text-violet-200 transition-colors">{project.title}</h3>
+                      <p className="relative text-sm text-zinc-400 line-clamp-2 mb-3">
+                        {project.description}
+                      </p>
+                      {project.link && (
+                        <a
+                          href={project.link}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="relative inline-flex items-center gap-1.5 text-sm text-violet-400 hover:text-violet-300 transition-colors"
+                        >
+                          <ExternalLink className="h-3.5 w-3.5" />
+                          View Project
+                        </a>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              </section>
+            )}
+
+            {/* Footer Actions */}
+            <div className="pt-8 border-t border-zinc-800/50 animate-in fade-in slide-in-from-bottom-4 duration-500 delay-400">
+              <div className="flex flex-wrap gap-6">
+                <Link
+                  to="/directory"
+                  className="text-sm text-zinc-400 hover:text-white transition-colors inline-flex items-center gap-1"
+                >
+                  Browse Directory
+                  <ArrowUpRight className="w-3.5 h-3.5" />
+                </Link>
+                <button
+                  onClick={() => setShowDeleteConfirm(true)}
+                  className="text-sm text-red-400/70 hover:text-red-400 transition-colors"
+                >
+                  Delete Profile
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+      </main>
+
+      {/* Delete Confirmation Modal */}
+      {showDeleteConfirm && (
+        <div className="fixed inset-0 bg-black/80 backdrop-blur-sm flex items-center justify-center z-50 p-4 animate-in fade-in duration-200">
+          <div className="bg-zinc-900 border border-zinc-800 rounded-2xl p-6 max-w-md w-full animate-in zoom-in-95 duration-200">
+            <h3 className="text-xl font-bold text-white mb-3">Delete Profile?</h3>
+            <p className="text-zinc-400 mb-6">
+              This will permanently remove your profile from the CTC Network directory. This action cannot be undone.
+            </p>
+            <div className="flex gap-3">
               <button
-                onClick={() => navigate('/directory/create')}
-                className="px-8 py-4 bg-white text-black font-secondary text-sm tracking-wide hover:bg-zinc-200 transition-colors"
+                onClick={() => setShowDeleteConfirm(false)}
+                disabled={isDeleting}
+                className="flex-1 px-4 py-3 bg-zinc-800 hover:bg-zinc-700 rounded-xl text-sm font-medium transition-colors"
               >
-                Create Your Profile
+                Cancel
+              </button>
+              <button
+                onClick={handleDelete}
+                disabled={isDeleting}
+                className="flex-1 px-4 py-3 bg-red-500 hover:bg-red-600 text-white rounded-xl text-sm font-medium transition-colors flex items-center justify-center gap-2"
+              >
+                {isDeleting ? (
+                  <>
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                    Deleting...
+                  </>
+                ) : (
+                  'Delete Profile'
+                )}
               </button>
             </div>
-        ) : (
-          /* Profile Card */
-          <>
-            <div className="bg-zinc-900/50 border border-zinc-800 rounded-xl p-6 md:p-8 mb-6">
-              <div className="flex flex-col md:flex-row md:items-start gap-6">
-                {/* Avatar */}
-                <div className="w-20 h-20 rounded-full bg-gradient-to-br from-pink-500 to-purple-600 flex items-center justify-center text-2xl font-bold text-white flex-shrink-0">
-                  {profile.fullName.charAt(0).toUpperCase()}
+          </div>
+        </div>
+      )}
+
+      {/* Enrichment Preview Modal */}
+      {showEnrichmentPreview && enrichmentData && (
+        <div className="fixed inset-0 bg-black/90 backdrop-blur-sm flex items-center justify-center z-50 p-4 overflow-y-auto animate-in fade-in duration-200">
+          <div className="bg-zinc-900 border border-zinc-800 rounded-2xl p-6 max-w-2xl w-full my-8 max-h-[90vh] overflow-y-auto animate-in zoom-in-95 duration-200">
+            <div className="flex items-center justify-between mb-6">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-xl bg-violet-500/20 flex items-center justify-center">
+                  <Search className="h-5 w-5 text-violet-400" />
                 </div>
-                
-                <div className="flex-1">
-                  <div className="flex flex-wrap items-center gap-3 mb-2">
-                    <h2 className="text-xl font-medium text-white">
-                      {profile.fullName}
-                    </h2>
-                    {profile.isCtcMember && (
-                      <span className="inline-flex items-center gap-1 px-2 py-1 rounded-full bg-pink-500/20 text-pink-400 text-xs font-medium border border-pink-500/30">
-                        <BadgeCheck className="h-3.5 w-3.5" />
-                        CTC Member
-                      </span>
+                <div>
+                  <h3 className="text-lg font-bold text-white">Enrich Your Profile</h3>
+                  <p className="text-sm text-zinc-500">Select items to add to your profile</p>
+                </div>
+              </div>
+              <button
+                onClick={() => {
+                  setShowEnrichmentPreview(false);
+                  setEnrichmentData(null);
+                }}
+                className="p-2 hover:bg-zinc-800 rounded-xl transition-colors"
+              >
+                <X className="h-5 w-5 text-zinc-400" />
+              </button>
+            </div>
+
+            {/* No Data Found Message */}
+            {enrichmentData.additionalSkills.length === 0 &&
+             enrichmentData.discoveredProjects.length === 0 &&
+             enrichmentData.workHistory.length === 0 &&
+             !enrichmentData.enrichedBio && (
+              <div className="mb-6 p-4 bg-zinc-800/50 border border-zinc-700/50 rounded-xl">
+                <p className="text-sm text-zinc-400">
+                  No information was found automatically. Add custom skills and projects below.
+                </p>
+              </div>
+            )}
+
+            {/* Skills Section */}
+            <div className="mb-6">
+              <h4 className="text-sm font-medium text-zinc-300 uppercase tracking-wide mb-3 flex items-center gap-2">
+                <Sparkles className="h-4 w-4 text-violet-400" />
+                Skills ({enrichmentData.additionalSkills.filter(s => s.selected).length} selected)
+              </h4>
+              <div className="flex flex-wrap gap-2 mb-3">
+                {enrichmentData.additionalSkills.map((skill, idx) => (
+                  <button
+                    key={idx}
+                    onClick={() => {
+                      const updated = [...enrichmentData.additionalSkills];
+                      updated[idx].selected = !updated[idx].selected;
+                      setEnrichmentData({ ...enrichmentData, additionalSkills: updated });
+                    }}
+                    className={cn(
+                      "px-3 py-1.5 rounded-full text-sm transition-all",
+                      skill.selected
+                        ? "bg-violet-500/20 text-violet-300 border border-violet-500/30"
+                        : "bg-zinc-800 text-zinc-500 border border-zinc-700"
                     )}
-                  </div>
+                  >
+                    {skill.name}
+                  </button>
+                ))}
+              </div>
+              <div className="flex gap-2">
+                <input
+                  type="text"
+                  value={customSkill}
+                  onChange={(e) => setCustomSkill(e.target.value)}
+                  onKeyDown={(e) => e.key === 'Enter' && addCustomSkill()}
+                  placeholder="Add custom skill..."
+                  className="flex-1 px-4 py-2.5 bg-zinc-800/50 border border-zinc-700/50 rounded-xl text-sm text-white placeholder:text-zinc-500 focus:outline-none focus:border-violet-500/50 focus:ring-1 focus:ring-violet-500/20 transition-all"
+                />
+                <button
+                  onClick={addCustomSkill}
+                  disabled={!customSkill.trim()}
+                  className="px-4 py-2.5 bg-violet-500/20 text-violet-400 rounded-xl hover:bg-violet-500/30 disabled:opacity-50 transition-colors"
+                >
+                  <Plus className="h-4 w-4" />
+                </button>
+              </div>
+            </div>
 
-                  <div className="flex items-center gap-2 text-zinc-400 text-sm mb-3">
-                    <MapPin className="h-4 w-4" />
-                    <span>{profile.location}</span>
-                  </div>
-
-                  <span className={cn(
-                    "inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium border mb-4",
-                    getAvailabilityColor(profile.availability)
-                  )}>
-                    <Briefcase className="h-3 w-3" />
-                    {getAvailabilityLabel(profile.availability)}
-                  </span>
-
-                  <p className="text-zinc-300 text-sm mb-4">{profile.bio}</p>
-
-                  <div className="flex flex-wrap gap-1.5 mb-4">
-                    {profile.focusAreas.map((area) => (
-                      <span
-                        key={area}
-                        className="px-2 py-0.5 rounded text-xs bg-purple-500/20 text-purple-300"
-                      >
-                        {getFocusAreaLabel(area)}
-                      </span>
-                    ))}
-                  </div>
-
-                  <div className="flex flex-wrap gap-1.5">
-                    {profile.skills.slice(0, 6).map((skill, index) => (
-                      <span
-                        key={index}
-                        className="px-2 py-0.5 rounded-full text-xs bg-zinc-800 text-zinc-300"
-                      >
-                        {skill}
-                      </span>
-                    ))}
-                    {profile.skills.length > 6 && (
-                      <span className="px-2 py-0.5 rounded-full text-xs bg-zinc-800 text-zinc-400">
-                        +{profile.skills.length - 6} more
-                      </span>
+            {/* Projects Section */}
+            <div className="mb-6">
+              <h4 className="text-sm font-medium text-zinc-300 uppercase tracking-wide mb-3 flex items-center gap-2">
+                <FolderOpen className="h-4 w-4 text-sky-400" />
+                Projects ({enrichmentData.discoveredProjects.filter(p => p.selected).length} selected)
+              </h4>
+              <div className="space-y-2 mb-3">
+                {enrichmentData.discoveredProjects.map((project, idx) => (
+                  <button
+                    key={idx}
+                    onClick={() => {
+                      const updated = [...enrichmentData.discoveredProjects];
+                      updated[idx].selected = !updated[idx].selected;
+                      setEnrichmentData({ ...enrichmentData, discoveredProjects: updated });
+                    }}
+                    className={cn(
+                      "w-full p-4 rounded-xl text-left transition-all border",
+                      project.selected
+                        ? "bg-sky-500/10 border-sky-500/20"
+                        : "bg-zinc-800/30 border-zinc-700/50"
                     )}
+                  >
+                    <div className="flex items-start gap-3">
+                      <div className={cn(
+                        "w-5 h-5 rounded-md border-2 flex items-center justify-center flex-shrink-0 mt-0.5 transition-all",
+                        project.selected
+                          ? "bg-sky-500 border-sky-500"
+                          : "border-zinc-600"
+                      )}>
+                        {project.selected && <CheckCircle2 className="h-3 w-3 text-white" />}
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <p className={cn("font-medium text-sm", project.selected ? "text-white" : "text-zinc-400")}>
+                          {project.title}
+                        </p>
+                        <p className="text-xs text-zinc-500 mt-1 line-clamp-2">{project.description}</p>
+                        {project.client && (
+                          <span className="inline-block mt-2 px-2 py-0.5 bg-zinc-700/50 text-zinc-400 text-xs rounded-md">
+                            Client: {project.client}
+                          </span>
+                        )}
+                      </div>
+                    </div>
+                  </button>
+                ))}
+              </div>
+              <div className="p-4 bg-zinc-800/30 rounded-xl border border-zinc-700/50">
+                <p className="text-xs text-zinc-400 mb-3 font-medium">Add custom project</p>
+                <div className="space-y-2">
+                  <input
+                    type="text"
+                    value={customProject.title}
+                    onChange={(e) => setCustomProject({ ...customProject, title: e.target.value })}
+                    placeholder="Project title"
+                    className="w-full px-4 py-2.5 bg-zinc-900/50 border border-zinc-700/50 rounded-xl text-sm text-white placeholder:text-zinc-500 focus:outline-none focus:border-sky-500/50 transition-all"
+                  />
+                  <input
+                    type="text"
+                    value={customProject.description}
+                    onChange={(e) => setCustomProject({ ...customProject, description: e.target.value })}
+                    placeholder="Brief description"
+                    className="w-full px-4 py-2.5 bg-zinc-900/50 border border-zinc-700/50 rounded-xl text-sm text-white placeholder:text-zinc-500 focus:outline-none focus:border-sky-500/50 transition-all"
+                  />
+                  <div className="flex gap-2">
+                    <input
+                      type="text"
+                      value={customProject.url}
+                      onChange={(e) => setCustomProject({ ...customProject, url: e.target.value })}
+                      placeholder="Project URL (optional)"
+                      className="flex-1 px-4 py-2.5 bg-zinc-900/50 border border-zinc-700/50 rounded-xl text-sm text-white placeholder:text-zinc-500 focus:outline-none focus:border-sky-500/50 transition-all"
+                    />
+                    <button
+                      onClick={addCustomProject}
+                      disabled={!customProject.title.trim()}
+                      className="px-4 py-2.5 bg-sky-500/20 text-sky-400 rounded-xl hover:bg-sky-500/30 disabled:opacity-50 transition-colors text-sm font-medium"
+                    >
+                      Add
+                    </button>
                   </div>
                 </div>
               </div>
             </div>
 
-{/* Actions */}
-             <div className="flex flex-col gap-4 mb-6">
-               <div className="flex flex-wrap gap-4">
-                 <button
-                   onClick={() => navigate('/directory/edit')}
-                   className="flex items-center gap-2 px-5 py-2.5 bg-pink-500 hover:bg-pink-600 text-black rounded-lg text-sm font-medium transition-colors"
-                 >
-                   <Edit className="h-4 w-4" />
-                   Edit Profile
-                 </button>
-                 <Link
-                   to={`/directory/profile/${profile.slug}`}
-                   className="flex items-center gap-2 px-4 py-2 bg-zinc-800 hover:bg-zinc-700 rounded-lg text-sm font-medium transition-colors"
-                 >
-                   <ExternalLink className="h-4 w-4" />
-                   View Public Profile
-                 </Link>
-               </div>
-               <div className="mt-4">
-                 <p className="text-xs font-secondary uppercase tracking-wide text-zinc-500 mb-2">Danger zone</p>
-                 <button
-                   onClick={() => setShowDeleteConfirm(true)}
-                   className="flex items-center gap-2 px-4 py-2 bg-red-500/10 hover:bg-red-500/20 text-red-400 rounded-lg text-sm font-medium transition-colors"
-                 >
-                   <Trash2 className="h-4 w-4" />
-                   Delete Profile
-                 </button>
-               </div>
-             </div>
-
-            {/* Delete Confirmation Modal */}
-            {showDeleteConfirm && (
-              <div className="fixed inset-0 bg-black/80 flex items-center justify-center z-50 p-4">
-                <div className="bg-zinc-900 border border-zinc-800 rounded-xl p-6 max-w-md w-full">
-                  <h3 className="text-xl font-primary text-white mb-4">Delete Profile?</h3>
-                  <p className="text-zinc-400 mb-6">
-                    This will permanently remove your profile from the CTC Network directory. This action cannot be undone.
-                  </p>
-                  <div className="flex gap-4">
+            {/* Work History Section */}
+            {enrichmentData.workHistory.length > 0 && (
+              <div className="mb-6">
+                <h4 className="text-sm font-medium text-zinc-300 uppercase tracking-wide mb-3 flex items-center gap-2">
+                  <Building2 className="h-4 w-4 text-emerald-400" />
+                  Work History ({enrichmentData.workHistory.filter(w => w.selected).length} selected)
+                </h4>
+                <div className="space-y-2">
+                  {enrichmentData.workHistory.map((work, idx) => (
                     <button
-                      onClick={() => setShowDeleteConfirm(false)}
-                      disabled={isDeleting}
-                      className="flex-1 px-4 py-2 bg-zinc-800 hover:bg-zinc-700 rounded-lg text-sm font-medium transition-colors"
-                    >
-                      Cancel
-                    </button>
-                    <button
-                      onClick={handleDelete}
-                      disabled={isDeleting}
-                      className="flex-1 px-4 py-2 bg-red-500 hover:bg-red-600 text-white rounded-lg text-sm font-medium transition-colors flex items-center justify-center gap-2"
-                    >
-                      {isDeleting ? (
-                        <>
-                          <Loader2 className="h-4 w-4 animate-spin" />
-                          Deleting...
-                        </>
-                      ) : (
-                        'Delete Profile'
+                      key={idx}
+                      onClick={() => {
+                        const updated = [...enrichmentData.workHistory];
+                        updated[idx].selected = !updated[idx].selected;
+                        setEnrichmentData({ ...enrichmentData, workHistory: updated });
+                      }}
+                      className={cn(
+                        "w-full p-4 rounded-xl text-left transition-all border",
+                        work.selected
+                          ? "bg-emerald-500/10 border-emerald-500/20"
+                          : "bg-zinc-800/30 border-zinc-700/50"
                       )}
+                    >
+                      <div className="flex items-start gap-3">
+                        <div className={cn(
+                          "w-5 h-5 rounded-md border-2 flex items-center justify-center flex-shrink-0 mt-0.5 transition-all",
+                          work.selected
+                            ? "bg-emerald-500 border-emerald-500"
+                            : "border-zinc-600"
+                        )}>
+                          {work.selected && <CheckCircle2 className="h-3 w-3 text-white" />}
+                        </div>
+                        <div className="flex-1">
+                          <p className={cn("font-medium text-sm", work.selected ? "text-white" : "text-zinc-400")}>
+                            {work.role} at {work.company}
+                          </p>
+                          {work.duration && (
+                            <p className="text-xs text-zinc-500 mt-0.5">{work.duration}</p>
+                          )}
+                          {work.description && (
+                            <p className="text-xs text-zinc-500 mt-1">{work.description}</p>
+                          )}
+                        </div>
+                      </div>
                     </button>
-                  </div>
+                  ))}
                 </div>
               </div>
             )}
 
-            {/* Job Matches Section */}
-            <div className="mt-10 pt-8 border-t border-zinc-800">
-              <div className="flex items-center gap-2 mb-6">
-                <Sparkles className="h-5 w-5 text-pink-500" />
-                <h3 className="text-lg font-primary text-white">Job Matches</h3>
-                {totalUnreadCount > 0 && (
-                  <span className="ml-1 px-2 py-0.5 bg-red-500 text-white text-xs font-secondary rounded-full min-w-[20px] text-center">
-                    {totalUnreadCount}
-                  </span>
-                )}
-                {jobMatches.length > 0 && (
-                  <span className="ml-2 px-2 py-0.5 bg-pink-500/20 text-pink-400 text-xs font-secondary rounded-full">
-                    {jobMatches.length} {jobMatches.length === 1 ? 'match' : 'matches'}
-                  </span>
-                )}
+            {/* Bio Section */}
+            {enrichmentData.enrichedBio && (
+              <div className="mb-6">
+                <h4 className="text-sm font-medium text-zinc-300 uppercase tracking-wide mb-3 flex items-center gap-2">
+                  <User className="h-4 w-4 text-fuchsia-400" />
+                  Suggested Bio
+                </h4>
+                <button
+                  onClick={() => setEnrichmentData({ ...enrichmentData, useBio: !enrichmentData.useBio })}
+                  className={cn(
+                    "w-full p-4 rounded-xl text-left transition-all border",
+                    enrichmentData.useBio
+                      ? "bg-fuchsia-500/10 border-fuchsia-500/20"
+                      : "bg-zinc-800/30 border-zinc-700/50"
+                  )}
+                >
+                  <div className="flex items-start gap-3">
+                    <div className={cn(
+                      "w-5 h-5 rounded-md border-2 flex items-center justify-center flex-shrink-0 mt-0.5 transition-all",
+                      enrichmentData.useBio
+                        ? "bg-fuchsia-500 border-fuchsia-500"
+                        : "border-zinc-600"
+                    )}>
+                      {enrichmentData.useBio && <CheckCircle2 className="h-3 w-3 text-white" />}
+                    </div>
+                    <p className={cn("text-sm leading-relaxed", enrichmentData.useBio ? "text-zinc-200" : "text-zinc-500")}>
+                      {enrichmentData.enrichedBio}
+                    </p>
+                  </div>
+                </button>
               </div>
+            )}
 
-              {jobMatches.length === 0 ? (
-                <div className="p-6 border border-zinc-800 rounded-lg bg-zinc-900/50 text-center">
-                  <Sparkles className="h-10 w-10 text-zinc-600 mx-auto mb-3" />
-                  <p className="text-sm font-secondary text-zinc-400">
-                    No job matches yet. Companies will see your profile when they post relevant opportunities.
-                  </p>
-                </div>
-              ) : (
-                <>
-                  <p className="text-sm font-secondary text-zinc-400 mb-6">
-                    These opportunities have been matched to your profile by our AI. Let us know if you're interested!
-                  </p>
-
-                <div className="space-y-4">
-                  {jobMatches.map((match) => {
-                    const isExpanded = expandedMatchId === match.id;
-                    const projectTypeLabel = PROJECT_TYPES.find((p) => p.value === match.job.projectType)?.label || match.job.projectType;
-                    const remoteLabel = REMOTE_PREFERENCES.find((r) => r.value === match.job.remotePreference)?.label || match.job.remotePreference;
-
-                    return (
-                      <div key={match.id} className="border border-zinc-800 rounded-lg overflow-hidden relative">
-                        {/* Blue dot for unread messages */}
-                        {matchUnreadStatus[match.id] && (
-                          <div className="absolute top-3 right-12 w-2.5 h-2.5 bg-blue-500 rounded-full" title="Unread messages" />
-                        )}
-                        <button
-                          onClick={() => setExpandedMatchId(isExpanded ? null : match.id)}
-                          className="w-full p-4 flex items-start justify-between text-left hover:bg-zinc-900/50 transition-colors"
-                        >
-                          <div className="flex-1">
-                            <div className="flex items-center gap-3 mb-2 flex-wrap">
-                              <h4 className="font-primary text-white">{match.job.title}</h4>
-                              <span className="px-2 py-0.5 bg-pink-500/20 text-pink-400 text-xs font-secondary rounded">
-                                {match.matchScore}% match
-                              </span>
-                              {match.memberResponse ? (
-                                <span
-                                  className={cn(
-                                    'px-2 py-0.5 text-xs font-secondary rounded',
-                                    match.memberResponse === 'interested'
-                                      ? 'bg-green-500/20 text-green-400'
-                                      : 'bg-zinc-500/20 text-zinc-400'
-                                  )}
-                                >
-                                  {match.memberResponse === 'interested' ? 'Interested' : 'Not Interested'}
-                                </span>
-                              ) : (
-                                <span className="px-2 py-0.5 bg-blue-500/20 text-blue-400 text-xs font-secondary rounded">
-                                  New
-                                </span>
-                              )}
-                            </div>
-                            <div className="flex flex-wrap items-center gap-3 text-sm text-zinc-400 font-secondary">
-                              <span className="flex items-center gap-1">
-                                <Building2 className="h-3.5 w-3.5" />
-                                {match.company.companyName}
-                                {match.company.verified && (
-                                  <BadgeCheck className="h-3.5 w-3.5 text-blue-400" title="Verified Company" />
-                                )}
-                              </span>
-                              <span>{projectTypeLabel}</span>
-                              <span>{remoteLabel}</span>
-                              {match.job.location && (
-                                <span className="flex items-center gap-1">
-                                  <MapPin className="h-3.5 w-3.5" />
-                                  {match.job.location}
-                                </span>
-                              )}
-                              <span className="flex items-center gap-1">
-                                <Calendar className="h-3.5 w-3.5" />
-                                {new Date(match.createdAt).toLocaleDateString()}
-                              </span>
-                            </div>
-                          </div>
-                          {isExpanded ? (
-                            <ChevronUp className="h-5 w-5 text-zinc-500 flex-shrink-0" />
-                          ) : (
-                            <ChevronDown className="h-5 w-5 text-zinc-500 flex-shrink-0" />
-                          )}
-                        </button>
-
-                        {isExpanded && (
-                          <div className="px-4 pb-4 border-t border-zinc-800">
-                            <div className="pt-4 space-y-4">
-                              {/* Match Reasoning */}
-                              <div className="p-3 bg-pink-500/10 border border-pink-500/20 rounded-lg">
-                                <p className="text-xs font-secondary text-pink-400 uppercase tracking-wide mb-1">
-                                  Why you're a match
-                                </p>
-                                <p className="text-sm text-zinc-300 font-secondary">
-                                  {match.matchReasoning}
-                                </p>
-                              </div>
-
-                              {/* Job Description */}
-                              <div>
-                                <p className="text-xs font-secondary text-zinc-500 uppercase tracking-wide mb-2">
-                                  Description
-                                </p>
-                                <p className="text-sm text-zinc-300 font-secondary whitespace-pre-wrap">
-                                  {match.job.description}
-                                </p>
-                              </div>
-
-                              {/* Requirements */}
-                              {match.job.requirements && (
-                                <div>
-                                  <p className="text-xs font-secondary text-zinc-500 uppercase tracking-wide mb-2">
-                                    Requirements
-                                  </p>
-                                  <p className="text-sm text-zinc-300 font-secondary whitespace-pre-wrap">
-                                    {match.job.requirements}
-                                  </p>
-                                </div>
-                              )}
-
-                              {/* Details Grid */}
-                              <div className="grid grid-cols-2 gap-4">
-                                {match.job.budgetRange && (
-                                  <div>
-                                    <p className="text-xs font-secondary text-zinc-500 uppercase tracking-wide mb-1 flex items-center gap-1">
-                                      <DollarSign className="h-3 w-3" />
-                                      Budget
-                                    </p>
-                                    <p className="text-sm text-zinc-300 font-secondary">
-                                      {match.job.budgetRange}
-                                    </p>
-                                  </div>
-                                )}
-                                {match.job.timeline && (
-                                  <div>
-                                    <p className="text-xs font-secondary text-zinc-500 uppercase tracking-wide mb-1 flex items-center gap-1">
-                                      <Calendar className="h-3 w-3" />
-                                      Timeline
-                                    </p>
-                                    <p className="text-sm text-zinc-300 font-secondary">
-                                      {match.job.timeline}
-                                    </p>
-                                  </div>
-                                )}
-                              </div>
-
-                              {/* Skills */}
-                              {match.skillMatches && match.skillMatches.length > 0 && (
-                                <div>
-                                  <p className="text-xs font-secondary text-zinc-500 uppercase tracking-wide mb-2">
-                                    Matched Skills
-                                  </p>
-                                  <div className="flex flex-wrap gap-2">
-                                    {match.skillMatches.map((skill, idx) => (
-                                      <span
-                                        key={idx}
-                                        className="px-2 py-1 bg-zinc-800 text-zinc-300 text-xs font-secondary rounded"
-                                      >
-                                        {skill.skill}
-                                      </span>
-                                    ))}
-                                  </div>
-                                </div>
-                              )}
-
-                              {/* Response Buttons */}
-                              {!match.memberResponse && (
-                                <div className="flex gap-3 pt-4 border-t border-zinc-800">
-                                  <button
-                                    onClick={() => handleRespondToMatch(match.id, 'interested')}
-                                    disabled={respondingMatchId === match.id}
-                                    className="flex-1 flex items-center justify-center gap-2 px-4 py-3 bg-green-500 hover:bg-green-600 text-white font-secondary text-sm rounded-lg transition-colors disabled:opacity-50"
-                                  >
-                                    {respondingMatchId === match.id ? (
-                                      <Loader2 className="h-4 w-4 animate-spin" />
-                                    ) : (
-                                      <CheckCircle2 className="h-4 w-4" />
-                                    )}
-                                    I'm Interested
-                                  </button>
-                                  <button
-                                    onClick={() => handleRespondToMatch(match.id, 'not-interested')}
-                                    disabled={respondingMatchId === match.id}
-                                    className="flex-1 flex items-center justify-center gap-2 px-4 py-3 bg-zinc-800 hover:bg-zinc-700 text-zinc-300 font-secondary text-sm rounded-lg transition-colors disabled:opacity-50"
-                                  >
-                                    {respondingMatchId === match.id ? (
-                                      <Loader2 className="h-4 w-4 animate-spin" />
-                                    ) : (
-                                      <XCircle className="h-4 w-4" />
-                                    )}
-                                    Not Interested
-                                  </button>
-                                </div>
-                              )}
-
-                              {/* Already Responded */}
-                              {match.memberResponse && (
-                                <div className="pt-4 border-t border-zinc-800">
-                                  <p className="text-sm text-zinc-400 font-secondary">
-                                    {match.memberResponse === 'interested'
-                                      ? "You've expressed interest. The company will be notified and may reach out to you."
-                                      : "You've declined this opportunity. No further action needed."}
-                                  </p>
-                                </div>
-                              )}
-
-                              {/* Messaging Section */}
-                              <div className="pt-4 border-t border-zinc-800">
-                                {match.memberResponse === 'interested' ? (
-                                  <>
-                                    {/* Messages Toggle Button */}
-                                    <button
-                                      onClick={(e) => {
-                                        e.stopPropagation();
-                                        setExpandedMessagingMatchId(
-                                          expandedMessagingMatchId === match.id ? null : match.id
-                                        );
-                                      }}
-                                      className={cn(
-                                        'flex items-center gap-2 px-3 py-2 text-sm font-secondary transition-colors rounded-lg',
-                                        expandedMessagingMatchId === match.id
-                                          ? 'bg-pink-500/20 text-pink-400 border border-pink-500/30'
-                                          : 'bg-zinc-800 text-zinc-300 hover:bg-zinc-700 border border-zinc-700'
-                                      )}
-                                    >
-                                      <MessageSquare className="h-4 w-4" />
-                                      {expandedMessagingMatchId === match.id ? 'Hide Messages' : 'Messages'}
-                                    </button>
-
-                                    {/* Messages Section Content */}
-                                    {expandedMessagingMatchId === match.id && (
-                                      <div className="mt-4">
-                                        <div className="flex items-center gap-2 mb-3">
-                                          <MessageSquare className="h-4 w-4 text-pink-400" />
-                                          <span className="text-sm font-secondary text-white">
-                                            Conversation with {match.company.companyName}
-                                          </span>
-                                        </div>
-
-                                        {/* Conversation History */}
-                                        <div className="bg-zinc-900/50 border border-zinc-700 rounded-lg p-3 mb-3 max-h-64 overflow-y-auto">
-                                          {loadingConversations[match.id] ? (
-                                            <div className="flex items-center justify-center py-6">
-                                              <Loader2 className="h-4 w-4 animate-spin text-zinc-500" />
-                                              <span className="ml-2 text-sm text-zinc-400 font-secondary">
-                                                Loading messages...
-                                              </span>
-                                            </div>
-                                          ) : (conversations[match.id] || []).length === 0 ? (
-                                            <div className="text-center py-6">
-                                              <MessageSquare className="h-6 w-6 text-zinc-600 mx-auto mb-2" />
-                                              <p className="text-sm text-zinc-500 font-secondary">
-                                                No messages yet. Start the conversation!
-                                              </p>
-                                            </div>
-                                          ) : (
-                                            <div className="space-y-3">
-                                              {(conversations[match.id] || []).map((msg) => (
-                                                <div
-                                                  key={msg.id}
-                                                  className={cn(
-                                                    'flex flex-col max-w-[85%]',
-                                                    msg.senderType === 'member' ? 'ml-auto items-end' : 'items-start'
-                                                  )}
-                                                >
-                                                  <span className="text-xs text-zinc-500 font-secondary mb-1">
-                                                    {msg.senderType === 'member' ? 'You' : match.company.companyName} ·{' '}
-                                                    {new Date(msg.createdAt).toLocaleString(undefined, {
-                                                      month: 'short',
-                                                      day: 'numeric',
-                                                      hour: '2-digit',
-                                                      minute: '2-digit',
-                                                    })}
-                                                  </span>
-                                                  <div
-                                                    className={cn(
-                                                      'px-3 py-2 rounded-lg text-sm font-secondary',
-                                                      msg.senderType === 'member'
-                                                        ? 'bg-pink-500/20 text-pink-100 border border-pink-500/30'
-                                                        : 'bg-zinc-800 text-zinc-200 border border-zinc-700'
-                                                    )}
-                                                  >
-                                                    {msg.content}
-                                                  </div>
-                                                </div>
-                                              ))}
-                                              <div
-                                                ref={(el) => {
-                                                  messagesEndRef.current[match.id] = el;
-                                                }}
-                                              />
-                                            </div>
-                                          )}
-                                        </div>
-
-                                        {/* Message Input */}
-                                        <div className="flex gap-2">
-                                          <input
-                                            type="text"
-                                            value={messageInputs[match.id] || ''}
-                                            onChange={(e) =>
-                                              setMessageInputs((prev) => ({
-                                                ...prev,
-                                                [match.id]: e.target.value,
-                                              }))
-                                            }
-                                            onKeyDown={(e) => {
-                                              if (e.key === 'Enter' && !e.shiftKey) {
-                                                e.preventDefault();
-                                                sendMessage(match.id);
-                                              }
-                                            }}
-                                            placeholder="Type a message..."
-                                            className="flex-1 px-3 py-2 bg-zinc-900 border border-zinc-700 text-white text-sm font-secondary placeholder:text-zinc-500 focus:outline-none focus:border-zinc-500 rounded-lg"
-                                            disabled={sendingMessages[match.id]}
-                                          />
-                                          <button
-                                            onClick={() => sendMessage(match.id)}
-                                            disabled={
-                                              sendingMessages[match.id] || !messageInputs[match.id]?.trim()
-                                            }
-                                            className="px-4 py-2 bg-pink-500 text-white text-sm font-secondary hover:bg-pink-600 disabled:opacity-50 disabled:cursor-not-allowed transition-colors rounded-lg flex items-center gap-2"
-                                          >
-                                            {sendingMessages[match.id] ? (
-                                              <Loader2 className="h-4 w-4 animate-spin" />
-                                            ) : (
-                                              <Send className="h-4 w-4" />
-                                            )}
-                                            Send
-                                          </button>
-                                        </div>
-                                      </div>
-                                    )}
-                                  </>
-                                ) : (
-                                  <div className="flex items-center gap-2 p-3 bg-zinc-900/50 border border-zinc-700 rounded-lg">
-                                    <MessageSquare className="h-4 w-4 text-zinc-500" />
-                                    <p className="text-sm text-zinc-400 font-secondary">
-                                      Respond to this match to start messaging
-                                    </p>
-                                  </div>
-                                )}
-                              </div>
-                            </div>
-                          </div>
-                        )}
-                      </div>
-                    );
-                  })}
-                </div>
-                </>
-              )}
-            </div>
-          </>
-        )}
-
-{/* Community CTA */}
-           <div className="mt-12 pt-8 border-t border-zinc-800">
-             <h3 className="text-lg font-primary text-white mb-2">Explore the Community</h3>
-             <p className="text-sm font-secondary text-zinc-400 mb-4 max-w-md">
-               Discover other creative technologists in the CTC Network.
-             </p>
-             <div className="flex flex-wrap gap-4">
-              <Link
-                to="/directory"
-                className="text-sm font-secondary text-zinc-400 hover:text-white transition-colors"
+            {/* Action Buttons */}
+            <div className="flex gap-3 pt-4 border-t border-zinc-800/50">
+              <button
+                onClick={() => {
+                  setShowEnrichmentPreview(false);
+                  setEnrichmentData(null);
+                }}
+                className="flex-1 px-4 py-3 bg-zinc-800/50 hover:bg-zinc-800 rounded-xl text-sm font-medium transition-colors"
               >
-                Browse Directory →
-              </Link>
+                Cancel
+              </button>
+              <button
+                onClick={applyEnrichment}
+                disabled={isApplying}
+                className="flex-1 px-4 py-3 bg-gradient-to-r from-violet-500 to-fuchsia-500 hover:from-violet-600 hover:to-fuchsia-600 text-white rounded-xl text-sm font-medium transition-all flex items-center justify-center gap-2 shadow-lg shadow-violet-500/20"
+              >
+                {isApplying ? (
+                  <>
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                    Applying...
+                  </>
+                ) : (
+                  <>
+                    <CheckCircle2 className="h-4 w-4" />
+                    Apply Selected
+                  </>
+                )}
+              </button>
             </div>
           </div>
         </div>
-
-        {/* Right Side - Cube */}
-        <div className="hidden lg:flex flex-1 relative items-center justify-center min-h-[50vh] lg:min-h-screen">
-          <div className="absolute inset-0 bg-gradient-to-br from-zinc-900/50 via-black to-black" />
-          <div className="relative z-10 w-full h-full flex items-center justify-center">
-            <ImageCube 
-              size={4} 
-              rotationSpeed={0.006} 
-              position={{ x: 0, y: 0, z: 0 }} 
-              forceVisible={true} 
-            />
-          </div>
-        </div>
-      </div>
-
-      {/* Vertical Text on Left Edge */}
-      <div className="hidden lg:block fixed left-8 top-1/2 -translate-y-1/2 -rotate-90 origin-center">
-        <span className="text-xs font-secondary tracking-[0.3em] text-zinc-600 uppercase whitespace-nowrap">
-          Amsterdam • London • 2026
-        </span>
-      </div>
-
-      {/* Vertical Text on Right Edge */}
-      <div className="hidden lg:block fixed right-8 top-1/2 -translate-y-1/2 rotate-90 origin-center">
-        <span className="text-xs font-secondary tracking-[0.3em] text-zinc-600 uppercase whitespace-nowrap">
-          Creative • Technology • Collective
-        </span>
-      </div>
+      )}
     </div>
   );
 };

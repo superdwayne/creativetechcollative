@@ -1,6 +1,7 @@
-import React, { useEffect } from 'react';
-import { Menu, X } from 'lucide-react';
+import React, { useEffect, useState } from 'react';
+import { Menu, X, Sparkles } from 'lucide-react';
 import { useNavigate, useLocation } from 'react-router-dom';
+import { useAuth } from '@/contexts/AuthContext';
 
 interface NavigationProps {
   showCubeIcon: boolean;
@@ -14,6 +15,47 @@ const Navigation: React.FC<NavigationProps> = ({
 }) => {
   const navigate = useNavigate();
   const location = useLocation();
+  const { user, session } = useAuth();
+  const [isBetaUser, setIsBetaUser] = useState(false);
+  const [betaLoading, setBetaLoading] = useState(true);
+
+  // Check if user has beta access
+  useEffect(() => {
+    const checkBetaAccess = async () => {
+      if (!user || !session) {
+        setIsBetaUser(false);
+        setBetaLoading(false);
+        return;
+      }
+
+      try {
+        const response = await fetch('/api/beta/status', {
+          method: 'GET',
+          headers: {
+            'Content-Type': 'application/json',
+            Authorization: `Bearer ${session.access_token}`,
+          },
+        });
+
+        if (response.ok) {
+          const data = await response.json();
+          // User is a beta user if they have approved beta application OR have an approved profile
+          const hasBetaAccess = data.betaApplication?.status === 'approved' || 
+                                data.profileStatus === 'approved';
+          setIsBetaUser(hasBetaAccess);
+        } else {
+          setIsBetaUser(false);
+        }
+      } catch (err) {
+        console.error('[Navigation] Beta check error:', err);
+        setIsBetaUser(false);
+      } finally {
+        setBetaLoading(false);
+      }
+    };
+
+    checkBetaAccess();
+  }, [user, session]);
 
   // Always scroll to top when the route changes (desktop and mobile)
   useEffect(() => {
@@ -27,19 +69,27 @@ const Navigation: React.FC<NavigationProps> = ({
     { id: 'newsletter', label: 'Newsletter', path: '/newsletter' },
   ];
 
-  // Right nav items
+  // Right nav items - conditionally include BetaHub for beta users and Sign Up for signed-in users
   const rightNavItems = [
     { id: 'playground', label: 'Playground', path: '/playground' },
     { id: 'partners', label: 'Partners', path: '/partners' },
     { id: 'contact', label: 'Contact', path: '/contact' },
+    // Sign Up link - for all signed-in users
+    ...(user && session ? [{ id: 'signup', label: 'Sign Up', path: '/beta', isSignUp: true }] : []),
+    // BetaHub link - only for approved beta users
+    ...(isBetaUser && !betaLoading ? [{ id: 'betahub', label: 'BetaHub', path: '/beta/hub', isBeta: true }] : []),
   ];
 
   // All nav items for mobile
   const allNavItems = [
     { id: 'home', label: 'Home', path: '/' },
     ...leftNavItems,
-    ...rightNavItems,
+    ...rightNavItems.filter(item => !('isBeta' in item && item.isBeta) && !('isSignUp' in item && item.isSignUp)), // Exclude beta and signup from regular items
     { id: 'collaborations', label: 'Collaborations', path: '/collaborations' },
+    // Add Sign Up for signed-in users
+    ...(user && session ? [{ id: 'signup', label: 'Sign Up', path: '/beta', isSignUp: true }] : []),
+    // Add BetaHub at the end for beta users
+    ...(isBetaUser && !betaLoading ? [{ id: 'betahub', label: 'BetaHub', path: '/beta/hub', isBeta: true }] : []),
   ];
 
   const handleNavigation = (path: string) => {
@@ -153,12 +203,17 @@ const Navigation: React.FC<NavigationProps> = ({
                 <button
                   key={item.id}
                   onClick={() => handleNavigation(item.path)}
-                  className={`text-sm font-secondary tracking-wide transition-colors ${
-                    isActive(item.path)
-                      ? 'text-white' 
-                      : 'text-zinc-400 hover:text-white'
+                  className={`text-sm font-secondary tracking-wide transition-colors flex items-center gap-1.5 ${
+                    'isSignUp' in item && item.isSignUp
+                      ? 'bg-white text-black px-4 py-1.5 rounded-full hover:bg-zinc-200 font-medium'
+                      : 'isBeta' in item && item.isBeta
+                        ? 'text-purple-400 hover:text-purple-300'
+                        : isActive(item.path)
+                          ? 'text-white' 
+                          : 'text-zinc-400 hover:text-white'
                   }`}
                 >
+                  {'isBeta' in item && item.isBeta && <Sparkles className="h-3.5 w-3.5" />}
                   {item.label}
                 </button>
               ))}
@@ -201,15 +256,22 @@ const Navigation: React.FC<NavigationProps> = ({
                     key={item.id}
                     onClick={() => handleNavigation(item.path)}
                     className={`block w-full text-left transition-all duration-300 transform hover:translate-x-4 ${
-                      isActive(item.path)
-                        ? 'text-white' 
-                        : 'text-zinc-500 hover:text-white'
+                      'isSignUp' in item && item.isSignUp
+                        ? 'text-white'
+                        : 'isBeta' in item && item.isBeta
+                          ? 'text-purple-400 hover:text-purple-300'
+                          : isActive(item.path)
+                            ? 'text-white' 
+                            : 'text-zinc-500 hover:text-white'
                     }`}
                     style={{
                       animationDelay: `${index * 100}ms`
                     }}
                   >
-                    <span className="text-4xl font-medium font-secondary uppercase tracking-tight leading-none block">
+                    <span className={`text-4xl font-medium font-secondary uppercase tracking-tight leading-none flex items-center gap-3 ${
+                      'isSignUp' in item && item.isSignUp ? 'bg-white text-black px-6 py-2 rounded-full inline-flex' : ''
+                    }`}>
+                      {'isBeta' in item && item.isBeta && <Sparkles className="h-8 w-8" />}
                       {item.label}
                     </span>
                   </button>

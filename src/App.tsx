@@ -47,6 +47,15 @@ import AuthCallbackPage from './pages/AuthCallbackPage';
 import HirePage from './pages/HirePage';
 import AdminDashboardPage from './pages/AdminDashboardPage';
 import PurchaseCreditsPage from './pages/PurchaseCreditsPage';
+import CompanyAuthPage from './pages/CompanyAuthPage';
+import CompanyRegisterPage from './pages/CompanyRegisterPage';
+import CompanyRequestAccessPage from './pages/CompanyRequestAccessPage';
+import CompanyDashboardPage from './pages/CompanyDashboardPage';
+import ChatPage from './pages/ChatPage';
+import BetaPage from './pages/BetaPage';
+import BetaHubPage from './pages/BetaHubPage';
+import BetaAuthPage from './pages/BetaAuthPage';
+import BetaAccountSetupPage from './pages/BetaAccountSetupPage';
 import { usePageTracking } from './hooks/usePageTracking';
 
 // Helper function to get appropriate icon for category/tag
@@ -493,6 +502,87 @@ function App() {
               element={
                 <div className="w-full">
                   <PurchaseCreditsPage />
+                </div>
+              }
+            />
+            {/* Company Auth route */}
+            <Route
+              path="/company/auth"
+              element={
+                <div className="w-full">
+                  <CompanyAuthPage />
+                </div>
+              }
+            />
+            {/* Company Request Access route */}
+            <Route
+              path="/company/request-access"
+              element={
+                <div className="w-full">
+                  <CompanyRequestAccessPage />
+                </div>
+              }
+            />
+            {/* Company Register route (legacy - kept for existing users) */}
+            <Route
+              path="/company/register"
+              element={
+                <div className="w-full">
+                  <CompanyRegisterPage />
+                </div>
+              }
+            />
+            {/* Company Dashboard route */}
+            <Route
+              path="/company/dashboard"
+              element={
+                <div className="w-full">
+                  <CompanyDashboardPage />
+                </div>
+              }
+            />
+            {/* Messages / Chat route */}
+            <Route
+              path="/messages"
+              element={
+                <div className="w-full">
+                  <ChatPage />
+                </div>
+              }
+            />
+            {/* Hidden Beta signup route - accessible via direct URL only */}
+            <Route
+              path="/beta"
+              element={
+                <div className="w-full">
+                  <BetaPage />
+                </div>
+              }
+            />
+            {/* Beta Hub - protected area for approved beta members */}
+            <Route
+              path="/beta/hub"
+              element={
+                <div className="w-full">
+                  <BetaHubPage />
+                </div>
+              }
+            />
+            {/* Beta Auth - login page for beta members */}
+            <Route
+              path="/beta/auth"
+              element={
+                <div className="w-full">
+                  <BetaAuthPage />
+                </div>
+              }
+            />
+            {/* Beta Account Setup - create account after approval */}
+            <Route
+              path="/beta/create-account"
+              element={
+                <div className="w-full">
+                  <BetaAccountSetupPage />
                 </div>
               }
             />

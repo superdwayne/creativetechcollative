@@ -8,6 +8,10 @@ interface Playground {
   description: string;
   image?: string;
   embedUrl?: string;
+  videoUrl?: string;
+  externalUrl?: string;
+  npmUrl?: string;
+  usageInstructions?: string;
   type: 'iframe' | 'image' | 'video';
 }
 
@@ -18,10 +22,29 @@ const PlaygroundPage: React.FC = () => {
 
   const playgrounds: Playground[] = [
     {
+      id: 'localhost',
+      title: 'Localhost Gallery',
+      description: 'Manage your local dev servers with elegance. A beautiful gallery interface for discovering and organizing your localhost servers across 50+ frameworks.',
+      videoUrl: '/collaborations/localhost.mov',
+      externalUrl: 'https://localhost-ten-tau.vercel.app/',
+      npmUrl: 'https://www.npmjs.com/package/localhost-gallery-agent',
+      usageInstructions: 'npm install -g localhost-gallery-agent && localhost-gallery',
+      type: 'video'
+    },
+    {
       id: 'igor',
       title: 'Meet Igor',
       description: 'Your AI guide into the world of Creative Technology community, want to know more about the community and how it started just ask .',
+      image: '/playgrounds/igor-cover.svg',
       embedUrl: 'https://mascotte.ai/embed?data=JgQDAR4sOTIFAwAHUh9LSkc&lang=false',
+      type: 'iframe'
+    },
+    {
+      id: 'spreed',
+      title: 'Spreed',
+      description: 'A speed reading tool that helps you consume text faster. Paste text, enter a URL, or upload content and read at speeds from 200 to 1500 WPM.',
+      image: '/playgrounds/spreed-cover.svg',
+      embedUrl: 'https://spreed-sigma.vercel.app/',
       type: 'iframe'
     }
   ];
@@ -100,8 +123,8 @@ const PlaygroundPage: React.FC = () => {
           {selectedPlayground && (
             <div className="w-full mb-8 bg-zinc-900 overflow-hidden transition-all duration-500">
               <div className="grid grid-cols-1 md:grid-cols-2">
-                {/* Left side - Embed or Image */}
-                <div className="aspect-square relative">
+                {/* Left side - Embed, Video or Image */}
+                <div className={`relative ${selectedPlayground.type === 'video' ? 'aspect-video' : 'aspect-square'}`}>
                   {selectedPlayground.type === 'iframe' && selectedPlayground.embedUrl ? (
                     <>
                       <iframe
@@ -118,6 +141,15 @@ const PlaygroundPage: React.FC = () => {
                         </div>
                       )}
                     </>
+                  ) : selectedPlayground.type === 'video' && selectedPlayground.videoUrl ? (
+                    <video
+                      src={selectedPlayground.videoUrl}
+                      className="w-full h-full object-contain bg-zinc-950"
+                      autoPlay
+                      loop
+                      muted
+                      playsInline
+                    />
                   ) : (
                     <img 
                       src={selectedPlayground.image} 
@@ -145,9 +177,48 @@ const PlaygroundPage: React.FC = () => {
                   <h3 className="text-4xl md:text-5xl font-primary font-medium text-white mb-6">
                     {selectedPlayground.title}
                   </h3>
-                  <p className="text-zinc-400 font-secondary text-lg leading-relaxed mb-8">
+                  <p className="text-zinc-400 font-secondary text-lg leading-relaxed mb-6">
                     {selectedPlayground.description}
                   </p>
+
+                  {/* Usage Instructions */}
+                  {selectedPlayground.usageInstructions && (
+                    <div className="mb-6">
+                      <span className="text-xs font-secondary tracking-[0.2em] text-zinc-500 uppercase mb-2 block">
+                        Quick Start
+                      </span>
+                      <code className="block bg-zinc-800 px-4 py-3 text-sm font-mono text-emerald-400 rounded">
+                        {selectedPlayground.usageInstructions}
+                      </code>
+                    </div>
+                  )}
+
+                  {/* External Links */}
+                  <div className="flex flex-wrap gap-4 mb-8">
+                    {selectedPlayground.externalUrl && (
+                      <a
+                        href={selectedPlayground.externalUrl}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="px-6 py-3 bg-white text-black font-secondary text-sm tracking-wide hover:bg-zinc-200 transition-colors flex items-center gap-2"
+                      >
+                        Try It Live
+                        <span>↗</span>
+                      </a>
+                    )}
+                    {selectedPlayground.npmUrl && (
+                      <a
+                        href={selectedPlayground.npmUrl}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="px-6 py-3 border border-zinc-700 text-white font-secondary text-sm tracking-wide hover:border-zinc-500 hover:bg-zinc-800 transition-colors flex items-center gap-2"
+                      >
+                        npm Package
+                        <span>↗</span>
+                      </a>
+                    )}
+                  </div>
+
                   <button
                     onClick={() => navigate('/contact')}
                     className="self-start text-sm font-secondary text-zinc-400 hover:text-white transition-colors flex items-center gap-2"
@@ -171,7 +242,16 @@ const PlaygroundPage: React.FC = () => {
                   setIframeLoaded(false);
                 }}
               >
-                {playground.image && (
+                {playground.type === 'video' && playground.videoUrl ? (
+                  <video
+                    src={playground.videoUrl}
+                    className="w-full h-full object-contain bg-zinc-950 opacity-80 group-hover:opacity-100 group-hover:scale-105 transition-all duration-500"
+                    autoPlay
+                    loop
+                    muted
+                    playsInline
+                  />
+                ) : playground.image && (
                   <img 
                     src={playground.image} 
                     alt={playground.title}
@@ -181,7 +261,7 @@ const PlaygroundPage: React.FC = () => {
                 <div className="absolute inset-0 bg-gradient-to-t from-black via-black/50 to-transparent" />
                 <div className="absolute bottom-0 left-0 right-0 p-6">
                   <span className="text-xs font-secondary tracking-[0.2em] text-zinc-500 uppercase mb-2 block">
-                    {playground.type === 'iframe' ? 'Interactive' : 'Experiment'}
+                    {playground.type === 'iframe' ? 'Interactive' : playground.type === 'video' ? 'Tool' : 'Experiment'}
                   </span>
                   <h3 className="text-2xl md:text-3xl font-primary font-medium text-white mb-2">
                     {playground.title}

@@ -12,7 +12,6 @@ import type {
   JobMatchWithProfile,
   MemberResponse,
 } from '@/types/job-matching';
-import { getWebhookUrl } from '@/utils/webhookUtils';
 
 const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
 const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
@@ -31,38 +30,40 @@ export async function getCurrentUserId(): Promise<string | null> {
   return user?.id ?? null;
 }
 
-// Send profile approval notification to admin
-async function sendProfileApprovalNotification(profile: NetworkProfile): Promise<void> {
+// Send profile approval notification to admin via Resend API
+async function sendProfileApprovalNotification(profile: NetworkProfile, accessToken?: string): Promise<void> {
   try {
-    const webhookUrl = getWebhookUrl('profile-approval');
-    const username = import.meta.env.VITE_N8N_BASIC_AUTH_USERNAME;
-    const password = import.meta.env.VITE_N8N_BASIC_AUTH_PASSWORD;
-    
-    if (!username || !password) {
-      console.warn('Webhook credentials not configured. Approval notification not sent.');
+    // If we don't have an access token, we can't make the authenticated request
+    if (!accessToken) {
+      console.warn('No access token provided. Admin notification not sent.');
       return;
     }
 
-    const basicAuth = btoa(`${username}:${password}`);
-
-    await fetch(webhookUrl, {
+    const response = await fetch('/api/notify-profile-created', {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        'Authorization': `Basic ${basicAuth}`
+        'Authorization': `Bearer ${accessToken}`,
       },
       body: JSON.stringify({
-        to: 'dwayne@creativetechnologists.nl',
-        subject: 'New CTC Network Profile Awaiting Approval',
+        profileId: profile.id,
         profileName: profile.fullName,
         profileEmail: profile.email,
         profileSlug: profile.slug,
-        profileUrl: `${window.location.origin}/directory/profile/${profile.slug}`,
-        dashboardUrl: `${supabaseUrl}/project/${supabaseUrl.split('//')[1].split('.')[0]}/editor`,
-        timestamp: new Date().toISOString(),
+        profileLocation: profile.location,
+        profileBio: profile.bio,
+        focusAreas: profile.focusAreas,
       }),
       signal: AbortSignal.timeout(10000)
     });
+
+    if (!response.ok) {
+      const error = await response.json().catch(() => ({}));
+      console.warn('Admin notification API error:', error.error || response.statusText);
+    } else {
+      const result = await response.json();
+      console.log('Admin notification result:', result.message);
+    }
   } catch (error) {
     console.error('Failed to send approval notification:', error);
     // Don't throw - profile creation should succeed even if notification fails
@@ -156,6 +157,7 @@ export async function deleteImage(imageUrl: string): Promise<{ success: boolean;
   return { success: true, error: null };
 }
 
+
 function generateSlug(fullName: string): string {
   return fullName
     .toLowerCase()
@@ -186,7 +188,11 @@ async function getUniqueSlug(baseSlug: string): Promise<string> {
   return slug;
 }
 
-export async function createProfile(formData: ProfileFormData, userId: string): Promise<{ success: boolean; profile?: NetworkProfile; error?: string }> {
+export async function createProfile(
+  formData: ProfileFormData, 
+  userId: string,
+  accessToken?: string
+): Promise<{ success: boolean; profile?: NetworkProfile; error?: string }> {
   if (!supabase) {
     return { success: false, error: 'Database not configured' };
   }
@@ -199,6 +205,29 @@ export async function createProfile(formData: ProfileFormData, userId: string): 
       .split('\n')
       .map(link => link.trim())
       .filter(link => link.length > 0);
+
+    // Check if user has an approved beta application to set membership_type
+    let membershipType: 'beta' | 'full' = 'full';
+    if (accessToken) {
+      try {
+        const betaCheckResponse = await fetch('/api/check-beta-status', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${accessToken}`,
+          },
+          body: JSON.stringify({ email: formData.email }),
+        });
+        if (betaCheckResponse.ok) {
+          const betaData = await betaCheckResponse.json();
+          if (betaData.isBetaMember) {
+            membershipType = 'beta';
+          }
+        }
+      } catch (betaCheckError) {
+        console.warn('Failed to check beta status, defaulting to full member:', betaCheckError);
+      }
+    }
 
     const profileData = {
       user_id: userId,
@@ -216,6 +245,7 @@ export async function createProfile(formData: ProfileFormData, userId: string): 
       is_ctc_member: formData.isCtcMember,
       profile_picture_url: formData.profilePictureUrl || null,
       slug,
+      membership_type: membershipType,
     };
 
     const { data, error } = await supabase
@@ -248,10 +278,11 @@ export async function createProfile(formData: ProfileFormData, userId: string): 
       createdAt: data.created_at,
       updatedAt: data.updated_at,
       slug: data.slug,
+      membershipType: data.membership_type || 'full',
     };
 
-    // Send notification email to admin
-    await sendProfileApprovalNotification(profile);
+    // Send notification email to admin (via Resend API)
+    await sendProfileApprovalNotification(profile, accessToken);
 
     return { success: true, profile };
   } catch (error: any) {
@@ -285,6 +316,9 @@ export async function updateProfile(profileId: string, formData: ProfileFormData
       availability: formData.availability,
       is_ctc_member: formData.isCtcMember,
       profile_picture_url: formData.profilePictureUrl || null,
+      // Clear embedding so it gets regenerated with updated data
+      embedding: null,
+      embedding_updated_at: null,
     };
 
     const { data, error } = await supabase
@@ -381,6 +415,7 @@ export async function getProfileByUserId(userId: string): Promise<NetworkProfile
       createdAt: data.created_at,
       updatedAt: data.updated_at,
       slug: data.slug,
+      membershipType: data.membership_type || 'full',
     };
   } catch (error) {
     console.error('Error fetching profile by user ID:', error);
@@ -388,20 +423,25 @@ export async function getProfileByUserId(userId: string): Promise<NetworkProfile
   }
 }
 
-export async function getProfileBySlug(slug: string): Promise<NetworkProfile | null> {
+/**
+ * Get a profile by email address
+ * Used to find profiles that may have been created before the user registered
+ */
+export async function getProfileByEmail(email: string): Promise<NetworkProfile | null> {
   if (!supabase) return null;
 
   try {
     const { data, error } = await supabase
       .from('network_profiles')
       .select('*')
-      .eq('slug', slug)
+      .eq('email', email)
       .single();
 
     if (error || !data) return null;
 
     return {
       id: data.id,
+      userId: data.user_id,
       fullName: data.full_name,
       location: data.location,
       email: data.email,
@@ -423,118 +463,89 @@ export async function getProfileBySlug(slug: string): Promise<NetworkProfile | n
       slug: data.slug,
     };
   } catch (error) {
-    console.error('Error fetching profile by slug:', error);
+    console.error('Error fetching profile by email:', error);
     return null;
   }
 }
 
-export async function notifyAdminProfileCreated(profile: NetworkProfile) {
-  if (!supabase) return [];
+/**
+ * Link an existing profile to a user account
+ * Used when a user logs in and their profile exists but isn't linked to their user ID
+ */
+export async function linkProfileToUser(profileId: string, userId: string): Promise<boolean> {
+  if (!supabase) return false;
 
   try {
-    const { data, error } = await supabase
+    const { error } = await supabase
       .from('network_profiles')
-      .select('id')
-      .eq('slug', profile.slug)
-      .single();
+      .update({ user_id: userId })
+      .eq('id', profileId);
 
-    if (error) throw error;
+    if (error) {
+      console.error('Error linking profile to user:', error);
+      return false;
+    }
 
-    const adminEmails = await getAdminEmails();
-
-    await sendProfileCreatedNotification(adminEmails, profile);
-
-    return { success: true };
-  } catch (error: any) {
-    console.error('Error notifying admin of profile creation:', error);
-    return { success: false, error: error.message || 'Failed to notify admin' };
+    return true;
+  } catch (error) {
+    console.error('Error linking profile to user:', error);
+    return false;
   }
 }
 
-export async function getAdminEmails(): Promise<string[]> {
-  if (!supabase) return [];
-
-  try {
-    const { data, error } = await supabase
-      .from('admins')
-      .select('email');
-
-    if (error) throw error;
-
-    return data.map((admin: any) => admin.email);
-  } catch (error: any) {
-    console.error('Error fetching admin emails:', error);
-    return [];
-  }
-}
-
-export async function sendProfileCreatedNotification(adminEmails: string[], profile: NetworkProfile) {
-  if (!supabase) return;
-
-  try {
-    const emailTemplate = await getEmailTemplate('profile-created');
-
-    const emailData = {
-      profileName: profile.fullName,
-      profileSlug: profile.slug,
-    };
-
-    await sendEmail(adminEmails, emailTemplate, emailData);
-  } catch (error: any) {
-    console.error('Error sending profile created notification:', error);
-  }
-}
-
-export async function getEmailTemplate(templateName: string): Promise<string> {
-  if (!supabase) return '';
-
-  try {
-    const { data, error } = await supabase
-      .from('email_templates')
-      .select('template')
-      .eq('name', templateName)
-      .single();
-
-    if (error) throw error;
-
-    return data.template;
-  } catch (error: any) {
-    console.error('Error fetching email template:', error);
-    return '';
-  }
-}
-
-export async function sendEmail(to: string[], template: string, data: any) {
-  if (!supabase) return;
-
-  try {
-    const emailService = await getEmailService();
-
-    await emailService.send({
-      to,
-      subject: 'New Profile Created',
-      html: template,
-      data,
-    });
-  } catch (error: any) {
-    console.error('Error sending email:', error);
-  }
-}
-
-export async function getEmailService(): Promise<any> {
+export async function getProfileBySlug(slugOrId: string): Promise<NetworkProfile | null> {
   if (!supabase) return null;
 
+  // Helper to check if input looks like a UUID
+  const isUUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(slugOrId);
+
   try {
-    const { data, error } = await supabase
-      .from('email_services')
-      .select('service')
+    // First try by slug
+    let { data, error } = await supabase
+      .from('network_profiles')
+      .select('*')
+      .eq('slug', slugOrId)
       .single();
 
-    if (error) throw error;
+    // If not found by slug and input looks like a UUID, try by ID
+    if ((error || !data) && isUUID) {
+      const result = await supabase
+        .from('network_profiles')
+        .select('*')
+        .eq('id', slugOrId)
+        .single();
+      data = result.data;
+      error = result.error;
+    }
 
-    return data.service;
-  } catch (error: any) {
-    console.error('Error fetching email service:', error);
+    if (error || !data) return null;
+
+    return {
+      id: data.id,
+      userId: data.user_id,
+      fullName: data.full_name,
+      location: data.location,
+      email: data.email,
+      portfolioUrl: data.portfolio_url,
+      linkedinUrl: data.linkedin_url,
+      otherSocialLinks: data.other_social_links,
+      bio: data.bio,
+      focusAreas: data.focus_areas,
+      skills: data.skills,
+      projects: data.projects,
+      availability: data.availability,
+      isCtcMember: data.is_ctc_member,
+      profilePictureUrl: data.profile_picture_url,
+      approved: data.approved || false,
+      approvedAt: data.approved_at,
+      approvedBy: data.approved_by,
+      createdAt: data.created_at,
+      updatedAt: data.updated_at,
+      slug: data.slug,
+      membershipType: data.membership_type || 'full',
+    };
+  } catch (error) {
+    console.error('Error fetching profile by slug or ID:', error);
     return null;
   }
 }
@@ -543,15 +554,18 @@ export async function getAllProfiles(): Promise<NetworkProfile[]> {
   if (!supabase) return [];
 
   try {
+    // Only fetch approved profiles for the public directory
     const { data, error } = await supabase
       .from('network_profiles')
       .select('*')
+      .eq('approved', true)
       .order('created_at', { ascending: false });
 
     if (error || !data) return [];
 
     return data.map((item: any) => ({
       id: item.id,
+      userId: item.user_id,
       fullName: item.full_name,
       location: item.location,
       email: item.email,
@@ -571,6 +585,7 @@ export async function getAllProfiles(): Promise<NetworkProfile[]> {
       createdAt: item.created_at,
       updatedAt: item.updated_at,
       slug: item.slug,
+      membershipType: item.membership_type || 'full',
     }));
   } catch (error) {
     console.error('Error fetching profiles:', error);

@@ -25,9 +25,8 @@ import {
 import { 
   ProfileFormData, 
   Project, 
-  FocusArea,
   AvailabilityStatus,
-  FOCUS_AREAS, 
+  SUGGESTED_FOCUS_AREAS, 
   AVAILABILITY_OPTIONS, 
   SUGGESTED_SKILLS 
 } from '@/types/network-profile';
@@ -192,16 +191,6 @@ useEffect(() => {
     }
   };
 
-  const toggleFocusArea = (area: FocusArea) => {
-    setFormData(prev => {
-      const current = prev.focusAreas;
-      if (current.includes(area)) {
-        return { ...prev, focusAreas: current.filter(a => a !== area) };
-      }
-      return { ...prev, focusAreas: [...current, area] };
-    });
-  };
-
   const isValidEmail = (email: string): boolean => {
     return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim());
   };
@@ -236,8 +225,9 @@ useEffect(() => {
     }
 
     if (step === 3) {
-      const validProjects = formData.projects.filter(p => p.title.trim() && p.imageUrl.trim() && p.description.trim());
-      if (validProjects.length < 2) newErrors.projects = 'Please complete at least 2 projects';
+      // Projects are valid with title and description - image is optional
+      const validProjects = formData.projects.filter(p => p.title.trim() && p.description.trim());
+      if (validProjects.length < 2) newErrors.projects = 'Please complete at least 2 projects with title and description';
     }
 
     if (step === 4) {
@@ -268,8 +258,9 @@ const handleNext = () => {
     setEnrichmentError('');
 
     try {
+      // Projects need title and description - image is optional
       const cleanedProjects = formData.projects.filter(p =>
-        p.title.trim() && p.imageUrl.trim() && p.description.trim()
+        p.title.trim() && p.description.trim()
       );
 
       const result = await updateProfile(profileId, {
@@ -280,6 +271,15 @@ const handleNext = () => {
       if (result.success) {
         track('profile_saved');
         setSubmitSuccess(true);
+
+        // Regenerate embedding so profile appears correctly in job matching
+        try {
+          await fetch(`/api/generate-embeddings?profileId=${profileId}`, {
+            method: 'POST',
+          });
+        } catch (embeddingErr) {
+          console.warn('Embedding regeneration failed:', embeddingErr);
+        }
 
         // Check if portfolio or LinkedIn URLs changed - trigger re-enrichment
         const urlsChanged =
@@ -577,6 +577,7 @@ const handleNext = () => {
                 />
                 {errors.bio && <p className="text-red-400 text-sm mt-1">{errors.bio}</p>}
               </div>
+
             </div>
           )}
 
@@ -585,26 +586,13 @@ const handleNext = () => {
             <div className="space-y-8">
               <div>
                 <h2 className="text-xl font-primary text-white mb-2">Focus Areas</h2>
-                <p className="text-zinc-400 text-sm mb-4">Select all that apply ({formData.focusAreas.length} selected)</p>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                  {FOCUS_AREAS.map((area) => {
-                    const isSelected = formData.focusAreas.includes(area.value);
-                    return (
-                      <button
-                        key={area.value}
-                        type="button"
-                        onClick={() => toggleFocusArea(area.value)}
-                        className={cn(
-                          "p-4 rounded-lg border text-left transition-all",
-                          isSelected ? "border-pink-500 bg-pink-500/10 text-white" : "border-zinc-700 bg-zinc-900/50 text-zinc-300 hover:border-zinc-600"
-                        )}
-                      >
-                        <div className="font-medium text-sm">{area.label}</div>
-                        <div className="text-xs text-zinc-500 mt-1">{area.description}</div>
-                      </button>
-                    );
-                  })}
-                </div>
+                <p className="text-zinc-400 text-sm mb-4">Add at least 1 focus area (type to search or add your own)</p>
+                <TagInput
+                  tags={formData.focusAreas}
+                  onTagsChange={(tags) => updateField('focusAreas', tags)}
+                  suggestions={SUGGESTED_FOCUS_AREAS}
+                  placeholder="Type a focus area and press Enter..."
+                />
                 {errors.focusAreas && <p className="text-red-400 text-sm mt-2">{errors.focusAreas}</p>}
               </div>
 

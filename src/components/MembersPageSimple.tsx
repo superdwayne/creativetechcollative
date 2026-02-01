@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { motion, useScroll, useTransform } from 'motion/react';
+import { motion, useScroll, useTransform } from 'framer-motion';
 import { Loader2, ArrowLeft, ArrowRight } from 'lucide-react';
 import { getWebhookUrl } from '@/utils/webhookUtils';
 import { useNavigate } from 'react-router-dom';

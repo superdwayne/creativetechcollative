@@ -1,20 +1,17 @@
-export type FocusArea = 
-  | 'immersive-experiences'
-  | 'interactive-web'
-  | 'generative-design'
-  | 'creative-automation'
-  | 'physical-computing'
-  | 'realtime-visuals';
+// Focus areas are now customizable strings - users can add their own
+export type FocusArea = string;
 
 export type AvailabilityStatus = 
   | 'open-to-work'
   | 'open-to-collaborations'
   | 'not-available';
 
+export type MembershipType = 'beta' | 'full';
+
 export interface Project {
   id: string;
   title: string;
-  imageUrl: string;
+  imageUrl?: string;  // Optional - enriched projects may not have images
   description: string;
   link?: string;
 }
@@ -41,6 +38,8 @@ export interface NetworkProfile {
   createdAt: string;
   updatedAt: string;
   slug: string;
+  // Membership type: 'beta' for approved beta members, 'full' for upgraded/direct members
+  membershipType?: MembershipType;
   // Embedding fields for AI-powered job matching
   embedding?: number[] | null;
   embeddingUpdatedAt?: string | null;
@@ -63,38 +62,45 @@ export interface ProfileFormData {
   profilePictureUrl: string;
 }
 
-export const FOCUS_AREAS: { value: FocusArea; label: string; description: string }[] = [
-  { 
-    value: 'immersive-experiences', 
-    label: 'Immersive Experiences', 
-    description: 'AR/VR/XR' 
-  },
-  { 
-    value: 'interactive-web', 
-    label: 'Interactive Web/Creative Development', 
-    description: 'WebGL, Creative Coding' 
-  },
-  { 
-    value: 'generative-design', 
-    label: 'Generative/Algorithmic Design', 
-    description: 'Procedural Art' 
-  },
-  { 
-    value: 'creative-automation', 
-    label: 'Creative Automation/AI', 
-    description: 'AI Tools, Automation' 
-  },
-  { 
-    value: 'physical-computing', 
-    label: 'Physical Computing', 
-    description: 'Hardware, IoT' 
-  },
-  { 
-    value: 'realtime-visuals', 
-    label: 'Real-time/Live Visuals', 
-    description: 'VJing, Live Performance' 
-  },
+// Suggested focus areas - users can select from these or add their own
+export const SUGGESTED_FOCUS_AREAS = [
+  'Immersive Experiences (AR/VR/XR)',
+  'Interactive Web Development',
+  'Creative Coding',
+  'Generative Art',
+  'Algorithmic Design',
+  'AI & Machine Learning',
+  'Creative Automation',
+  'Physical Computing',
+  'IoT & Hardware',
+  'Real-time Visuals',
+  'Live Performance',
+  'Motion Design',
+  'Data Visualization',
+  '3D Design & Animation',
+  'Game Development',
+  'Audio & Sound Design',
+  'Projection Mapping',
+  'Spatial Computing',
+  'Digital Installations',
+  'Brand Experience',
+  'Product Design',
+  'UX/UI Design',
+  'Creative Direction',
+  'Technical Direction',
+  'Experiential Marketing',
+  'Interactive Installations',
 ];
+
+// Legacy mapping for backwards compatibility with old focus area values
+export const LEGACY_FOCUS_AREA_MAP: Record<string, string> = {
+  'immersive-experiences': 'Immersive Experiences (AR/VR/XR)',
+  'interactive-web': 'Interactive Web Development',
+  'generative-design': 'Generative Art',
+  'creative-automation': 'AI & Machine Learning',
+  'physical-computing': 'Physical Computing',
+  'realtime-visuals': 'Real-time Visuals',
+};
 
 export const AVAILABILITY_OPTIONS: { value: AvailabilityStatus; label: string }[] = [
   { value: 'open-to-work', label: 'Open to work' },
@@ -141,3 +147,6 @@ export const SUGGESTED_SKILLS = [
   'Notch',
   'VVVV',
 ];
+
+// Alias for backwards compatibility
+export const FOCUS_AREAS = SUGGESTED_FOCUS_AREAS;

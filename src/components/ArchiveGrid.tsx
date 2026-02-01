@@ -56,8 +56,9 @@ const ArchiveGrid: React.FC<ArchiveGridProps> = ({ profiles, onClose, isLoading 
   const maxColumnItems = Math.max(...columns.map(c => c.length), 1);
   const canvasHeight = maxColumnItems * (CARD_HEIGHT + GAP) + Math.max(...columnOffsets) + 400;
 
+  const viewportHeight = typeof window !== 'undefined' ? window.innerHeight - 180 : 900; // Account for header
   const maxX = Math.max(0, canvasWidth - (typeof window !== 'undefined' ? window.innerWidth : 1920));
-  const maxY = Math.max(0, canvasHeight - (typeof window !== 'undefined' ? window.innerHeight : 1080));
+  const maxY = Math.max(0, canvasHeight - viewportHeight);
 
   // Start position - centered-ish
   useEffect(() => {
@@ -160,51 +161,16 @@ const ArchiveGrid: React.FC<ArchiveGridProps> = ({ profiles, onClose, isLoading 
   return (
     <div
       ref={containerRef}
-      className="fixed inset-0 overflow-hidden z-50 bg-black"
-      style={{ cursor: isDragging ? 'grabbing' : 'grab' }}
+      className="fixed left-0 right-0 bottom-0 overflow-hidden z-40 bg-black"
+      style={{
+        top: '180px', // Below the header
+        cursor: isDragging ? 'grabbing' : 'grab'
+      }}
       onPointerDown={handlePointerDown}
       onPointerMove={handlePointerMove}
       onPointerUp={handlePointerUp}
       onPointerLeave={handlePointerUp}
     >
-      {/* Header */}
-      <header className="fixed top-0 left-0 right-0 z-50 pointer-events-none">
-        <div className="max-w-7xl mx-auto px-6 md:px-12 py-6 md:py-8">
-          <div className="flex items-center justify-between pointer-events-auto">
-            {/* Left side - Back + Title */}
-            <div className="flex items-center gap-6">
-              {onClose && (
-                <button
-                  onClick={onClose}
-                  className="text-zinc-500 hover:text-white transition-colors duration-300 text-sm font-medium tracking-wide"
-                >
-                  ← Back
-                </button>
-              )}
-              <div>
-                <span className="text-[10px] font-medium tracking-[0.4em] text-zinc-600 uppercase block mb-1">
-                  The Creative Technology Collective
-                </span>
-                <h1 className="text-2xl md:text-3xl font-medium text-white tracking-tight">
-                  Archive
-                </h1>
-              </div>
-            </div>
-
-            {/* Right side - Count */}
-            <div className="text-right">
-              <div className="text-[10px] font-medium tracking-[0.3em] uppercase text-zinc-600 mb-1">
-                Members
-              </div>
-              <div className="text-3xl md:text-4xl font-light text-white tracking-tight">
-                {profiles.length.toString().padStart(2, '0')}
-              </div>
-            </div>
-          </div>
-        </div>
-        {/* Gradient fade */}
-        <div className="h-16 bg-gradient-to-b from-black to-transparent" />
-      </header>
 
       {/* Loading */}
       {isLoading && (
@@ -256,7 +222,7 @@ const ArchiveGrid: React.FC<ArchiveGridProps> = ({ profiles, onClose, isLoading 
                   style={{
                     width: CARD_WIDTH,
                     gap: GAP,
-                    paddingTop: columnOffsets[colIndex] + 140, // Account for header
+                    paddingTop: columnOffsets[colIndex] + 40,
                     transform: `translateY(${parallaxY}px)`,
                   }}
                 >

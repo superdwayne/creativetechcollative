@@ -22,8 +22,6 @@ import {
   Linkedin,
   Globe,
   X,
-  CheckCheck,
-  Link2,
   BadgeCheck,
   Mail,
   Phone,
@@ -32,6 +30,8 @@ import {
   CreditCard,
   DollarSign,
   BarChart3,
+  ArrowUpCircle,
+  Trash2,
 } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import { cn } from '@/lib/utils';
@@ -42,6 +42,7 @@ import {
   REMOTE_PREFERENCES,
 } from '@/types/job-matching';
 import { FOCUS_AREAS } from '@/types/network-profile';
+import { UserManagementSection } from '@/components/admin/UserManagementSection';
 
 // Types for admin API responses
 interface JobSubmissionWithDetails {
@@ -124,51 +125,6 @@ interface PendingProfile {
   slug: string;
 }
 
-// Pending match group types
-interface PendingMatchJob {
-  id: string;
-  title: string;
-  companyId: string;
-  companyName: string;
-  projectType: string;
-  remotePreference: string;
-  createdAt: string;
-}
-
-interface PendingMatchProfile {
-  id: string;
-  fullName: string;
-  email: string;
-  location: string;
-  bio: string;
-  skills: string[];
-  focusAreas: string[];
-  availability: string;
-  portfolioUrl: string | null;
-  linkedinUrl: string | null;
-  profilePictureUrl: string | null;
-}
-
-interface PendingMatch {
-  id: string;
-  jobId: string;
-  profileId: string;
-  matchScore: number;
-  matchReasoning: string;
-  skillMatches: SkillMatchInfo[] | null;
-  vectorSimilarity: number | null;
-  adminApproved: boolean | null;
-  memberNotified: boolean;
-  memberResponse: string | null;
-  createdAt: string;
-  profile: PendingMatchProfile;
-}
-
-interface PendingMatchGroup {
-  job: PendingMatchJob;
-  matches: PendingMatch[];
-}
-
 // Company type for admin view
 interface AdminCompany {
   id: string;
@@ -198,6 +154,83 @@ interface CreditUsageCompany {
 interface CreditUsageTotals {
   totalAnalyses: number;
   totalRevenue: number;
+}
+
+// Pending company request type
+interface PendingCompanyRequest {
+  id: string;
+  companyName: string;
+  companyWebsite: string | null;
+  contactName: string;
+  contactEmail: string;
+  contactPhone: string | null;
+  companySize: string | null;
+  industry: string | null;
+  status: 'pending' | 'approved' | 'rejected';
+  adminNotes: string | null;
+  reviewedAt: string | null;
+  reviewedBy: string | null;
+  createdAt: string;
+}
+
+// Beta application type
+interface BetaApplication {
+  id: string;
+  name: string;
+  email: string;
+  interests: string[];
+  status: 'pending' | 'approved' | 'rejected';
+  admin_notes: string | null;
+  created_at: string;
+  reviewed_at: string | null;
+  reviewed_by: string | null;
+}
+
+// Member types for admin member lists
+interface BetaMember {
+  id: string;
+  name: string;
+  email: string;
+  interests: string[];
+  status: 'pending' | 'approved' | 'rejected';
+  adminNotes: string | null;
+  createdAt: string;
+  reviewedAt: string | null;
+  reviewedBy: string | null;
+  memberType: 'beta';
+}
+
+interface DirectoryMember {
+  id: string;
+  userId: string;
+  fullName: string;
+  email: string;
+  location: string;
+  bio: string;
+  skills: string[];
+  focusAreas: string[];
+  availability: string;
+  portfolioUrl: string | null;
+  linkedinUrl: string | null;
+  profilePictureUrl: string | null;
+  slug: string;
+  approved: boolean;
+  approvedAt: string | null;
+  approvedBy: string | null;
+  createdAt: string;
+  updatedAt: string;
+  memberType: 'directory';
+  membershipType: 'beta' | 'full'; // beta = approved beta member, full = upgraded or direct signup
+}
+
+interface MemberCounts {
+  betaTotal: number;
+  betaApproved: number;
+  betaPending: number;
+  betaRejected: number;
+  directoryTotal: number;
+  directoryApproved: number;
+  directoryPending: number;
 }
 
 const AdminDashboardPage: React.FC = () => {
@@ -237,17 +270,40 @@ const AdminDashboardPage: React.FC = () => {
   const [rejectJobReason, setRejectJobReason] = useState('');
   const [rejectingJobId, setRejectingJobId] = useState<string | null>(null);
 
-  // Pending matches state
-  const [pendingMatchGroups, setPendingMatchGroups] = useState<PendingMatchGroup[]>([]);
-  const [loadingPendingMatches, setLoadingPendingMatches] = useState(false);
-  const [expandedPendingJobId, setExpandedPendingJobId] = useState<string | null>(null);
-  const [approvingAllJobId, setApprovingAllJobId] = useState<string | null>(null);
-
   // Companies state
   const [companies, setCompanies] = useState<AdminCompany[]>([]);
   const [loadingCompanies, setLoadingCompanies] = useState(false);
   const [expandedCompanyId, setExpandedCompanyId] = useState<string | null>(null);
   const [togglingVerifyId, setTogglingVerifyId] = useState<string | null>(null);
+
+  // Pending company requests state
+  const [pendingCompanyRequests, setPendingCompanyRequests] = useState<PendingCompanyRequest[]>([]);
+  const [loadingCompanyRequests, setLoadingCompanyRequests] = useState(false);
+  const [expandedRequestId, setExpandedRequestId] = useState<string | null>(null);
+  const [approvingRequestId, setApprovingRequestId] = useState<string | null>(null);
+  const [rejectingRequestId, setRejectingRequestId] = useState<string | null>(null);
+
+  // Beta applications state
+  const [betaApplications, setBetaApplications] = useState<BetaApplication[]>([]);
+  const [loadingBetaApplications, setLoadingBetaApplications] = useState(false);
+  const [approvingBetaId, setApprovingBetaId] = useState<string | null>(null);
+  const [rejectingBetaId, setRejectingBetaId] = useState<string | null>(null);
+  const [deletingBetaId, setDeletingBetaId] = useState<string | null>(null);
+
+  // Member lists state (approved members)
+  const [betaMembers, setBetaMembers] = useState<BetaMember[]>([]);
+  const [directoryMembers, setDirectoryMembers] = useState<DirectoryMember[]>([]);
+  const [upgradingMemberId, setUpgradingMemberId] = useState<string | null>(null);
+  const [memberCounts, setMemberCounts] = useState<MemberCounts>({
+    betaTotal: 0,
+    betaApproved: 0,
+    betaPending: 0,
+    betaRejected: 0,
+    directoryTotal: 0,
+    directoryApproved: 0,
+    directoryPending: 0,
+  });
+  const [loadingMembers, setLoadingMembers] = useState(false);
 
   // Credit usage state
   const [creditUsageCompanies, setCreditUsageCompanies] = useState<CreditUsageCompany[]>([]);
@@ -260,14 +316,6 @@ const AdminDashboardPage: React.FC = () => {
   const [grantCreditsNote, setGrantCreditsNote] = useState('');
   const [grantingCredits, setGrantingCredits] = useState(false);
 
-  // Enrichment state
-  const [enrichingProfiles, setEnrichingProfiles] = useState(false);
-  const [enrichmentResult, setEnrichmentResult] = useState<{
-    total: number;
-    successful: number;
-    failed: number;
-  } | null>(null);
-
   // Web enrichment state
   const [webEnrichingProfileId, setWebEnrichingProfileId] = useState<string | null>(null);
   const [webEnrichmentResult, setWebEnrichmentResult] = useState<{
@@ -278,6 +326,35 @@ const AdminDashboardPage: React.FC = () => {
     summary?: string;
     error?: string;
   } | null>(null);
+
+  // Email test state
+  const [testEmailAddress, setTestEmailAddress] = useState('');
+  const [testEmailType, setTestEmailType] = useState<'message' | 'profile_approved'>('message');
+  const [sendingTestEmail, setSendingTestEmail] = useState(false);
+  const [testEmailResult, setTestEmailResult] = useState<{
+    success: boolean;
+    message: string;
+    error?: string;
+  } | null>(null);
+
+  // Collapsible sections state
+  const [collapsedSections, setCollapsedSections] = useState<Record<string, boolean>>({
+    pendingJobs: true,
+    pendingProfiles: false,
+    pendingCompanyRequests: false,
+    betaApplications: false,
+    betaMembers: true,
+    directoryMembers: true,
+    companies: true,
+    creditUsage: true,
+    testEmail: true,
+    userManagement: true,
+    jobSubmissions: true,
+  });
+
+  const toggleSection = (section: string) => {
+    setCollapsedSections(prev => ({ ...prev, [section]: !prev[section] }));
+  };
 
   const fetchPendingProfiles = useCallback(async () => {
     if (!session?.access_token) return;
@@ -302,51 +379,6 @@ const AdminDashboardPage: React.FC = () => {
       console.error('Error fetching pending profiles:', err);
     } finally {
       setLoadingProfiles(false);
-    }
-  }, [session?.access_token]);
-
-  const enrichProfiles = useCallback(async () => {
-    if (!session?.access_token) return;
-
-    setEnrichingProfiles(true);
-    setEnrichmentResult(null);
-
-    try {
-      const response = await fetch('/api/enrich-profiles', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${session.access_token}`,
-        },
-        body: JSON.stringify({}), // Empty body to enrich all profiles that need it
-      });
-
-      const data = await response.json();
-
-      if (!response.ok) {
-        throw new Error(data.error || 'Failed to enrich profiles');
-      }
-
-      setEnrichmentResult({
-        total: data.total,
-        successful: data.successful,
-        failed: data.failed,
-      });
-
-      setToast({
-        message: data.total === 0
-          ? 'All profiles are already enriched!'
-          : `Enriched ${data.successful} of ${data.total} profiles`,
-        type: data.failed === 0 ? 'success' : 'error',
-      });
-    } catch (err) {
-      console.error('Error enriching profiles:', err);
-      setToast({
-        message: err instanceof Error ? err.message : 'Failed to enrich profiles',
-        type: 'error',
-      });
-    } finally {
-      setEnrichingProfiles(false);
     }
   }, [session?.access_token]);
 
@@ -411,32 +443,6 @@ const AdminDashboardPage: React.FC = () => {
     }
   }, [session?.access_token, fetchPendingProfiles]);
 
-  const fetchPendingMatches = useCallback(async () => {
-    if (!session?.access_token) return;
-
-    setLoadingPendingMatches(true);
-
-    try {
-      const response = await fetch('/api/admin/pending-matches', {
-        headers: {
-          Authorization: `Bearer ${session.access_token}`,
-        },
-      });
-
-      const data = await response.json();
-
-      if (!response.ok) {
-        throw new Error(data.error || 'Failed to fetch pending matches');
-      }
-
-      setPendingMatchGroups(data.groups);
-    } catch (err) {
-      console.error('Error fetching pending matches:', err);
-    } finally {
-      setLoadingPendingMatches(false);
-    }
-  }, [session?.access_token]);
-
   const fetchCompanies = useCallback(async () => {
     if (!session?.access_token) return;
 
@@ -460,6 +466,325 @@ const AdminDashboardPage: React.FC = () => {
       console.error('Error fetching companies:', err);
     } finally {
       setLoadingCompanies(false);
+    }
+  }, [session?.access_token]);
+
+  const fetchPendingCompanyRequests = useCallback(async () => {
+    if (!session?.access_token) return;
+
+    setLoadingCompanyRequests(true);
+
+    try {
+      const response = await fetch('/api/admin/company-requests?status=pending', {
+        headers: {
+          Authorization: `Bearer ${session.access_token}`,
+        },
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data.error || 'Failed to fetch company requests');
+      }
+
+      setPendingCompanyRequests(data.requests);
+    } catch (err) {
+      console.error('Error fetching company requests:', err);
+    } finally {
+      setLoadingCompanyRequests(false);
+    }
+  }, [session?.access_token]);
+
+  const approveCompanyRequest = async (requestId: string) => {
+    if (!session?.access_token) return;
+
+    setApprovingRequestId(requestId);
+
+    try {
+      const response = await fetch('/api/admin/company-requests/approve', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${session.access_token}`,
+        },
+        body: JSON.stringify({ requestId }),
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data.error || 'Failed to approve request');
+      }
+
+      // Remove from pending list
+      setPendingCompanyRequests((prev) => prev.filter((r) => r.id !== requestId));
+      
+      // Refresh companies list
+      fetchCompanies();
+
+      setToast({ message: 'Company approved and account created!', type: 'success' });
+    } catch (err: any) {
+      console.error('Error approving company request:', err);
+      setToast({ message: err.message || 'Failed to approve request', type: 'error' });
+    } finally {
+      setApprovingRequestId(null);
+    }
+  };
+
+  const rejectCompanyRequest = async (requestId: string) => {
+    if (!session?.access_token) return;
+
+    setRejectingRequestId(requestId);
+
+    try {
+      const response = await fetch('/api/admin/company-requests/reject', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${session.access_token}`,
+        },
+        body: JSON.stringify({ requestId }),
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data.error || 'Failed to reject request');
+      }
+
+      // Remove from pending list
+      setPendingCompanyRequests((prev) => prev.filter((r) => r.id !== requestId));
+
+      setToast({ message: 'Company request rejected', type: 'success' });
+    } catch (err: any) {
+      console.error('Error rejecting company request:', err);
+      setToast({ message: err.message || 'Failed to reject request', type: 'error' });
+    } finally {
+      setRejectingRequestId(null);
+    }
+  };
+
+  // Beta applications functions
+  const fetchBetaApplications = useCallback(async () => {
+    if (!session?.access_token) {
+      console.warn('[Beta Applications] No session token available');
+      return;
+    }
+
+    setLoadingBetaApplications(true);
+
+    try {
+      const response = await fetch('/api/admin/beta-applications?status=pending', {
+        headers: {
+          Authorization: `Bearer ${session.access_token}`,
+        },
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data.error || 'Failed to fetch beta applications');
+      }
+
+      console.log('[Beta Applications] Fetched:', data.applications?.length || 0, 'applications');
+      setBetaApplications(data.applications || []);
+    } catch (err: any) {
+      console.error('Error fetching beta applications:', err);
+      setToast({ message: `Failed to load beta applications: ${err.message}`, type: 'error' });
+    } finally {
+      setLoadingBetaApplications(false);
+    }
+  }, [session?.access_token]);
+
+  const approveBetaApplication = async (applicationId: string) => {
+    if (!session?.access_token) return;
+
+    setApprovingBetaId(applicationId);
+
+    try {
+      const response = await fetch('/api/admin/beta-applications/approve', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${session.access_token}`,
+        },
+        body: JSON.stringify({ applicationId }),
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data.error || 'Failed to approve application');
+      }
+
+      // Remove from pending list
+      setBetaApplications((prev) => prev.filter((a) => a.id !== applicationId));
+
+      setToast({ message: 'Beta application approved! User has been notified.', type: 'success' });
+    } catch (err: any) {
+      console.error('Error approving beta application:', err);
+      setToast({ message: err.message || 'Failed to approve application', type: 'error' });
+    } finally {
+      setApprovingBetaId(null);
+    }
+  };
+
+  const rejectBetaApplication = async (applicationId: string) => {
+    if (!session?.access_token) return;
+
+    setRejectingBetaId(applicationId);
+
+    try {
+      const response = await fetch('/api/admin/beta-applications/reject', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${session.access_token}`,
+        },
+        body: JSON.stringify({ applicationId, sendEmail: true }),
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data.error || 'Failed to reject application');
+      }
+
+      // Remove from pending list
+      setBetaApplications((prev) => prev.filter((a) => a.id !== applicationId));
+
+      const emailMessage = data.emailSent 
+        ? 'Beta application rejected and email sent' 
+        : 'Beta application rejected (email failed to send)';
+      setToast({ message: emailMessage, type: 'success' });
+    } catch (err: any) {
+      console.error('Error rejecting beta application:', err);
+      setToast({ message: err.message || 'Failed to reject application', type: 'error' });
+    } finally {
+      setRejectingBetaId(null);
+    }
+  };
+
+  const deleteBetaApplication = async (applicationId: string, applicationName: string) => {
+    if (!session?.access_token) return;
+
+    // Confirm deletion
+    if (!window.confirm(`Are you sure you want to delete the beta application for "${applicationName}"? This action cannot be undone.`)) {
+      return;
+    }
+
+    setDeletingBetaId(applicationId);
+
+    try {
+      const response = await fetch('/api/admin/beta-applications/delete', {
+        method: 'DELETE',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${session.access_token}`,
+        },
+        body: JSON.stringify({ applicationId }),
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data.error || 'Failed to delete application');
+      }
+
+      // Remove from pending list
+      setBetaApplications((prev) => prev.filter((a) => a.id !== applicationId));
+      // Also remove from beta members list if present
+      setBetaMembers((prev) => prev.filter((m) => m.id !== applicationId));
+
+      setToast({ message: `Beta application for ${applicationName} deleted`, type: 'success' });
+    } catch (err: any) {
+      console.error('Error deleting beta application:', err);
+      setToast({ message: err.message || 'Failed to delete application', type: 'error' });
+    } finally {
+      setDeletingBetaId(null);
+    }
+  };
+
+  // Upgrade a beta member to full directory member
+  const upgradeMember = async (profileId: string) => {
+    if (!session?.access_token) return;
+
+    setUpgradingMemberId(profileId);
+
+    try {
+      const response = await fetch('/api/admin/members/upgrade', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${session.access_token}`,
+        },
+        body: JSON.stringify({ profileId }),
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data.error || 'Failed to upgrade member');
+      }
+
+      // Update the member in the list
+      setDirectoryMembers((prev) =>
+        prev.map((member) =>
+          member.id === profileId
+            ? { ...member, membershipType: 'full' as const }
+            : member
+        )
+      );
+
+      setToast({ message: data.message || 'Member upgraded to full directory member', type: 'success' });
+    } catch (err: any) {
+      console.error('Error upgrading member:', err);
+      setToast({ message: err.message || 'Failed to upgrade member', type: 'error' });
+    } finally {
+      setUpgradingMemberId(null);
+    }
+  };
+
+  // Fetch all members (approved beta and directory members)
+  const fetchMembers = useCallback(async () => {
+    if (!session?.access_token) return;
+
+    setLoadingMembers(true);
+
+    try {
+      const response = await fetch('/api/admin/members?type=all&status=approved', {
+        headers: {
+          Authorization: `Bearer ${session.access_token}`,
+        },
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data.error || 'Failed to fetch members');
+      }
+
+      console.log('[Members] Fetched:', {
+        beta: data.betaMembers?.length || 0,
+        directory: data.directoryMembers?.length || 0,
+      });
+
+      setBetaMembers(data.betaMembers || []);
+      setDirectoryMembers(data.directoryMembers || []);
+      setMemberCounts(data.counts || {
+        betaTotal: 0,
+        betaApproved: 0,
+        betaPending: 0,
+        betaRejected: 0,
+        directoryTotal: 0,
+        directoryApproved: 0,
+        directoryPending: 0,
+      });
+    } catch (err: any) {
+      console.error('Error fetching members:', err);
+      setToast({ message: `Failed to load members: ${err.message}`, type: 'error' });
+    } finally {
+      setLoadingMembers(false);
     }
   }, [session?.access_token]);
 
@@ -594,114 +919,6 @@ const AdminDashboardPage: React.FC = () => {
     }
   };
 
-  const approveAllMatchesForJob = async (jobId: string, matchIds: string[]) => {
-    if (!session?.access_token || approvingAllJobId) return;
-
-    setApprovingAllJobId(jobId);
-
-    try {
-      // Approve all matches sequentially
-      let approvedCount = 0;
-      for (const matchId of matchIds) {
-        const response = await fetch('/api/review-match', {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            Authorization: `Bearer ${session.access_token}`,
-          },
-          body: JSON.stringify({ matchId, approved: true }),
-        });
-
-        if (response.ok) {
-          approvedCount++;
-        }
-      }
-
-      // Remove the group from pending matches
-      setPendingMatchGroups((prev) => prev.filter((group) => group.job.id !== jobId));
-      setExpandedPendingJobId(null);
-
-      // Show success toast
-      setToast({
-        message: `${approvedCount} match${approvedCount !== 1 ? 'es' : ''} approved`,
-        type: 'success',
-      });
-      setTimeout(() => setToast(null), 3000);
-
-      // Refresh main matches if the job is expanded
-      if (expandedJobId === jobId) {
-        await fetchMatchesForJob(jobId);
-      }
-    } catch (err) {
-      console.error('Error approving all matches:', err);
-      setToast({
-        message: err instanceof Error ? err.message : 'Failed to approve matches',
-        type: 'error',
-      });
-      setTimeout(() => setToast(null), 3000);
-    } finally {
-      setApprovingAllJobId(null);
-    }
-  };
-
-  const reviewPendingMatch = async (matchId: string, jobId: string, approved: boolean) => {
-    if (!session?.access_token || reviewingMatchId) return;
-
-    setReviewingMatchId(matchId);
-
-    try {
-      const response = await fetch('/api/review-match', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${session.access_token}`,
-        },
-        body: JSON.stringify({ matchId, approved }),
-      });
-
-      const data = await response.json();
-
-      if (!response.ok) {
-        throw new Error(data.error || 'Failed to review match');
-      }
-
-      // Update local state - remove match from pending groups
-      setPendingMatchGroups((prev) => {
-        const newGroups = prev.map((group) => {
-          if (group.job.id === jobId) {
-            return {
-              ...group,
-              matches: group.matches.filter((m) => m.id !== matchId),
-            };
-          }
-          return group;
-        });
-        // Remove groups with no matches left
-        return newGroups.filter((group) => group.matches.length > 0);
-      });
-
-      // Show toast
-      setToast({
-        message: approved ? 'Match approved' : 'Match rejected',
-        type: 'success',
-      });
-      setTimeout(() => setToast(null), 3000);
-
-      // Refresh main matches if the job is expanded
-      if (expandedJobId === jobId) {
-        await fetchMatchesForJob(jobId);
-      }
-    } catch (err) {
-      console.error('Error reviewing match:', err);
-      setToast({
-        message: err instanceof Error ? err.message : 'Review failed',
-        type: 'error',
-      });
-      setTimeout(() => setToast(null), 3000);
-    } finally {
-      setReviewingMatchId(null);
-    }
-  };
 
   const approveProfile = async (profileId: string) => {
     if (!session?.access_token || approvingProfileId) return;
@@ -972,6 +1189,59 @@ const AdminDashboardPage: React.FC = () => {
     }
   };
 
+  // Send test email function
+  const sendTestEmail = async () => {
+    if (!session?.access_token || !testEmailAddress || sendingTestEmail) return;
+
+    setSendingTestEmail(true);
+    setTestEmailResult(null);
+
+    try {
+      const response = await fetch('/api/admin/test-email-notification', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${session.access_token}`,
+        },
+        body: JSON.stringify({
+          email: testEmailAddress,
+          type: testEmailType,
+        }),
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data.error || data.details || 'Failed to send test email');
+      }
+
+      setTestEmailResult({
+        success: true,
+        message: data.message || `Test email sent to ${testEmailAddress}`,
+      });
+      setToast({
+        message: `Test email sent to ${testEmailAddress}`,
+        type: 'success',
+      });
+      setTimeout(() => setToast(null), 3000);
+    } catch (err) {
+      console.error('Error sending test email:', err);
+      const errorMessage = err instanceof Error ? err.message : 'Failed to send test email';
+      setTestEmailResult({
+        success: false,
+        message: 'Failed to send email',
+        error: errorMessage,
+      });
+      setToast({
+        message: errorMessage,
+        type: 'error',
+      });
+      setTimeout(() => setToast(null), 5000);
+    } finally {
+      setSendingTestEmail(false);
+    }
+  };
+
   useEffect(() => {
     if (!authLoading && !user) {
       navigate('/directory/auth');
@@ -981,11 +1251,13 @@ const AdminDashboardPage: React.FC = () => {
     if (user && session) {
       fetchJobs();
       fetchPendingProfiles();
-      fetchPendingMatches();
+      fetchPendingCompanyRequests();
+      fetchBetaApplications();
+      fetchMembers();
       fetchCompanies();
       fetchCreditUsage();
     }
-  }, [user, session, authLoading, navigate, fetchJobs, fetchPendingProfiles, fetchPendingMatches, fetchCompanies, fetchCreditUsage]);
+  }, [user, session, authLoading, navigate, fetchJobs, fetchPendingProfiles, fetchPendingCompanyRequests, fetchBetaApplications, fetchMembers, fetchCompanies, fetchCreditUsage]);
 
   useEffect(() => {
     if (expandedJobId && !matches[expandedJobId]) {
@@ -1121,7 +1393,10 @@ const AdminDashboardPage: React.FC = () => {
 
         {/* Pending Jobs Section */}
         <div className="mb-10">
-          <div className="flex items-center justify-between mb-4">
+          <button
+            onClick={() => toggleSection('pendingJobs')}
+            className="w-full flex items-center justify-between mb-4 group"
+          >
             <div className="flex items-center gap-2">
               <Briefcase className="h-5 w-5 text-zinc-500" />
               <h2 className="text-xl font-primary">Pending Jobs</h2>
@@ -1131,9 +1406,13 @@ const AdminDashboardPage: React.FC = () => {
                 </span>
               )}
             </div>
-          </div>
+            <ChevronDown className={cn(
+              "h-5 w-5 text-zinc-500 transition-transform duration-200",
+              collapsedSections.pendingJobs ? "" : "rotate-180"
+            )} />
+          </button>
 
-          {loading ? (
+          {!collapsedSections.pendingJobs && (loading ? (
             <div className="border border-zinc-800 p-8 flex items-center justify-center">
               <Loader2 className="h-6 w-6 animate-spin text-zinc-500" />
             </div>
@@ -1325,27 +1604,34 @@ const AdminDashboardPage: React.FC = () => {
                   );
                 })}
             </div>
-          )}
+          ))}
         </div>
 
-        {/* Pending Matches Section */}
+        {/* Pending Profiles Section */}
         <div className="mb-10">
           <div className="flex items-center justify-between mb-4">
-            <div className="flex items-center gap-2">
-              <Link2 className="h-5 w-5 text-zinc-500" />
-              <h2 className="text-xl font-primary">Pending Matches</h2>
-              {pendingMatchGroups.reduce((acc, group) => acc + group.matches.length, 0) > 0 && (
+            <button
+              onClick={() => toggleSection('pendingProfiles')}
+              className="flex items-center gap-2 group"
+            >
+              <UserCircle className="h-5 w-5 text-zinc-500" />
+              <h2 className="text-xl font-primary">Pending Profiles</h2>
+              {pendingProfiles.length > 0 && (
                 <span className="px-2 py-0.5 bg-yellow-500/20 text-yellow-400 text-xs font-secondary rounded-full">
-                  {pendingMatchGroups.reduce((acc, group) => acc + group.matches.length, 0)}
+                  {pendingProfiles.length}
                 </span>
               )}
-            </div>
+              <ChevronDown className={cn(
+                "h-5 w-5 text-zinc-500 transition-transform duration-200",
+                collapsedSections.pendingProfiles ? "" : "rotate-180"
+              )} />
+            </button>
             <button
-              onClick={() => fetchPendingMatches()}
-              disabled={loadingPendingMatches}
+              onClick={() => fetchPendingProfiles()}
+              disabled={loadingProfiles}
               className="flex items-center gap-2 px-3 py-2 border border-zinc-800 text-zinc-400 hover:text-white hover:border-zinc-600 font-secondary text-sm transition-colors disabled:opacity-50"
             >
-              {loadingPendingMatches ? (
+              {loadingProfiles ? (
                 <Loader2 className="h-4 w-4 animate-spin" />
               ) : (
                 <RefreshCw className="h-4 w-4" />
@@ -1354,284 +1640,7 @@ const AdminDashboardPage: React.FC = () => {
             </button>
           </div>
 
-          {loadingPendingMatches ? (
-            <div className="border border-zinc-800 p-8 flex items-center justify-center">
-              <Loader2 className="h-6 w-6 animate-spin text-zinc-500" />
-            </div>
-          ) : pendingMatchGroups.length === 0 ? (
-            <div className="border border-zinc-800 p-8 text-center">
-              <CheckCircle2 className="h-12 w-12 text-green-500 mx-auto mb-4" />
-              <p className="text-zinc-400 font-secondary">
-                No pending matches to review. All caught up!
-              </p>
-            </div>
-          ) : (
-            <div className="space-y-3">
-              {pendingMatchGroups.map((group) => {
-                const isExpanded = expandedPendingJobId === group.job.id;
-                const projectTypeLabel =
-                  PROJECT_TYPES.find((p) => p.value === group.job.projectType)?.label ||
-                  group.job.projectType;
-
-                return (
-                  <div key={group.job.id} className="border border-zinc-800">
-                    {/* Job Header */}
-                    <button
-                      onClick={() => setExpandedPendingJobId(isExpanded ? null : group.job.id)}
-                      className="w-full p-4 flex items-center justify-between text-left hover:bg-zinc-900/50 transition-colors"
-                    >
-                      <div className="flex-1">
-                        <div className="flex items-center gap-3 mb-1">
-                          <h3 className="font-primary text-lg">{group.job.title}</h3>
-                          <span className="px-2 py-0.5 bg-pink-500/20 text-pink-400 text-xs font-secondary">
-                            {group.matches.length} pending match{group.matches.length !== 1 ? 'es' : ''}
-                          </span>
-                        </div>
-                        <div className="flex flex-wrap gap-4 text-sm text-zinc-500 font-secondary">
-                          <span className="flex items-center gap-1">
-                            <Building2 className="h-3 w-3" />
-                            {group.job.companyName}
-                          </span>
-                          <span>{projectTypeLabel}</span>
-                        </div>
-                      </div>
-                      {isExpanded ? (
-                        <ChevronUp className="h-5 w-5 text-zinc-500" />
-                      ) : (
-                        <ChevronDown className="h-5 w-5 text-zinc-500" />
-                      )}
-                    </button>
-
-                    {/* Expanded Content */}
-                    {isExpanded && (
-                      <div className="px-4 pb-4 border-t border-zinc-800">
-                        <div className="pt-4 space-y-4">
-                          {/* Approve All Button */}
-                          <div className="flex justify-end">
-                            <button
-                              onClick={() =>
-                                approveAllMatchesForJob(
-                                  group.job.id,
-                                  group.matches.map((m) => m.id)
-                                )
-                              }
-                              disabled={approvingAllJobId === group.job.id}
-                              className="flex items-center gap-2 px-4 py-2 bg-green-500 hover:bg-green-600 text-white font-secondary text-sm transition-colors disabled:opacity-50"
-                            >
-                              {approvingAllJobId === group.job.id ? (
-                                <>
-                                  <Loader2 className="h-4 w-4 animate-spin" />
-                                  Approving...
-                                </>
-                              ) : (
-                                <>
-                                  <CheckCheck className="h-4 w-4" />
-                                  Approve All ({group.matches.length})
-                                </>
-                              )}
-                            </button>
-                          </div>
-
-                          {/* Match Cards */}
-                          <div className="space-y-3">
-                            {group.matches.map((match) => (
-                              <div
-                                key={match.id}
-                                className="p-4 bg-zinc-900/50 border border-zinc-800"
-                              >
-                                <div className="flex items-start justify-between gap-4">
-                                  <div className="flex items-start gap-3 flex-1">
-                                    {/* Profile Picture */}
-                                    {match.profile.profilePictureUrl ? (
-                                      <img
-                                        src={match.profile.profilePictureUrl}
-                                        alt={match.profile.fullName}
-                                        className="w-10 h-10 rounded-full object-cover border border-zinc-700 flex-shrink-0"
-                                      />
-                                    ) : (
-                                      <div className="w-10 h-10 rounded-full bg-zinc-800 flex items-center justify-center border border-zinc-700 flex-shrink-0">
-                                        <UserCircle className="h-5 w-5 text-zinc-500" />
-                                      </div>
-                                    )}
-
-                                    <div className="flex-1 min-w-0">
-                                      <div className="flex items-center gap-3 mb-1">
-                                        <span className="font-primary text-white">
-                                          {match.profile.fullName}
-                                        </span>
-                                        <span className="px-2 py-0.5 bg-pink-500/20 text-pink-400 text-xs font-secondary">
-                                          {match.matchScore}% match
-                                        </span>
-                                      </div>
-                                      <div className="flex flex-wrap gap-3 text-sm text-zinc-400 font-secondary mb-2">
-                                        <span>{match.profile.email}</span>
-                                        {match.profile.location && (
-                                          <span className="flex items-center gap-1">
-                                            <MapPin className="h-3 w-3" />
-                                            {match.profile.location}
-                                          </span>
-                                        )}
-                                        {match.profile.portfolioUrl && (
-                                          <a
-                                            href={match.profile.portfolioUrl}
-                                            target="_blank"
-                                            rel="noopener noreferrer"
-                                            className="flex items-center gap-1 text-pink-400 hover:text-pink-300"
-                                          >
-                                            <ExternalLink className="h-3 w-3" />
-                                            Portfolio
-                                          </a>
-                                        )}
-                                      </div>
-                                      <p className="text-sm text-zinc-400 font-secondary line-clamp-2">
-                                        {match.matchReasoning}
-                                      </p>
-                                      {match.skillMatches && match.skillMatches.length > 0 && (
-                                        <div className="flex flex-wrap gap-1 mt-2">
-                                          {match.skillMatches.slice(0, 5).map((skill, idx) => (
-                                            <span
-                                              key={idx}
-                                              className="px-2 py-0.5 bg-zinc-800 text-zinc-300 text-xs font-secondary"
-                                            >
-                                              {skill.skill}
-                                            </span>
-                                          ))}
-                                          {match.skillMatches.length > 5 && (
-                                            <span className="px-2 py-0.5 bg-zinc-800 text-zinc-500 text-xs font-secondary">
-                                              +{match.skillMatches.length - 5}
-                                            </span>
-                                          )}
-                                        </div>
-                                      )}
-                                    </div>
-                                  </div>
-
-                                  {/* Action Buttons */}
-                                  <div className="flex gap-2 flex-shrink-0">
-                                    <button
-                                      onClick={() =>
-                                        reviewPendingMatch(match.id, group.job.id, true)
-                                      }
-                                      disabled={reviewingMatchId === match.id}
-                                      className="flex items-center gap-1 px-3 py-1.5 bg-green-500 hover:bg-green-600 text-white text-xs font-secondary transition-colors disabled:opacity-50"
-                                    >
-                                      {reviewingMatchId === match.id ? (
-                                        <Loader2 className="h-3 w-3 animate-spin" />
-                                      ) : (
-                                        <CheckCircle2 className="h-3 w-3" />
-                                      )}
-                                      Approve
-                                    </button>
-                                    <button
-                                      onClick={() =>
-                                        reviewPendingMatch(match.id, group.job.id, false)
-                                      }
-                                      disabled={reviewingMatchId === match.id}
-                                      className="flex items-center gap-1 px-3 py-1.5 bg-zinc-700 hover:bg-zinc-600 text-white text-xs font-secondary transition-colors disabled:opacity-50"
-                                    >
-                                      {reviewingMatchId === match.id ? (
-                                        <Loader2 className="h-3 w-3 animate-spin" />
-                                      ) : (
-                                        <XCircle className="h-3 w-3" />
-                                      )}
-                                      Reject
-                                    </button>
-                                  </div>
-                                </div>
-                              </div>
-                            ))}
-                          </div>
-                        </div>
-                      </div>
-                    )}
-                  </div>
-                );
-              })}
-            </div>
-          )}
-        </div>
-
-        {/* Pending Profiles Section */}
-        <div className="mb-10">
-          <div className="flex items-center justify-between mb-4">
-            <div className="flex items-center gap-2">
-              <UserCircle className="h-5 w-5 text-zinc-500" />
-              <h2 className="text-xl font-primary">Pending Profiles</h2>
-              {pendingProfiles.length > 0 && (
-                <span className="px-2 py-0.5 bg-yellow-500/20 text-yellow-400 text-xs font-secondary rounded-full">
-                  {pendingProfiles.length}
-                </span>
-              )}
-            </div>
-            <div className="flex items-center gap-2">
-              <button
-                onClick={enrichProfiles}
-                disabled={enrichingProfiles}
-                className="flex items-center gap-2 px-3 py-2 bg-purple-500/20 border border-purple-500/30 text-purple-400 hover:bg-purple-500/30 hover:text-purple-300 font-secondary text-sm transition-colors disabled:opacity-50"
-              >
-                {enrichingProfiles ? (
-                  <>
-                    <Loader2 className="h-4 w-4 animate-spin" />
-                    Enriching...
-                  </>
-                ) : (
-                  <>
-                    <Sparkles className="h-4 w-4" />
-                    Enrich Profiles
-                  </>
-                )}
-              </button>
-              <button
-                onClick={() => fetchPendingProfiles()}
-                disabled={loadingProfiles}
-                className="flex items-center gap-2 px-3 py-2 border border-zinc-800 text-zinc-400 hover:text-white hover:border-zinc-600 font-secondary text-sm transition-colors disabled:opacity-50"
-              >
-                {loadingProfiles ? (
-                  <Loader2 className="h-4 w-4 animate-spin" />
-                ) : (
-                  <RefreshCw className="h-4 w-4" />
-                )}
-                Refresh
-              </button>
-            </div>
-          </div>
-
-          {/* Enrichment Result Banner */}
-          {enrichmentResult && (
-            <div className={cn(
-              "mb-4 p-3 border rounded flex items-center justify-between",
-              enrichmentResult.failed === 0
-                ? "bg-green-500/10 border-green-500/20"
-                : "bg-yellow-500/10 border-yellow-500/20"
-            )}>
-              <div className="flex items-center gap-2">
-                <Sparkles className={cn(
-                  "h-4 w-4",
-                  enrichmentResult.failed === 0 ? "text-green-400" : "text-yellow-400"
-                )} />
-                <span className="text-sm font-secondary text-zinc-300">
-                  {enrichmentResult.total === 0 ? (
-                    "All profiles are already enriched with embeddings"
-                  ) : (
-                    <>
-                      Enriched {enrichmentResult.successful} of {enrichmentResult.total} profiles
-                      {enrichmentResult.failed > 0 && (
-                        <span className="text-red-400"> ({enrichmentResult.failed} failed)</span>
-                      )}
-                    </>
-                  )}
-                </span>
-              </div>
-              <button
-                onClick={() => setEnrichmentResult(null)}
-                className="text-zinc-500 hover:text-zinc-300"
-              >
-                <X className="h-4 w-4" />
-              </button>
-            </div>
-          )}
-
-          {loadingProfiles ? (
+          {!collapsedSections.pendingProfiles && (loadingProfiles ? (
             <div className="border border-zinc-800 p-8 flex items-center justify-center">
               <Loader2 className="h-6 w-6 animate-spin text-zinc-500" />
             </div>
@@ -1958,19 +1967,635 @@ const AdminDashboardPage: React.FC = () => {
                 );
               })}
             </div>
-          )}
+          ))}
+        </div>
+
+        {/* Pending Company Requests Section */}
+        <div className="mb-10">
+          <div className="flex items-center justify-between mb-4">
+            <button
+              onClick={() => toggleSection('pendingCompanyRequests')}
+              className="flex items-center gap-2 group"
+            >
+              <Building2 className="h-5 w-5 text-zinc-500" />
+              <h2 className="text-xl font-primary">Pending Company Requests</h2>
+              {pendingCompanyRequests.length > 0 && (
+                <span className="px-2 py-0.5 bg-yellow-500/20 text-yellow-400 text-xs font-secondary rounded-full">
+                  {pendingCompanyRequests.length}
+                </span>
+              )}
+              <ChevronDown className={cn(
+                "h-5 w-5 text-zinc-500 transition-transform duration-200",
+                collapsedSections.pendingCompanyRequests ? "" : "rotate-180"
+              )} />
+            </button>
+            <button
+              onClick={() => fetchPendingCompanyRequests()}
+              disabled={loadingCompanyRequests}
+              className="flex items-center gap-2 px-3 py-2 border border-zinc-800 text-zinc-400 hover:text-white hover:border-zinc-600 font-secondary text-sm transition-colors disabled:opacity-50"
+            >
+              {loadingCompanyRequests ? (
+                <Loader2 className="h-4 w-4 animate-spin" />
+              ) : (
+                <RefreshCw className="h-4 w-4" />
+              )}
+              Refresh
+            </button>
+          </div>
+
+          {!collapsedSections.pendingCompanyRequests && (loadingCompanyRequests ? (
+            <div className="border border-zinc-800 p-8 flex items-center justify-center">
+              <Loader2 className="h-6 w-6 animate-spin text-zinc-500" />
+            </div>
+          ) : pendingCompanyRequests.length === 0 ? (
+            <div className="border border-zinc-800 p-8 text-center">
+              <Building2 className="h-12 w-12 text-zinc-700 mx-auto mb-4" />
+              <p className="text-zinc-400 font-secondary">No pending company requests.</p>
+            </div>
+          ) : (
+            <div className="space-y-3">
+              {pendingCompanyRequests.map((request) => {
+                const isExpanded = expandedRequestId === request.id;
+                return (
+                  <div key={request.id} className="border border-zinc-800">
+                    {/* Request Header */}
+                    <button
+                      onClick={() => setExpandedRequestId(isExpanded ? null : request.id)}
+                      className="w-full p-4 flex items-center justify-between text-left hover:bg-zinc-900/50 transition-colors"
+                    >
+                      <div className="flex items-center gap-4 flex-1">
+                        <div className="w-10 h-10 rounded-full bg-yellow-500/20 flex items-center justify-center border border-yellow-500/30">
+                          <Building2 className="h-5 w-5 text-yellow-400" />
+                        </div>
+
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center gap-3 mb-1">
+                            <h3 className="font-primary text-white">{request.companyName}</h3>
+                            <span className="px-2 py-0.5 bg-yellow-500/20 text-yellow-400 text-xs font-secondary border border-yellow-500/30">
+                              Pending
+                            </span>
+                          </div>
+                          <div className="flex flex-wrap gap-3 text-sm text-zinc-500 font-secondary">
+                            <span className="flex items-center gap-1">
+                              <Mail className="h-3 w-3" />
+                              {request.contactEmail}
+                            </span>
+                            {request.industry && <span>{request.industry}</span>}
+                            <span className="flex items-center gap-1">
+                              <Calendar className="h-3 w-3" />
+                              {new Date(request.createdAt).toLocaleDateString()}
+                            </span>
+                          </div>
+                        </div>
+                      </div>
+
+                      {isExpanded ? (
+                        <ChevronUp className="h-5 w-5 text-zinc-500 flex-shrink-0" />
+                      ) : (
+                        <ChevronDown className="h-5 w-5 text-zinc-500 flex-shrink-0" />
+                      )}
+                    </button>
+
+                    {/* Expanded Request Details */}
+                    {isExpanded && (
+                      <div className="px-4 pb-4 border-t border-zinc-800">
+                        <div className="pt-4 space-y-4">
+                          {/* Contact Info */}
+                          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                            <div>
+                              <p className="text-xs font-secondary text-zinc-500 uppercase tracking-wide mb-2">
+                                Contact Name
+                              </p>
+                              <p className="text-sm text-zinc-300 font-secondary">
+                                {request.contactName}
+                              </p>
+                            </div>
+                            <div>
+                              <p className="text-xs font-secondary text-zinc-500 uppercase tracking-wide mb-2">
+                                Contact Email
+                              </p>
+                              <p className="text-sm text-zinc-300 font-secondary">
+                                {request.contactEmail}
+                              </p>
+                            </div>
+                            {request.contactPhone && (
+                              <div>
+                                <p className="text-xs font-secondary text-zinc-500 uppercase tracking-wide mb-2">
+                                  Phone
+                                </p>
+                                <p className="text-sm text-zinc-300 font-secondary flex items-center gap-1">
+                                  <Phone className="h-3 w-3" />
+                                  {request.contactPhone}
+                                </p>
+                              </div>
+                            )}
+                            {request.companyWebsite && (
+                              <div>
+                                <p className="text-xs font-secondary text-zinc-500 uppercase tracking-wide mb-2">
+                                  Website
+                                </p>
+                                <a
+                                  href={request.companyWebsite.startsWith('http') ? request.companyWebsite : `https://${request.companyWebsite}`}
+                                  target="_blank"
+                                  rel="noopener noreferrer"
+                                  className="text-sm text-pink-400 hover:text-pink-300 font-secondary flex items-center gap-1"
+                                >
+                                  <Globe className="h-3 w-3" />
+                                  {request.companyWebsite}
+                                  <ExternalLink className="h-3 w-3" />
+                                </a>
+                              </div>
+                            )}
+                          </div>
+
+                          {/* Company Details */}
+                          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                            {request.industry && (
+                              <div>
+                                <p className="text-xs font-secondary text-zinc-500 uppercase tracking-wide mb-2">
+                                  Industry
+                                </p>
+                                <p className="text-sm text-zinc-300 font-secondary">
+                                  {request.industry}
+                                </p>
+                              </div>
+                            )}
+                            {request.companySize && (
+                              <div>
+                                <p className="text-xs font-secondary text-zinc-500 uppercase tracking-wide mb-2">
+                                  Company Size
+                                </p>
+                                <p className="text-sm text-zinc-300 font-secondary capitalize">
+                                  {request.companySize}
+                                </p>
+                              </div>
+                            )}
+                          </div>
+
+                          {/* Approve/Reject Buttons */}
+                          <div className="flex gap-3 pt-4 border-t border-zinc-800">
+                            <button
+                              onClick={() => approveCompanyRequest(request.id)}
+                              disabled={approvingRequestId === request.id || rejectingRequestId === request.id}
+                              className="flex items-center gap-2 px-4 py-2 bg-emerald-500 hover:bg-emerald-600 text-white font-secondary text-sm transition-colors disabled:opacity-50"
+                            >
+                              {approvingRequestId === request.id ? (
+                                <>
+                                  <Loader2 className="h-4 w-4 animate-spin" />
+                                  Approving...
+                                </>
+                              ) : (
+                                <>
+                                  <CheckCircle2 className="h-4 w-4" />
+                                  Approve
+                                </>
+                              )}
+                            </button>
+                            <button
+                              onClick={() => rejectCompanyRequest(request.id)}
+                              disabled={approvingRequestId === request.id || rejectingRequestId === request.id}
+                              className="flex items-center gap-2 px-4 py-2 bg-red-500/20 hover:bg-red-500/30 text-red-400 font-secondary text-sm transition-colors disabled:opacity-50"
+                            >
+                              {rejectingRequestId === request.id ? (
+                                <>
+                                  <Loader2 className="h-4 w-4 animate-spin" />
+                                  Rejecting...
+                                </>
+                              ) : (
+                                <>
+                                  <XCircle className="h-4 w-4" />
+                                  Reject
+                                </>
+                              )}
+                            </button>
+                          </div>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+          ))}
+        </div>
+
+        {/* Beta Applications Section */}
+        <div className="mb-10">
+          <div className="flex items-center justify-between mb-4">
+            <button
+              onClick={() => toggleSection('betaApplications')}
+              className="flex items-center gap-2 group"
+            >
+              <Sparkles className="h-5 w-5 text-purple-500" />
+              <h2 className="text-xl font-primary text-white">Beta Applications</h2>
+              <span className="ml-2 text-sm text-zinc-500">({betaApplications.length} pending)</span>
+              <ChevronDown className={cn(
+                "h-5 w-5 text-zinc-500 transition-transform duration-200",
+                collapsedSections.betaApplications ? "" : "rotate-180"
+              )} />
+            </button>
+            <button
+              onClick={() => fetchBetaApplications()}
+              disabled={loadingBetaApplications}
+              className="flex items-center gap-2 px-3 py-2 border border-zinc-800 text-zinc-400 hover:text-white hover:border-zinc-600 font-secondary text-sm transition-colors disabled:opacity-50"
+            >
+              {loadingBetaApplications ? (
+                <Loader2 className="h-4 w-4 animate-spin" />
+              ) : (
+                <RefreshCw className="h-4 w-4" />
+              )}
+              Refresh
+            </button>
+          </div>
+
+          {!collapsedSections.betaApplications && (loadingBetaApplications ? (
+            <div className="border border-zinc-800 p-8 flex items-center justify-center">
+              <Loader2 className="h-6 w-6 animate-spin text-zinc-500" />
+            </div>
+          ) : betaApplications.length === 0 ? (
+            <div className="border border-zinc-800 p-8 text-center">
+              <Sparkles className="h-12 w-12 text-zinc-700 mx-auto mb-4" />
+              <p className="text-zinc-500 font-secondary">No pending beta applications</p>
+            </div>
+          ) : (
+            <div className="space-y-4">
+              {betaApplications.map((application) => (
+                <div
+                  key={application.id}
+                  className="border border-zinc-800 p-6 hover:border-zinc-700 transition-colors"
+                >
+                  <div className="flex items-start justify-between gap-4">
+                    <div className="flex-1">
+                      <div className="flex items-center gap-3 mb-2">
+                        <h3 className="text-lg font-primary text-white">{application.name}</h3>
+                        <span className="px-2 py-0.5 text-xs font-secondary bg-purple-500/20 text-purple-400 border border-purple-500/30">
+                          Beta Applicant
+                        </span>
+                      </div>
+                      <div className="flex items-center gap-4 text-sm text-zinc-400 font-secondary mb-3">
+                        <span className="flex items-center gap-1">
+                          <Mail className="h-4 w-4" />
+                          {application.email}
+                        </span>
+                        <span className="flex items-center gap-1">
+                          <Calendar className="h-4 w-4" />
+                          {new Date(application.created_at).toLocaleDateString()}
+                        </span>
+                      </div>
+                      {application.interests.length > 0 && (
+                        <div className="flex flex-wrap gap-2">
+                          <span className="text-xs text-zinc-500 font-secondary">Interests:</span>
+                          {application.interests.map((interest) => (
+                            <span
+                              key={interest}
+                              className="px-2 py-1 text-xs font-secondary bg-zinc-800 text-zinc-300 border border-zinc-700"
+                            >
+                              {interest.replace(/-/g, ' ')}
+                            </span>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <button
+                        onClick={() => approveBetaApplication(application.id)}
+                        disabled={approvingBetaId === application.id || rejectingBetaId === application.id || deletingBetaId === application.id}
+                        className="flex items-center gap-2 px-4 py-2 bg-green-600 hover:bg-green-500 text-white font-secondary text-sm transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                      >
+                        {approvingBetaId === application.id ? (
+                          <Loader2 className="h-4 w-4 animate-spin" />
+                        ) : (
+                          <CheckCircle2 className="h-4 w-4" />
+                        )}
+                        Approve
+                      </button>
+                      <button
+                        onClick={() => rejectBetaApplication(application.id)}
+                        disabled={approvingBetaId === application.id || rejectingBetaId === application.id || deletingBetaId === application.id}
+                        className="flex items-center gap-2 px-4 py-2 bg-red-600 hover:bg-red-500 text-white font-secondary text-sm transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                      >
+                        {rejectingBetaId === application.id ? (
+                          <Loader2 className="h-4 w-4 animate-spin" />
+                        ) : (
+                          <XCircle className="h-4 w-4" />
+                        )}
+                        Reject
+                      </button>
+                      <button
+                        onClick={() => deleteBetaApplication(application.id, application.name)}
+                        disabled={approvingBetaId === application.id || rejectingBetaId === application.id || deletingBetaId === application.id}
+                        className="flex items-center gap-2 px-4 py-2 bg-zinc-700 hover:bg-zinc-600 text-white font-secondary text-sm transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                        title="Delete application permanently"
+                      >
+                        {deletingBetaId === application.id ? (
+                          <Loader2 className="h-4 w-4 animate-spin" />
+                        ) : (
+                          <Trash2 className="h-4 w-4" />
+                        )}
+                        Delete
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          ))}
+        </div>
+
+        {/* Beta Members Section */}
+        <div className="mb-10">
+          <div className="flex items-center justify-between mb-4">
+            <button
+              onClick={() => toggleSection('betaMembers')}
+              className="flex items-center gap-2 group"
+            >
+              <Sparkles className="h-5 w-5 text-purple-400" />
+              <h2 className="text-xl font-primary text-white">Beta Members</h2>
+              <span className="ml-2 px-2 py-0.5 bg-purple-500/20 text-purple-400 text-xs font-secondary rounded-full">
+                {memberCounts.betaApproved} approved
+              </span>
+              <ChevronDown className={cn(
+                "h-5 w-5 text-zinc-500 transition-transform duration-200",
+                collapsedSections.betaMembers ? "" : "rotate-180"
+              )} />
+            </button>
+            <button
+              onClick={() => fetchMembers()}
+              disabled={loadingMembers}
+              className="flex items-center gap-2 px-3 py-2 border border-zinc-800 text-zinc-400 hover:text-white hover:border-zinc-600 font-secondary text-sm transition-colors disabled:opacity-50"
+            >
+              {loadingMembers ? (
+                <Loader2 className="h-4 w-4 animate-spin" />
+              ) : (
+                <RefreshCw className="h-4 w-4" />
+              )}
+              Refresh
+            </button>
+          </div>
+
+          {!collapsedSections.betaMembers && (loadingMembers ? (
+            <div className="border border-zinc-800 p-8 flex items-center justify-center">
+              <Loader2 className="h-6 w-6 animate-spin text-zinc-500" />
+            </div>
+          ) : betaMembers.length === 0 ? (
+            <div className="border border-zinc-800 p-8 text-center">
+              <Sparkles className="h-12 w-12 text-zinc-700 mx-auto mb-4" />
+              <p className="text-zinc-500 font-secondary">No approved beta members yet</p>
+            </div>
+          ) : (
+            <div className="border border-zinc-800 overflow-hidden">
+              <table className="w-full">
+                <thead className="bg-zinc-900 border-b border-zinc-800">
+                  <tr>
+                    <th className="text-left px-4 py-3 text-sm font-secondary text-zinc-400">Name</th>
+                    <th className="text-left px-4 py-3 text-sm font-secondary text-zinc-400">Email</th>
+                    <th className="text-left px-4 py-3 text-sm font-secondary text-zinc-400">Interests</th>
+                    <th className="text-left px-4 py-3 text-sm font-secondary text-zinc-400">Joined</th>
+                    <th className="text-right px-4 py-3 text-sm font-secondary text-zinc-400">Actions</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {betaMembers.map((member) => (
+                    <tr key={member.id} className="border-b border-zinc-800 last:border-0 hover:bg-zinc-900/50">
+                      <td className="px-4 py-3">
+                        <div className="flex items-center gap-2">
+                          <span className="text-white font-secondary">{member.name}</span>
+                          <span className="px-1.5 py-0.5 text-[10px] font-secondary bg-purple-500/20 text-purple-400 border border-purple-500/30 rounded">
+                            Beta
+                          </span>
+                        </div>
+                      </td>
+                      <td className="px-4 py-3 text-zinc-400 font-secondary text-sm">{member.email}</td>
+                      <td className="px-4 py-3">
+                        <div className="flex flex-wrap gap-1">
+                          {member.interests.slice(0, 3).map((interest) => (
+                            <span key={interest} className="px-2 py-0.5 text-xs font-secondary bg-zinc-800 text-zinc-300 rounded">
+                              {interest.replace(/-/g, ' ')}
+                            </span>
+                          ))}
+                          {member.interests.length > 3 && (
+                            <span className="text-xs text-zinc-500">+{member.interests.length - 3}</span>
+                          )}
+                        </div>
+                      </td>
+                      <td className="px-4 py-3 text-zinc-500 font-secondary text-sm">
+                        {new Date(member.createdAt).toLocaleDateString()}
+                      </td>
+                      <td className="px-4 py-3 text-right">
+                        <button
+                          onClick={() => deleteBetaApplication(member.id, member.name)}
+                          disabled={deletingBetaId === member.id}
+                          className="p-2 text-zinc-500 hover:text-red-400 hover:bg-red-400/10 rounded transition-colors disabled:opacity-50"
+                          title="Delete beta member"
+                        >
+                          {deletingBetaId === member.id ? (
+                            <Loader2 className="h-4 w-4 animate-spin" />
+                          ) : (
+                            <Trash2 className="h-4 w-4" />
+                          )}
+                        </button>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          ))}
+        </div>
+
+        {/* Directory Members Section */}
+        <div className="mb-10">
+          <div className="flex items-center justify-between mb-4">
+            <button
+              onClick={() => toggleSection('directoryMembers')}
+              className="flex items-center gap-2 group"
+            >
+              <Users className="h-5 w-5 text-blue-400" />
+              <h2 className="text-xl font-primary text-white">Directory Members</h2>
+              <span className="ml-2 px-2 py-0.5 bg-blue-500/20 text-blue-400 text-xs font-secondary rounded-full">
+                {memberCounts.directoryApproved} approved
+              </span>
+              <ChevronDown className={cn(
+                "h-5 w-5 text-zinc-500 transition-transform duration-200",
+                collapsedSections.directoryMembers ? "" : "rotate-180"
+              )} />
+            </button>
+            <button
+              onClick={() => fetchMembers()}
+              disabled={loadingMembers}
+              className="flex items-center gap-2 px-3 py-2 border border-zinc-800 text-zinc-400 hover:text-white hover:border-zinc-600 font-secondary text-sm transition-colors disabled:opacity-50"
+            >
+              {loadingMembers ? (
+                <Loader2 className="h-4 w-4 animate-spin" />
+              ) : (
+                <RefreshCw className="h-4 w-4" />
+              )}
+              Refresh
+            </button>
+          </div>
+
+          {!collapsedSections.directoryMembers && (loadingMembers ? (
+            <div className="border border-zinc-800 p-8 flex items-center justify-center">
+              <Loader2 className="h-6 w-6 animate-spin text-zinc-500" />
+            </div>
+          ) : directoryMembers.length === 0 ? (
+            <div className="border border-zinc-800 p-8 text-center">
+              <Users className="h-12 w-12 text-zinc-700 mx-auto mb-4" />
+              <p className="text-zinc-500 font-secondary">No approved directory members yet</p>
+            </div>
+          ) : (
+            <div className="border border-zinc-800 overflow-hidden">
+              <table className="w-full">
+                <thead className="bg-zinc-900 border-b border-zinc-800">
+                  <tr>
+                    <th className="text-left px-4 py-3 text-sm font-secondary text-zinc-400">Name</th>
+                    <th className="text-left px-4 py-3 text-sm font-secondary text-zinc-400">Location</th>
+                    <th className="text-left px-4 py-3 text-sm font-secondary text-zinc-400">Focus Areas</th>
+                    <th className="text-left px-4 py-3 text-sm font-secondary text-zinc-400">Status</th>
+                    <th className="text-left px-4 py-3 text-sm font-secondary text-zinc-400">Joined</th>
+                    <th className="text-left px-4 py-3 text-sm font-secondary text-zinc-400">Links</th>
+                    <th className="text-left px-4 py-3 text-sm font-secondary text-zinc-400">Actions</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {directoryMembers.map((member) => (
+                    <tr key={member.id} className="border-b border-zinc-800 last:border-0 hover:bg-zinc-900/50">
+                      <td className="px-4 py-3">
+                        <div className="flex items-center gap-3">
+                          {member.profilePictureUrl ? (
+                            <img
+                              src={member.profilePictureUrl}
+                              alt={member.fullName}
+                              className="w-8 h-8 rounded-full object-cover"
+                            />
+                          ) : (
+                            <div className="w-8 h-8 rounded-full bg-zinc-800 flex items-center justify-center">
+                              <UserCircle className="w-5 h-5 text-zinc-500" />
+                            </div>
+                          )}
+                          <div>
+                            <div className="flex items-center gap-2">
+                              <span className="text-white font-secondary">{member.fullName}</span>
+                              {member.membershipType === 'beta' && (
+                                <span className="px-1.5 py-0.5 text-[10px] font-secondary bg-purple-500/20 text-purple-400 border border-purple-500/30 rounded">
+                                  BETA
+                                </span>
+                              )}
+                            </div>
+                            <span className="text-zinc-500 font-secondary text-xs">{member.email}</span>
+                          </div>
+                        </div>
+                      </td>
+                      <td className="px-4 py-3">
+                        <span className="flex items-center gap-1 text-zinc-400 font-secondary text-sm">
+                          <MapPin className="h-3 w-3" />
+                          {member.location}
+                        </span>
+                      </td>
+                      <td className="px-4 py-3">
+                        <div className="flex flex-wrap gap-1">
+                          {member.focusAreas.slice(0, 2).map((area) => (
+                            <span key={area} className="px-2 py-0.5 text-xs font-secondary bg-blue-500/10 text-blue-400 rounded">
+                              {area.replace(/-/g, ' ')}
+                            </span>
+                          ))}
+                          {member.focusAreas.length > 2 && (
+                            <span className="text-xs text-zinc-500">+{member.focusAreas.length - 2}</span>
+                          )}
+                        </div>
+                      </td>
+                      <td className="px-4 py-3">
+                        <span className={cn(
+                          "px-2 py-0.5 text-xs font-secondary rounded",
+                          member.availability === 'open-to-work' && "bg-green-500/20 text-green-400",
+                          member.availability === 'open-to-collaborations' && "bg-blue-500/20 text-blue-400",
+                          member.availability === 'not-available' && "bg-zinc-500/20 text-zinc-400"
+                        )}>
+                          {member.availability.replace(/-/g, ' ')}
+                        </span>
+                      </td>
+                      <td className="px-4 py-3 text-zinc-500 font-secondary text-sm">
+                        {new Date(member.createdAt).toLocaleDateString()}
+                      </td>
+                      <td className="px-4 py-3">
+                        <div className="flex items-center gap-2">
+                          {member.portfolioUrl && (
+                            <a
+                              href={member.portfolioUrl}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="text-zinc-400 hover:text-white transition-colors"
+                              title="Portfolio"
+                            >
+                              <Globe className="h-4 w-4" />
+                            </a>
+                          )}
+                          {member.linkedinUrl && (
+                            <a
+                              href={member.linkedinUrl}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="text-zinc-400 hover:text-blue-400 transition-colors"
+                              title="LinkedIn"
+                            >
+                              <Linkedin className="h-4 w-4" />
+                            </a>
+                          )}
+                          <a
+                            href={`/directory/${member.slug}`}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="text-zinc-400 hover:text-white transition-colors"
+                            title="View Profile"
+                          >
+                            <ExternalLink className="h-4 w-4" />
+                          </a>
+                        </div>
+                      </td>
+                      <td className="px-4 py-3">
+                        {member.membershipType === 'beta' ? (
+                          <button
+                            onClick={() => upgradeMember(member.id)}
+                            disabled={upgradingMemberId === member.id}
+                            className="flex items-center gap-1.5 px-3 py-1.5 bg-gradient-to-r from-purple-500/20 to-blue-500/20 hover:from-purple-500/30 hover:to-blue-500/30 text-purple-400 border border-purple-500/30 font-secondary text-xs transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+                            title="Upgrade to full directory member"
+                          >
+                            {upgradingMemberId === member.id ? (
+                              <Loader2 className="h-3 w-3 animate-spin" />
+                            ) : (
+                              <ArrowUpCircle className="h-3 w-3" />
+                            )}
+                            Upgrade
+                          </button>
+                        ) : (
+                          <span className="text-zinc-500 font-secondary text-xs">Full member</span>
+                        )}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          ))}
         </div>
 
         {/* Companies Section */}
         <div className="mb-10">
           <div className="flex items-center justify-between mb-4">
-            <div className="flex items-center gap-2">
+            <button
+              onClick={() => toggleSection('companies')}
+              className="flex items-center gap-2 group"
+            >
               <Building2 className="h-5 w-5 text-zinc-500" />
               <h2 className="text-xl font-primary">Companies</h2>
               <span className="px-2 py-0.5 bg-zinc-500/20 text-zinc-400 text-xs font-secondary rounded-full">
                 {companies.length}
               </span>
-            </div>
+              <ChevronDown className={cn(
+                "h-5 w-5 text-zinc-500 transition-transform duration-200",
+                collapsedSections.companies ? "" : "rotate-180"
+              )} />
+            </button>
             <button
               onClick={() => fetchCompanies()}
               disabled={loadingCompanies}
@@ -1985,7 +2610,7 @@ const AdminDashboardPage: React.FC = () => {
             </button>
           </div>
 
-          {loadingCompanies ? (
+          {!collapsedSections.companies && (loadingCompanies ? (
             <div className="border border-zinc-800 p-8 flex items-center justify-center">
               <Loader2 className="h-6 w-6 animate-spin text-zinc-500" />
             </div>
@@ -2168,19 +2793,26 @@ const AdminDashboardPage: React.FC = () => {
                 );
               })}
             </div>
-          )}
+          ))}
         </div>
 
         {/* Credit Usage Section */}
         <div className="mb-10">
           <div className="flex items-center justify-between mb-4">
-            <div className="flex items-center gap-2">
+            <button
+              onClick={() => toggleSection('creditUsage')}
+              className="flex items-center gap-2 group"
+            >
               <CreditCard className="h-5 w-5 text-zinc-500" />
               <h2 className="text-xl font-primary">Credit Usage</h2>
               <span className="px-2 py-0.5 bg-zinc-500/20 text-zinc-400 text-xs font-secondary rounded-full">
                 {creditUsageCompanies.length}
               </span>
-            </div>
+              <ChevronDown className={cn(
+                "h-5 w-5 text-zinc-500 transition-transform duration-200",
+                collapsedSections.creditUsage ? "" : "rotate-180"
+              )} />
+            </button>
             <button
               onClick={() => fetchCreditUsage()}
               disabled={loadingCreditUsage}
@@ -2195,6 +2827,8 @@ const AdminDashboardPage: React.FC = () => {
             </button>
           </div>
 
+          {!collapsedSections.creditUsage && (
+          <>
           {/* Platform Totals */}
           <div className="grid grid-cols-2 gap-4 mb-6">
             <div className="border border-zinc-800 p-4">
@@ -2298,45 +2932,180 @@ const AdminDashboardPage: React.FC = () => {
               </div>
             </div>
           )}
+          </>
+          )}
         </div>
 
-        {/* Filter Bar */}
-        <div className="flex items-center gap-4 mb-6">
-          <div className="flex items-center gap-2">
-            <Filter className="h-4 w-4 text-zinc-500" />
-            <span className="text-sm font-secondary text-zinc-400">Filter:</span>
-          </div>
-          <select
-            value={statusFilter}
-            onChange={(e) => {
-              setStatusFilter(e.target.value as JobStatus | '');
-              setPagination((prev) => ({ ...prev, page: 1 }));
-            }}
-            className="px-3 py-2 bg-transparent border border-zinc-800 text-white font-secondary text-sm focus:border-zinc-600 focus:outline-none appearance-none cursor-pointer"
-          >
-            <option value="" className="bg-zinc-900">
-              All Statuses
-            </option>
-            {JOB_STATUSES.map((status) => (
-              <option key={status.value} value={status.value} className="bg-zinc-900">
-                {status.label}
-              </option>
-            ))}
-          </select>
+        {/* Email Test Section */}
+        <div className="mb-10">
           <button
-            onClick={() => fetchJobs()}
-            className="flex items-center gap-2 px-3 py-2 border border-zinc-800 text-zinc-400 hover:text-white hover:border-zinc-600 font-secondary text-sm transition-colors"
+            onClick={() => toggleSection('testEmail')}
+            className="w-full flex items-center justify-between mb-4 group"
           >
-            <RefreshCw className="h-4 w-4" />
-            Refresh
+            <div className="flex items-center gap-2">
+              <Mail className="h-5 w-5 text-zinc-500" />
+              <h2 className="text-xl font-primary">Test Email Notifications</h2>
+            </div>
+            <ChevronDown className={cn(
+              "h-5 w-5 text-zinc-500 transition-transform duration-200",
+              collapsedSections.testEmail ? "" : "rotate-180"
+            )} />
           </button>
+
+          {!collapsedSections.testEmail && (
+          <div className="border border-zinc-800 p-6">
+            <p className="text-sm text-zinc-400 font-secondary mb-4">
+              Send a test email to verify the notification system is working correctly.
+            </p>
+
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
+              {/* Email Input */}
+              <div className="md:col-span-2">
+                <label className="block text-xs font-secondary text-zinc-500 uppercase tracking-wide mb-2">
+                  Recipient Email
+                </label>
+                <input
+                  type="email"
+                  value={testEmailAddress}
+                  onChange={(e) => setTestEmailAddress(e.target.value)}
+                  placeholder="email@example.com"
+                  className="w-full px-4 py-3 bg-zinc-800 border border-zinc-700 text-white placeholder:text-zinc-500 font-secondary text-sm focus:outline-none focus:border-zinc-500"
+                />
+              </div>
+
+              {/* Email Type Select */}
+              <div>
+                <label className="block text-xs font-secondary text-zinc-500 uppercase tracking-wide mb-2">
+                  Email Type
+                </label>
+                <select
+                  value={testEmailType}
+                  onChange={(e) => setTestEmailType(e.target.value as 'message' | 'profile_approved')}
+                  className="w-full px-4 py-3 bg-zinc-800 border border-zinc-700 text-white font-secondary text-sm focus:outline-none focus:border-zinc-500 appearance-none cursor-pointer"
+                >
+                  <option value="message" className="bg-zinc-900">New Message Notification</option>
+                  <option value="profile_approved" className="bg-zinc-900">Profile Approved</option>
+                </select>
+              </div>
+            </div>
+
+            {/* Send Button */}
+            <div className="flex items-center gap-4">
+              <button
+                onClick={sendTestEmail}
+                disabled={sendingTestEmail || !testEmailAddress}
+                className="flex items-center gap-2 px-6 py-3 bg-pink-500 hover:bg-pink-600 text-white font-secondary text-sm transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                {sendingTestEmail ? (
+                  <>
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                    Sending...
+                  </>
+                ) : (
+                  <>
+                    <Mail className="h-4 w-4" />
+                    Send Test Email
+                  </>
+                )}
+              </button>
+
+              {/* Result Message */}
+              {testEmailResult && (
+                <div className={cn(
+                  "flex items-center gap-2 text-sm font-secondary",
+                  testEmailResult.success ? "text-green-400" : "text-red-400"
+                )}>
+                  {testEmailResult.success ? (
+                    <CheckCircle2 className="h-4 w-4" />
+                  ) : (
+                    <AlertCircle className="h-4 w-4" />
+                  )}
+                  {testEmailResult.success ? testEmailResult.message : testEmailResult.error}
+                </div>
+              )}
+            </div>
+          </div>
+          )}
+        </div>
+
+        {/* User Management Section */}
+        <div className="mb-10">
+          <button
+            onClick={() => toggleSection('userManagement')}
+            className="w-full flex items-center justify-between mb-4 group"
+          >
+            <div className="flex items-center gap-2">
+              <Users className="h-5 w-5 text-zinc-500" />
+              <h2 className="text-xl font-primary">User Management</h2>
+            </div>
+            <ChevronDown className={cn(
+              "h-5 w-5 text-zinc-500 transition-transform duration-200",
+              collapsedSections.userManagement ? "" : "rotate-180"
+            )} />
+          </button>
+
+          {!collapsedSections.userManagement && session?.access_token && (
+            <UserManagementSection
+              accessToken={session.access_token}
+              onToast={(message, type) => {
+                setToast({ message, type });
+                setTimeout(() => setToast(null), 3000);
+              }}
+            />
+          )}
         </div>
 
         {/* Jobs List */}
         <div className="mb-8">
-          <div className="flex items-center gap-2 mb-4">
-            <Briefcase className="h-5 w-5 text-zinc-500" />
-            <h2 className="text-xl font-primary">Job Submissions</h2>
+          <button
+            onClick={() => toggleSection('jobSubmissions')}
+            className="w-full flex items-center justify-between mb-4 group"
+          >
+            <div className="flex items-center gap-2">
+              <Briefcase className="h-5 w-5 text-zinc-500" />
+              <h2 className="text-xl font-primary">All Job Submissions</h2>
+              <span className="px-2 py-0.5 bg-zinc-500/20 text-zinc-400 text-xs font-secondary rounded-full">
+                {jobs.length}
+              </span>
+            </div>
+            <ChevronDown className={cn(
+              "h-5 w-5 text-zinc-500 transition-transform duration-200",
+              collapsedSections.jobSubmissions ? "" : "rotate-180"
+            )} />
+          </button>
+
+          {!collapsedSections.jobSubmissions && (
+          <>
+          {/* Filter Bar */}
+          <div className="flex items-center gap-4 mb-6">
+            <div className="flex items-center gap-2">
+              <Filter className="h-4 w-4 text-zinc-500" />
+              <span className="text-sm font-secondary text-zinc-400">Filter:</span>
+            </div>
+            <select
+              value={statusFilter}
+              onChange={(e) => {
+                setStatusFilter(e.target.value as JobStatus | '');
+                setPagination((prev) => ({ ...prev, page: 1 }));
+              }}
+              className="px-3 py-2 bg-transparent border border-zinc-800 text-white font-secondary text-sm focus:border-zinc-600 focus:outline-none appearance-none cursor-pointer"
+            >
+              <option value="" className="bg-zinc-900">
+                All Statuses
+              </option>
+              {JOB_STATUSES.map((status) => (
+                <option key={status.value} value={status.value} className="bg-zinc-900">
+                  {status.label}
+                </option>
+              ))}
+            </select>
+            <button
+              onClick={() => fetchJobs()}
+              className="flex items-center gap-2 px-3 py-2 border border-zinc-800 text-zinc-400 hover:text-white hover:border-zinc-600 font-secondary text-sm transition-colors"
+            >
+              <RefreshCw className="h-4 w-4" />
+              Refresh
+            </button>
           </div>
 
           {jobs.length === 0 ? (
@@ -2622,10 +3391,9 @@ const AdminDashboardPage: React.FC = () => {
               })}
             </div>
           )}
-        </div>
 
-        {/* Pagination */}
-        {pagination.totalPages > 1 && (
+          {/* Pagination */}
+          {pagination.totalPages > 1 && (
           <div className="flex items-center justify-center gap-4">
             <button
               onClick={() =>
@@ -2650,6 +3418,9 @@ const AdminDashboardPage: React.FC = () => {
             </button>
           </div>
         )}
+        </>
+        )}
+        </div>
 
         {/* Vertical Text on Left Edge */}
         <div className="hidden lg:block fixed left-8 top-1/2 -translate-y-1/2 -rotate-90 origin-center">

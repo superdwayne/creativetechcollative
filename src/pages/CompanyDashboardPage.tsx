@@ -1,206 +1,135 @@
-import React, { useState, useEffect, useCallback, useRef } from 'react';
-import { useNavigate } from 'react-router-dom';
+import React, { useEffect, useState, useCallback } from 'react';
+import { useNavigate, Link } from 'react-router-dom';
+import {
+  Building2,
+  Briefcase,
+  Users,
+  LogOut,
+  Loader2,
+  AlertCircle,
+  Plus,
+  ChevronDown,
+  ChevronRight,
+  CheckCircle2,
+  Clock,
+  XCircle,
+  MapPin,
+  ExternalLink,
+  CreditCard,
+  X,
+  MessageSquare,
+} from 'lucide-react';
 import { Input } from '../components/ui/input';
 import { Textarea } from '../components/ui/textarea';
 import { TagInput } from '../components/ui/tag-input';
-import {
-  Loader2,
-  Building2,
-  Briefcase,
-  Plus,
-  LogOut,
-  Clock,
-  CheckCircle2,
-  AlertCircle,
-  ChevronDown,
-  ChevronUp,
-  Users,
-  ExternalLink,
-  MapPin,
-  Calendar,
-  DollarSign,
-  X,
-  Sparkles,
-  Mail,
-  MessageSquare,
-  Send,
-} from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
-import { getCompanyByUserId, getJobSubmissionsByCompany, getMatchesWithProfilesByJobId } from '@/lib/supabase';
-import { cn } from '@/lib/utils';
+import { usePresence } from '@/hooks/usePresence';
 import {
   Company,
   JobSubmission,
   JobMatchWithProfile,
   PROJECT_TYPES,
   REMOTE_PREFERENCES,
+  JOB_STATUSES,
   ProjectType,
   RemotePreference,
-  JOB_STATUSES,
 } from '@/types/job-matching';
-import { FOCUS_AREAS, SUGGESTED_SKILLS } from '@/types/network-profile';
+import { FOCUS_AREAS } from '@/types/network-profile';
+import {
+  getCompanyByUserId,
+  getJobSubmissionsByCompany,
+  getMatchesWithProfilesByJobId,
+  supabase,
+} from '@/lib/supabase';
+import { cn } from '@/lib/utils';
 
-interface JobFormData {
-  title: string;
-  description: string;
-  requirements: string;
-  preferredSkills: string[];
-  focusAreas: string[];
-  budgetRange: string;
-  projectType: ProjectType;
-  remotePreference: RemotePreference;
-  location: string;
-  timeline: string;
+interface CompanyCredits {
+  freeAnalysesRemaining: number;
+  purchasedCredits: number;
+  bonusCredits: number;
 }
 
-interface Message {
-  id: string;
-  matchId: string;
-  senderType: 'company' | 'member';
-  senderId: string;
-  content: string;
-  createdAt: string;
-  readAt: string | null;
+interface JobWithMatches extends JobSubmission {
+  matches: JobMatchWithProfile[];
+  isExpanded: boolean;
+  isLoadingMatches: boolean;
 }
-
-const initialJobFormData: JobFormData = {
-  title: '',
-  description: '',
-  requirements: '',
-  preferredSkills: [],
-  focusAreas: [],
-  budgetRange: '',
-  projectType: 'project-based',
-  remotePreference: 'flexible',
-  location: '',
-  timeline: '',
-};
 
 const CompanyDashboardPage: React.FC = () => {
   const navigate = useNavigate();
   const { user, session, signOut, loading: authLoading } = useAuth();
-
+  
+  // Track user presence to avoid sending email notifications when they're active
+  usePresence();
+  
   const [company, setCompany] = useState<Company | null>(null);
-  const [jobs, setJobs] = useState<JobSubmission[]>([]);
+  const [credits, setCredits] = useState<CompanyCredits | null>(null);
+  const [jobs, setJobs] = useState<JobWithMatches[]>([]);
   const [loading, setLoading] = useState(true);
-  const [showJobForm, setShowJobForm] = useState(false);
-  const [expandedJobId, setExpandedJobId] = useState<string | null>(null);
-
-  // Matches state
-  const [jobMatches, setJobMatches] = useState<Record<string, JobMatchWithProfile[]>>({});
-  const [loadingMatches, setLoadingMatches] = useState<Record<string, boolean>>({});
+  const [error, setError] = useState('');
+  const [unreadMessageCount, setUnreadMessageCount] = useState(0);
 
   // Job form state
-  const [jobFormData, setJobFormData] = useState<JobFormData>(initialJobFormData);
-  const [jobFormErrors, setJobFormErrors] = useState<Record<string, string>>({});
+  const [showJobForm, setShowJobForm] = useState(false);
   const [isSubmittingJob, setIsSubmittingJob] = useState(false);
-  const [jobSubmitError, setJobSubmitError] = useState('');
-  const [jobSubmitSuccess, setJobSubmitSuccess] = useState(false);
+  const [jobFormError, setJobFormError] = useState('');
+  const [jobForm, setJobForm] = useState({
+    title: '',
+    description: '',
+    requirements: '',
+    preferredSkills: [] as string[],
+    focusAreas: [] as string[],
+    budgetRange: '',
+    projectType: 'project-based' as ProjectType,
+    remotePreference: 'flexible' as RemotePreference,
+    location: '',
+    timeline: '',
+  });
 
-  // Messaging state
-  const [expandedMessagingMatchId, setExpandedMessagingMatchId] = useState<string | null>(null);
-  const [conversations, setConversations] = useState<Record<string, Message[]>>({});
-  const [loadingConversations, setLoadingConversations] = useState<Record<string, boolean>>({});
-  const [messageInputs, setMessageInputs] = useState<Record<string, string>>({});
-  const [sendingMessages, setSendingMessages] = useState<Record<string, boolean>>({});
-  const messagesEndRef = useRef<Record<string, HTMLDivElement | null>>({});
-
-  // Unread message state
-  const [totalUnreadCount, setTotalUnreadCount] = useState(0);
-  const [matchUnreadStatus, setMatchUnreadStatus] = useState<Record<string, boolean>>({});
-
-  // Fetch total unread count
-  const fetchUnreadCount = useCallback(async () => {
-    if (!session) return;
-
-    try {
-      const response = await fetch('/api/messages/unread-count', {
-        headers: {
-          Authorization: `Bearer ${session.access_token}`,
-        },
-      });
-      const data = await response.json();
-      if (response.ok) {
-        setTotalUnreadCount(data.count);
-      }
-    } catch (error) {
-      console.error('Error fetching unread count:', error);
-    }
-  }, [session]);
-
-  // Fetch unread status per match
-  const fetchMatchUnreadStatus = useCallback(
-    async (matchIds: string[]) => {
-      if (!session || matchIds.length === 0) return;
-
-      try {
-        const response = await fetch('/api/messages/unread-status', {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            Authorization: `Bearer ${session.access_token}`,
-          },
-          body: JSON.stringify({ matchIds }),
-        });
-        const data = await response.json();
-        if (response.ok && data.success) {
-          setMatchUnreadStatus((prev) => ({ ...prev, ...data.unreadStatus }));
-        }
-      } catch (error) {
-        console.error('Error fetching match unread status:', error);
-      }
-    },
-    [session]
-  );
-
-  const loadData = useCallback(async () => {
+  const fetchData = useCallback(async () => {
     if (!user) return;
 
     try {
-      const [companyData, jobsData] = await Promise.all([
-        getCompanyByUserId(user.id),
-        getCompanyByUserId(user.id).then((c) =>
-          c ? getJobSubmissionsByCompany(c.id) : []
-        ),
-      ]);
-
+      // Fetch company
+      const companyData = await getCompanyByUserId(user.id);
       if (!companyData) {
         navigate('/company/register');
         return;
       }
-
       setCompany(companyData);
-      setJobs(jobsData);
 
-      // Prefetch match counts for all matched jobs
-      const matchedJobs = jobsData.filter((job) => job.status === 'matched');
-      if (matchedJobs.length > 0) {
-        const matchPromises = matchedJobs.map(async (job) => {
-          const matches = await getMatchesWithProfilesByJobId(job.id);
-          const approvedMatches = matches.filter((m) => m.adminApproved === true);
-          return { jobId: job.id, matches: approvedMatches };
-        });
+      // Fetch jobs
+      const jobsData = await getJobSubmissionsByCompany(companyData.id);
+      setJobs(jobsData.map(job => ({
+        ...job,
+        matches: [],
+        isExpanded: false,
+        isLoadingMatches: false,
+      })));
 
-        const results = await Promise.all(matchPromises);
-        const matchesMap: Record<string, JobMatchWithProfile[]> = {};
-        const allMatchIds: string[] = [];
-        results.forEach(({ jobId, matches }) => {
-          matchesMap[jobId] = matches;
-          matches.forEach((m) => allMatchIds.push(m.id));
-        });
-        setJobMatches(matchesMap);
+      // Fetch credits
+      if (supabase) {
+        const { data: creditsData } = await supabase
+          .from('company_analysis_credits')
+          .select('free_analyses_remaining, purchased_credits, bonus_credits')
+          .eq('company_id', companyData.id)
+          .single();
 
-        // Fetch unread status for all matches
-        if (session && allMatchIds.length > 0) {
-          fetchMatchUnreadStatus(allMatchIds);
+        if (creditsData) {
+          setCredits({
+            freeAnalysesRemaining: creditsData.free_analyses_remaining || 0,
+            purchasedCredits: creditsData.purchased_credits || 0,
+            bonusCredits: creditsData.bonus_credits || 0,
+          });
         }
       }
-    } catch (error) {
-      console.error('Error loading data:', error);
+    } catch (err) {
+      console.error('Error fetching data:', err);
+      setError('Failed to load dashboard data');
     } finally {
       setLoading(false);
     }
-  }, [user, navigate, session, fetchMatchUnreadStatus]);
+  }, [user, navigate]);
 
   useEffect(() => {
     if (!authLoading && !user) {
@@ -209,191 +138,89 @@ const CompanyDashboardPage: React.FC = () => {
     }
 
     if (user) {
-      loadData();
+      fetchData();
     }
-  }, [user, authLoading, navigate, loadData]);
+  }, [user, authLoading, navigate, fetchData]);
 
-  // Fetch unread count when session is available
+  // Fetch unread message count
   useEffect(() => {
-    if (session) {
+    const fetchUnreadCount = async () => {
+      if (!session?.access_token) return;
+      
+      try {
+        const response = await fetch('/api/messages/unread-count', {
+          headers: {
+            Authorization: `Bearer ${session.access_token}`,
+          },
+        });
+        
+        if (response.ok) {
+          const data = await response.json();
+          setUnreadMessageCount(data.count || 0);
+        }
+      } catch (err) {
+        console.error('Error fetching unread count:', err);
+      }
+    };
+
+    if (session?.access_token) {
       fetchUnreadCount();
     }
-  }, [session, fetchUnreadCount]);
-
-  // Fetch matches when a job is expanded
-  const fetchMatchesForJob = useCallback(
-    async (jobId: string) => {
-      if (loadingMatches[jobId] || jobMatches[jobId]) return;
-
-      setLoadingMatches((prev) => ({ ...prev, [jobId]: true }));
-
-      try {
-        const matches = await getMatchesWithProfilesByJobId(jobId);
-        // Only show approved matches to companies
-        const approvedMatches = matches.filter((m) => m.adminApproved === true);
-        setJobMatches((prev) => ({ ...prev, [jobId]: approvedMatches }));
-      } catch (error) {
-        console.error('Error fetching matches:', error);
-      } finally {
-        setLoadingMatches((prev) => ({ ...prev, [jobId]: false }));
-      }
-    },
-    [loadingMatches, jobMatches]
-  );
-
-  // Fetch matches when job is expanded
-  useEffect(() => {
-    if (expandedJobId) {
-      fetchMatchesForJob(expandedJobId);
-    }
-  }, [expandedJobId, fetchMatchesForJob]);
-
-  // Fetch conversation for a match
-  const fetchConversation = useCallback(
-    async (matchId: string) => {
-      if (!session) return;
-
-      setLoadingConversations((prev) => ({ ...prev, [matchId]: true }));
-
-      try {
-        const response = await fetch(`/api/messages/conversation?matchId=${matchId}`, {
-          headers: {
-            Authorization: `Bearer ${session.access_token}`,
-          },
-        });
-
-        const data = await response.json();
-
-        if (response.ok && data.success) {
-          setConversations((prev) => ({ ...prev, [matchId]: data.messages }));
-          // Update unread status for this match (now read)
-          setMatchUnreadStatus((prev) => ({ ...prev, [matchId]: false }));
-          // If messages were marked as read, refresh total unread count
-          if (data.markedAsRead > 0) {
-            fetchUnreadCount();
-          }
-        } else {
-          console.error('Failed to fetch conversation:', data.error);
-        }
-      } catch (error) {
-        console.error('Error fetching conversation:', error);
-      } finally {
-        setLoadingConversations((prev) => ({ ...prev, [matchId]: false }));
-      }
-    },
-    [session, fetchUnreadCount]
-  );
-
-  // Load conversation when messaging section is expanded
-  useEffect(() => {
-    if (expandedMessagingMatchId && !conversations[expandedMessagingMatchId]) {
-      fetchConversation(expandedMessagingMatchId);
-    }
-  }, [expandedMessagingMatchId, conversations, fetchConversation]);
-
-  // Auto-scroll to newest messages when conversation changes or messaging opens
-  useEffect(() => {
-    if (expandedMessagingMatchId && messagesEndRef.current[expandedMessagingMatchId]) {
-      messagesEndRef.current[expandedMessagingMatchId]?.scrollIntoView({ behavior: 'smooth' });
-    }
-  }, [expandedMessagingMatchId, conversations]);
-
-  // Send a message
-  const sendMessage = useCallback(
-    async (matchId: string) => {
-      if (!session) return;
-
-      const content = messageInputs[matchId]?.trim();
-      if (!content) return;
-
-      setSendingMessages((prev) => ({ ...prev, [matchId]: true }));
-
-      try {
-        const response = await fetch('/api/messages/send', {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            Authorization: `Bearer ${session.access_token}`,
-          },
-          body: JSON.stringify({ matchId, content }),
-        });
-
-        const data = await response.json();
-
-        if (response.ok && data.success) {
-          // Add the new message to the conversation
-          setConversations((prev) => ({
-            ...prev,
-            [matchId]: [...(prev[matchId] || []), data.message],
-          }));
-          // Clear the input
-          setMessageInputs((prev) => ({ ...prev, [matchId]: '' }));
-          // Scroll to the new message
-          setTimeout(() => {
-            messagesEndRef.current[matchId]?.scrollIntoView({ behavior: 'smooth' });
-          }, 100);
-        } else {
-          console.error('Failed to send message:', data.error);
-        }
-      } catch (error) {
-        console.error('Error sending message:', error);
-      } finally {
-        setSendingMessages((prev) => ({ ...prev, [matchId]: false }));
-      }
-    },
-    [session, messageInputs]
-  );
+  }, [session?.access_token]);
 
   const handleSignOut = async () => {
     await signOut();
-    navigate('/company/auth');
+    navigate('/');
   };
 
-  const updateJobField = <K extends keyof JobFormData>(field: K, value: JobFormData[K]) => {
-    setJobFormData((prev) => ({ ...prev, [field]: value }));
-    if (jobFormErrors[field]) {
-      setJobFormErrors((prev) => {
-        const newErrors = { ...prev };
-        delete newErrors[field];
-        return newErrors;
-      });
-    }
-  };
-
-  const toggleFocusArea = (area: string) => {
-    setJobFormData((prev) => {
-      const current = prev.focusAreas;
-      if (current.includes(area)) {
-        return { ...prev, focusAreas: current.filter((a) => a !== area) };
+  const toggleJobExpand = async (jobId: string) => {
+    setJobs(prev => prev.map(job => {
+      if (job.id === jobId) {
+        // If expanding and no matches loaded yet, fetch them
+        if (!job.isExpanded && job.matches.length === 0) {
+          loadMatchesForJob(jobId);
+          return { ...job, isExpanded: true, isLoadingMatches: true };
+        }
+        return { ...job, isExpanded: !job.isExpanded };
       }
-      return { ...prev, focusAreas: [...current, area] };
-    });
+      return job;
+    }));
   };
 
-  const validateJobForm = (): boolean => {
-    const newErrors: Record<string, string> = {};
-
-    if (!jobFormData.title.trim()) {
-      newErrors.title = 'Job title is required';
+  const loadMatchesForJob = async (jobId: string) => {
+    try {
+      const matches = await getMatchesWithProfilesByJobId(jobId);
+      setJobs(prev => prev.map(job =>
+        job.id === jobId
+          ? { ...job, matches, isLoadingMatches: false }
+          : job
+      ));
+    } catch (err) {
+      console.error('Error loading matches:', err);
+      setJobs(prev => prev.map(job =>
+        job.id === jobId
+          ? { ...job, isLoadingMatches: false }
+          : job
+      ));
     }
-
-    if (!jobFormData.description.trim()) {
-      newErrors.description = 'Job description is required';
-    } else if (jobFormData.description.length < 50) {
-      newErrors.description = 'Description must be at least 50 characters';
-    }
-
-    setJobFormErrors(newErrors);
-    return Object.keys(newErrors).length === 0;
   };
 
   const handleSubmitJob = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (!session?.access_token) return;
 
-    if (!validateJobForm() || !session) return;
+    // Validation
+    if (!jobForm.title.trim()) {
+      setJobFormError('Job title is required');
+      return;
+    }
+    if (!jobForm.description.trim()) {
+      setJobFormError('Job description is required');
+      return;
+    }
 
     setIsSubmittingJob(true);
-    setJobSubmitError('');
+    setJobFormError('');
 
     try {
       const response = await fetch('/api/submit-job', {
@@ -403,16 +230,16 @@ const CompanyDashboardPage: React.FC = () => {
           Authorization: `Bearer ${session.access_token}`,
         },
         body: JSON.stringify({
-          title: jobFormData.title.trim(),
-          description: jobFormData.description.trim(),
-          requirements: jobFormData.requirements.trim() || undefined,
-          preferredSkills: jobFormData.preferredSkills.length > 0 ? jobFormData.preferredSkills : undefined,
-          focusAreas: jobFormData.focusAreas.length > 0 ? jobFormData.focusAreas : undefined,
-          budgetRange: jobFormData.budgetRange.trim() || undefined,
-          projectType: jobFormData.projectType,
-          remotePreference: jobFormData.remotePreference,
-          location: jobFormData.location.trim() || undefined,
-          timeline: jobFormData.timeline.trim() || undefined,
+          title: jobForm.title.trim(),
+          description: jobForm.description.trim(),
+          requirements: jobForm.requirements.trim() || undefined,
+          preferredSkills: jobForm.preferredSkills.length > 0 ? jobForm.preferredSkills : undefined,
+          focusAreas: jobForm.focusAreas.length > 0 ? jobForm.focusAreas : undefined,
+          budgetRange: jobForm.budgetRange.trim() || undefined,
+          projectType: jobForm.projectType,
+          remotePreference: jobForm.remotePreference,
+          location: jobForm.location.trim() || undefined,
+          timeline: jobForm.timeline.trim() || undefined,
         }),
       });
 
@@ -422,549 +249,605 @@ const CompanyDashboardPage: React.FC = () => {
         throw new Error(data.error || 'Failed to submit job');
       }
 
-      setJobSubmitSuccess(true);
-      setJobFormData(initialJobFormData);
+      // Add new job to list
+      setJobs(prev => [{
+        ...data.job,
+        matches: [],
+        isExpanded: false,
+        isLoadingMatches: false,
+      }, ...prev]);
 
-      // Reload jobs
-      setTimeout(() => {
-        setJobSubmitSuccess(false);
-        setShowJobForm(false);
-        loadData();
-      }, 2000);
-    } catch (error: unknown) {
-      console.error('Submit job error:', error);
-      setJobSubmitError(error instanceof Error ? error.message : 'An unexpected error occurred. Please try again.');
+      // Reset form
+      setJobForm({
+        title: '',
+        description: '',
+        requirements: '',
+        preferredSkills: [],
+        focusAreas: [],
+        budgetRange: '',
+        projectType: 'project-based',
+        remotePreference: 'flexible',
+        location: '',
+        timeline: '',
+      });
+      setShowJobForm(false);
+    } catch (err: any) {
+      console.error('Error submitting job:', err);
+      setJobFormError(err.message || 'Failed to submit job');
     } finally {
       setIsSubmittingJob(false);
     }
   };
 
   const getStatusBadge = (status: string) => {
-    const statusInfo = JOB_STATUSES.find((s) => s.value === status);
-    const statusColors: Record<string, string> = {
-      pending: 'bg-yellow-500/20 text-yellow-400 border-yellow-500/30',
-      reviewed: 'bg-blue-500/20 text-blue-400 border-blue-500/30',
-      matched: 'bg-green-500/20 text-green-400 border-green-500/30',
-      closed: 'bg-zinc-500/20 text-zinc-400 border-zinc-500/30',
-      rejected: 'bg-red-500/20 text-red-400 border-red-500/30',
+    const statusInfo = JOB_STATUSES.find(s => s.value === status);
+    const colorMap: Record<string, string> = {
+      pending: 'bg-amber-500/15 text-amber-400 border-amber-500/20',
+      reviewed: 'bg-blue-500/15 text-blue-400 border-blue-500/20',
+      matched: 'bg-emerald-500/15 text-emerald-400 border-emerald-500/20',
+      closed: 'bg-zinc-500/15 text-zinc-400 border-zinc-500/20',
+      rejected: 'bg-red-500/15 text-red-400 border-red-500/20',
+    };
+    const iconMap: Record<string, React.ReactNode> = {
+      pending: <Clock className="h-3.5 w-3.5" />,
+      reviewed: <CheckCircle2 className="h-3.5 w-3.5" />,
+      matched: <Users className="h-3.5 w-3.5" />,
+      closed: <XCircle className="h-3.5 w-3.5" />,
+      rejected: <XCircle className="h-3.5 w-3.5" />,
     };
 
     return (
-      <span
-        className={cn(
-          'px-3 py-1 text-xs font-secondary border',
-          statusColors[status] || statusColors.pending
-        )}
-      >
+      <span className={cn(
+        "inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium border",
+        colorMap[status] || colorMap.pending
+      )}>
+        {iconMap[status] || iconMap.pending}
         {statusInfo?.label || status}
       </span>
     );
   };
 
+  const totalCredits = credits
+    ? credits.freeAnalysesRemaining + credits.purchasedCredits + credits.bonusCredits
+    : 0;
+
+  const totalMatches = jobs.reduce((acc, job) => {
+    // Count approved matches
+    const approvedMatches = job.matches.filter(m => m.adminApproved).length;
+    return acc + approvedMatches;
+  }, 0);
+
   if (authLoading || loading) {
     return (
       <div className="min-h-screen bg-black text-white flex items-center justify-center">
-        <Loader2 className="h-8 w-8 animate-spin text-white" />
+        <div className="flex flex-col items-center gap-4">
+          <div className="relative">
+            <div className="w-12 h-12 rounded-full border-2 border-zinc-800 border-t-white animate-spin" />
+          </div>
+          <p className="text-zinc-500 text-sm">Loading your dashboard...</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (!company) {
+    return (
+      <div className="min-h-screen bg-black text-white flex items-center justify-center">
+        <div className="text-center">
+          <p className="text-zinc-400 mb-4">No company found</p>
+          <button
+            onClick={() => navigate('/company/register')}
+            className="px-6 py-3 bg-white text-black font-secondary text-sm"
+          >
+            Register Your Company
+          </button>
+        </div>
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen bg-black text-white overflow-hidden">
-      <div className="max-w-6xl mx-auto px-8 md:px-16 py-20 lg:py-24">
-        {/* Header */}
-        <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4 mb-10">
-          <div>
-            <span className="text-xs font-secondary tracking-[0.3em] text-zinc-500 uppercase">
-              CTC Company Portal
-            </span>
-            <h1 className="text-3xl md:text-4xl font-primary font-medium leading-[0.95] tracking-tight mt-2">
-              Dashboard
-            </h1>
+    <div className="min-h-screen bg-black text-white relative overflow-hidden">
+      {/* Background atmosphere */}
+      <div className="fixed inset-0 pointer-events-none">
+        <div className="absolute top-0 left-1/4 w-96 h-96 bg-pink-500/5 rounded-full blur-3xl" />
+        <div className="absolute bottom-0 right-1/4 w-96 h-96 bg-violet-500/5 rounded-full blur-3xl" />
+      </div>
+
+      {/* Header */}
+      <header className="relative border-b border-zinc-800/50 backdrop-blur-sm bg-black/50 sticky top-0 z-40">
+        <div className="max-w-6xl mx-auto px-6 py-4 flex items-center justify-between">
+          <div className="flex items-center gap-3">
+            <Link to="/" className="text-xs font-medium tracking-[0.2em] text-zinc-500 uppercase hover:text-zinc-300 transition-colors">
+              CTC Talent
+            </Link>
+            <span className="text-zinc-700">/</span>
+            <span className="text-sm font-medium text-white">Dashboard</span>
           </div>
           <button
             onClick={handleSignOut}
-            className="flex items-center gap-2 px-4 py-2 border border-zinc-700 text-zinc-400 hover:text-white hover:border-zinc-500 font-secondary text-sm transition-colors"
+            className="flex items-center gap-2 px-4 py-2 text-zinc-400 hover:text-white text-sm transition-all hover:bg-zinc-800/50 rounded-lg"
           >
             <LogOut className="h-4 w-4" />
             Sign Out
           </button>
         </div>
+      </header>
 
-        {/* Company Profile Card */}
-        {company && (
-          <div className="border border-zinc-800 p-6 mb-8">
-            <div className="flex items-start gap-4">
-              <div className="w-16 h-16 bg-zinc-800 flex items-center justify-center flex-shrink-0">
-                <Building2 className="h-8 w-8 text-zinc-500" />
-              </div>
-              <div className="flex-1">
-                <div className="flex items-center gap-3 mb-2">
-                  <h2 className="text-xl font-primary">{company.companyName}</h2>
-                  {company.verified ? (
-                    <span className="flex items-center gap-1 px-2 py-0.5 bg-green-500/20 text-green-400 text-xs font-secondary border border-green-500/30">
-                      <CheckCircle2 className="h-3 w-3" />
-                      Verified
-                    </span>
-                  ) : (
-                    <span className="flex items-center gap-1 px-2 py-0.5 bg-yellow-500/20 text-yellow-400 text-xs font-secondary border border-yellow-500/30">
-                      <Clock className="h-3 w-3" />
-                      Pending Verification
-                    </span>
-                  )}
-                </div>
-                <div className="flex flex-wrap gap-4 text-sm text-zinc-400 font-secondary">
-                  {company.industry && <span>{company.industry}</span>}
-                  {company.companySize && (
-                    <span className="capitalize">{company.companySize}</span>
-                  )}
-                  {company.companyWebsite && (
-                    <a
-                      href={company.companyWebsite}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="flex items-center gap-1 text-zinc-400 hover:text-white transition-colors"
-                    >
-                      <ExternalLink className="h-3 w-3" />
-                      Website
-                    </a>
-                  )}
-                </div>
-              </div>
-            </div>
+      <main className="relative max-w-6xl mx-auto px-6 py-12">
+        {error && (
+          <div className="mb-8 p-4 bg-red-500/10 border border-red-500/20 rounded-xl flex items-center gap-3 text-red-400">
+            <AlertCircle className="h-5 w-5 flex-shrink-0" />
+            <p className="text-sm">{error}</p>
+            <button onClick={() => setError('')} className="ml-auto p-1 hover:bg-red-500/20 rounded">
+              <X className="h-4 w-4" />
+            </button>
           </div>
         )}
 
-        {/* Jobs Section */}
-        <div className="mb-8">
-          <div className="flex items-center justify-between mb-6">
-            <h2 className="text-xl font-primary flex items-center gap-2">
-              <Briefcase className="h-5 w-5 text-zinc-500" />
-              Your Job Submissions
-              {totalUnreadCount > 0 && (
-                <span className="px-2 py-0.5 bg-red-500 text-white text-xs font-secondary rounded-full min-w-[20px] text-center">
-                  {totalUnreadCount}
+        {/* Company Header */}
+        <div className="relative bg-gradient-to-br from-zinc-900/80 to-zinc-900/40 border border-zinc-800/50 rounded-2xl p-8 backdrop-blur-sm mb-8">
+          <div className="absolute inset-0 rounded-2xl bg-gradient-to-br from-pink-500/5 via-transparent to-violet-500/5 pointer-events-none" />
+
+          <div className="relative flex flex-col lg:flex-row gap-8 items-start">
+            {/* Company Info */}
+            <div className="flex-1">
+              <div className="flex items-center gap-4 mb-4">
+                <div className="w-16 h-16 rounded-2xl bg-gradient-to-br from-pink-500/20 to-violet-500/20 flex items-center justify-center border border-white/5">
+                  <Building2 className="h-8 w-8 text-zinc-400" />
+                </div>
+                <div>
+                  <h1 className="text-2xl font-bold text-white tracking-tight">{company.companyName}</h1>
+                  <p className="text-zinc-400 text-sm">{company.contactName} • {company.contactEmail}</p>
+                </div>
+              </div>
+
+              {company.verified ? (
+                <span className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-emerald-500/15 text-emerald-400 text-xs font-medium border border-emerald-500/20">
+                  <CheckCircle2 className="h-3.5 w-3.5" />
+                  Verified Company
+                </span>
+              ) : (
+                <span className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-amber-500/15 text-amber-400 text-xs font-medium border border-amber-500/20">
+                  <Clock className="h-3.5 w-3.5" />
+                  Pending Verification
                 </span>
               )}
-            </h2>
-            <button
-              onClick={() => setShowJobForm(true)}
-              className="flex items-center gap-2 px-4 py-2 bg-white text-black font-secondary text-sm tracking-wide hover:bg-zinc-200 transition-colors"
-            >
-              <Plus className="h-4 w-4" />
-              New Job
-            </button>
+            </div>
+
+            {/* Credits Card */}
+            <div className="lg:w-72 bg-zinc-800/30 rounded-xl p-5 border border-zinc-700/50">
+              <div className="flex items-center gap-2 mb-3">
+                <CreditCard className="h-5 w-5 text-pink-400" />
+                <span className="text-sm font-medium text-zinc-300">Analysis Credits</span>
+              </div>
+              <div className="text-3xl font-bold text-white mb-2">{totalCredits}</div>
+              {credits && (
+                <div className="text-xs text-zinc-500 space-y-1">
+                  {credits.freeAnalysesRemaining > 0 && (
+                    <p>{credits.freeAnalysesRemaining} free credits</p>
+                  )}
+                  {credits.purchasedCredits > 0 && (
+                    <p>{credits.purchasedCredits} purchased</p>
+                  )}
+                  {credits.bonusCredits > 0 && (
+                    <p>{credits.bonusCredits} bonus</p>
+                  )}
+                </div>
+              )}
+              <Link
+                to="/company/purchase-credits"
+                className="mt-4 block text-center px-4 py-2 bg-pink-500/20 text-pink-400 rounded-lg text-sm font-medium hover:bg-pink-500/30 transition-colors"
+              >
+                Purchase Credits
+              </Link>
+            </div>
           </div>
+        </div>
+
+        {/* Quick Stats */}
+        <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-8">
+          <div className="bg-zinc-900/50 border border-zinc-800/50 rounded-xl p-5">
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 rounded-lg bg-blue-500/20 flex items-center justify-center">
+                <Briefcase className="h-5 w-5 text-blue-400" />
+              </div>
+              <div>
+                <p className="text-2xl font-bold text-white">{jobs.length}</p>
+                <p className="text-xs text-zinc-500">Jobs Submitted</p>
+              </div>
+            </div>
+          </div>
+          <div className="bg-zinc-900/50 border border-zinc-800/50 rounded-xl p-5">
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 rounded-lg bg-emerald-500/20 flex items-center justify-center">
+                <Users className="h-5 w-5 text-emerald-400" />
+              </div>
+              <div>
+                <p className="text-2xl font-bold text-white">{totalMatches}</p>
+                <p className="text-xs text-zinc-500">Approved Matches</p>
+              </div>
+            </div>
+          </div>
+          <div className="bg-zinc-900/50 border border-zinc-800/50 rounded-xl p-5">
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 rounded-lg bg-amber-500/20 flex items-center justify-center">
+                <Clock className="h-5 w-5 text-amber-400" />
+              </div>
+              <div>
+                <p className="text-2xl font-bold text-white">
+                  {jobs.filter(j => j.status === 'pending').length}
+                </p>
+                <p className="text-xs text-zinc-500">Pending Review</p>
+              </div>
+            </div>
+          </div>
+          <Link
+            to="/messages"
+            className="bg-zinc-900/50 border border-zinc-800/50 rounded-xl p-5 hover:border-pink-500/30 hover:bg-pink-500/5 transition-all group"
+          >
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 rounded-lg bg-pink-500/20 flex items-center justify-center relative">
+                <MessageSquare className="h-5 w-5 text-pink-400" />
+                {unreadMessageCount > 0 && (
+                  <span className="absolute -top-1 -right-1 w-4 h-4 bg-pink-500 text-white text-[10px] rounded-full flex items-center justify-center">
+                    {unreadMessageCount > 9 ? '9+' : unreadMessageCount}
+                  </span>
+                )}
+              </div>
+              <div>
+                <p className="text-2xl font-bold text-white">{unreadMessageCount}</p>
+                <p className="text-xs text-zinc-500 group-hover:text-pink-400 transition-colors">Unread Messages</p>
+              </div>
+            </div>
+          </Link>
+        </div>
+
+        {/* Submit New Job Section */}
+        <div className="mb-8">
+          <button
+            onClick={() => setShowJobForm(!showJobForm)}
+            className="flex items-center gap-2 px-5 py-3 bg-white text-black rounded-xl font-medium text-sm hover:bg-zinc-100 transition-colors"
+          >
+            <Plus className="h-4 w-4" />
+            Submit New Job
+            <ChevronDown className={cn(
+              "h-4 w-4 transition-transform",
+              showJobForm && "rotate-180"
+            )} />
+          </button>
+
+          {showJobForm && (
+            <div className="mt-4 bg-zinc-900/50 border border-zinc-800/50 rounded-xl p-6">
+              <h3 className="text-lg font-bold text-white mb-6">New Job Specification</h3>
+
+              {jobFormError && (
+                <div className="mb-6 p-4 bg-red-500/10 border border-red-500/20 rounded-lg flex items-center gap-3 text-red-400 text-sm">
+                  <AlertCircle className="h-4 w-4 flex-shrink-0" />
+                  {jobFormError}
+                </div>
+              )}
+
+              <form onSubmit={handleSubmitJob} className="space-y-5">
+                <div>
+                  <label className="block text-sm font-medium text-zinc-300 mb-2">Job Title *</label>
+                  <Input
+                    value={jobForm.title}
+                    onChange={(e) => setJobForm(prev => ({ ...prev, title: e.target.value }))}
+                    placeholder="e.g., Creative Developer for Interactive Installation"
+                    className="h-12"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-zinc-300 mb-2">Description *</label>
+                  <Textarea
+                    value={jobForm.description}
+                    onChange={(e) => setJobForm(prev => ({ ...prev, description: e.target.value }))}
+                    placeholder="Describe the project, goals, and what you're looking for..."
+                    rows={4}
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-zinc-300 mb-2">Requirements</label>
+                  <Textarea
+                    value={jobForm.requirements}
+                    onChange={(e) => setJobForm(prev => ({ ...prev, requirements: e.target.value }))}
+                    placeholder="Must-have qualifications and experience..."
+                    rows={3}
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-zinc-300 mb-2">Preferred Skills</label>
+                  <TagInput
+                    tags={jobForm.preferredSkills}
+                    onTagsChange={(tags) => setJobForm(prev => ({ ...prev, preferredSkills: tags }))}
+                    placeholder="Add skills (e.g., Three.js, Unity, React)..."
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-zinc-300 mb-2">Focus Areas</label>
+                  <div className="flex flex-wrap gap-2">
+                    {FOCUS_AREAS.map((area) => (
+                      <button
+                        key={area.value}
+                        type="button"
+                        onClick={() => {
+                          setJobForm(prev => ({
+                            ...prev,
+                            focusAreas: prev.focusAreas.includes(area.value)
+                              ? prev.focusAreas.filter(a => a !== area.value)
+                              : [...prev.focusAreas, area.value]
+                          }));
+                        }}
+                        className={cn(
+                          "px-3 py-1.5 rounded-full text-sm border transition-colors",
+                          jobForm.focusAreas.includes(area.value)
+                            ? "bg-pink-500/20 text-pink-400 border-pink-500/30"
+                            : "bg-zinc-800 text-zinc-400 border-zinc-700 hover:border-zinc-600"
+                        )}
+                      >
+                        {area.label}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+                  <div>
+                    <label className="block text-sm font-medium text-zinc-300 mb-2">Project Type</label>
+                    <select
+                      value={jobForm.projectType}
+                      onChange={(e) => setJobForm(prev => ({ ...prev, projectType: e.target.value as ProjectType }))}
+                      className="w-full h-12 px-4 bg-transparent border border-zinc-800 rounded-md text-white font-secondary"
+                    >
+                      {PROJECT_TYPES.map((type) => (
+                        <option key={type.value} value={type.value} className="bg-zinc-900">
+                          {type.label}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-medium text-zinc-300 mb-2">Remote Preference</label>
+                    <select
+                      value={jobForm.remotePreference}
+                      onChange={(e) => setJobForm(prev => ({ ...prev, remotePreference: e.target.value as RemotePreference }))}
+                      className="w-full h-12 px-4 bg-transparent border border-zinc-800 rounded-md text-white font-secondary"
+                    >
+                      {REMOTE_PREFERENCES.map((pref) => (
+                        <option key={pref.value} value={pref.value} className="bg-zinc-900">
+                          {pref.label}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
+                  <div>
+                    <label className="block text-sm font-medium text-zinc-300 mb-2">Location</label>
+                    <Input
+                      value={jobForm.location}
+                      onChange={(e) => setJobForm(prev => ({ ...prev, location: e.target.value }))}
+                      placeholder="City, Country"
+                      className="h-12"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-zinc-300 mb-2">Budget Range</label>
+                    <Input
+                      value={jobForm.budgetRange}
+                      onChange={(e) => setJobForm(prev => ({ ...prev, budgetRange: e.target.value }))}
+                      placeholder="e.g., €5,000 - €10,000"
+                      className="h-12"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-zinc-300 mb-2">Timeline</label>
+                    <Input
+                      value={jobForm.timeline}
+                      onChange={(e) => setJobForm(prev => ({ ...prev, timeline: e.target.value }))}
+                      placeholder="e.g., 3 months"
+                      className="h-12"
+                    />
+                  </div>
+                </div>
+
+                <div className="flex gap-3 pt-4">
+                  <button
+                    type="button"
+                    onClick={() => setShowJobForm(false)}
+                    className="px-6 py-3 bg-zinc-800 text-white rounded-lg text-sm font-medium hover:bg-zinc-700 transition-colors"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    type="submit"
+                    disabled={isSubmittingJob}
+                    className="px-6 py-3 bg-white text-black rounded-lg text-sm font-medium hover:bg-zinc-100 transition-colors disabled:opacity-50 flex items-center gap-2"
+                  >
+                    {isSubmittingJob ? (
+                      <>
+                        <Loader2 className="h-4 w-4 animate-spin" />
+                        Submitting...
+                      </>
+                    ) : (
+                      'Submit Job'
+                    )}
+                  </button>
+                </div>
+              </form>
+            </div>
+          )}
+        </div>
+
+        {/* Jobs List */}
+        <div>
+          <h2 className="text-xs font-semibold tracking-[0.2em] text-zinc-500 uppercase mb-4 flex items-center gap-2">
+            <Briefcase className="w-4 h-4" />
+            Your Jobs
+            <span className="text-zinc-600">({jobs.length})</span>
+          </h2>
 
           {jobs.length === 0 ? (
-            <div className="border border-zinc-800 p-8 text-center">
+            <div className="bg-zinc-900/30 border border-zinc-800/50 rounded-xl p-12 text-center">
               <Briefcase className="h-12 w-12 text-zinc-700 mx-auto mb-4" />
-              <p className="text-zinc-400 font-secondary mb-4">
-                No job submissions yet. Submit a job spec to find matching creative technologists.
+              <p className="text-zinc-400 mb-2">No jobs submitted yet</p>
+              <p className="text-zinc-600 text-sm">
+                Submit your first job to start matching with creative technologists
               </p>
-              <button
-                onClick={() => setShowJobForm(true)}
-                className="inline-flex items-center gap-2 px-6 py-3 bg-white text-black font-secondary text-sm tracking-wide hover:bg-zinc-200 transition-colors"
-              >
-                <Plus className="h-4 w-4" />
-                Submit Your First Job
-              </button>
             </div>
           ) : (
             <div className="space-y-4">
               {jobs.map((job) => (
-                <div key={job.id} className="border border-zinc-800">
+                <div
+                  key={job.id}
+                  className="bg-zinc-900/30 border border-zinc-800/50 rounded-xl overflow-hidden"
+                >
+                  {/* Job Header */}
                   <button
-                    onClick={() => setExpandedJobId(expandedJobId === job.id ? null : job.id)}
-                    className="w-full p-4 flex items-center justify-between text-left hover:bg-zinc-900/50 transition-colors"
+                    onClick={() => toggleJobExpand(job.id)}
+                    className="w-full p-5 flex items-center gap-4 text-left hover:bg-zinc-800/30 transition-colors"
                   >
-                    <div className="flex-1">
-                      <div className="flex items-center gap-3 mb-1">
-                        <h3 className="font-primary text-lg">{job.title}</h3>
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-3 mb-2">
+                        <h3 className="font-medium text-white truncate">{job.title}</h3>
                         {getStatusBadge(job.status)}
-                        {job.status === 'matched' && jobMatches[job.id] && jobMatches[job.id].length > 0 && (
-                          <span className="flex items-center gap-1 text-xs font-secondary text-zinc-400">
-                            <Users className="h-3 w-3" />
-                            {jobMatches[job.id].length} {jobMatches[job.id].length === 1 ? 'match' : 'matches'}
-                          </span>
-                        )}
                       </div>
-                      <div className="flex flex-wrap gap-4 text-sm text-zinc-500 font-secondary">
-                        <span className="capitalize">{job.projectType.replace('-', ' ')}</span>
-                        <span className="capitalize">{job.remotePreference}</span>
+                      <div className="flex items-center gap-4 text-sm text-zinc-500">
+                        <span>{PROJECT_TYPES.find(t => t.value === job.projectType)?.label}</span>
+                        <span>•</span>
+                        <span>{REMOTE_PREFERENCES.find(r => r.value === job.remotePreference)?.label}</span>
                         {job.location && (
-                          <span className="flex items-center gap-1">
-                            <MapPin className="h-3 w-3" />
-                            {job.location}
-                          </span>
+                          <>
+                            <span>•</span>
+                            <span className="flex items-center gap-1">
+                              <MapPin className="h-3.5 w-3.5" />
+                              {job.location}
+                            </span>
+                          </>
                         )}
-                        <span>
-                          {new Date(job.createdAt).toLocaleDateString()}
-                        </span>
                       </div>
                     </div>
-                    {expandedJobId === job.id ? (
-                      <ChevronUp className="h-5 w-5 text-zinc-500" />
-                    ) : (
-                      <ChevronDown className="h-5 w-5 text-zinc-500" />
-                    )}
+                    <div className="flex items-center gap-4">
+                      {job.matches.filter(m => m.adminApproved).length > 0 && (
+                        <span className="text-sm text-emerald-400">
+                          {job.matches.filter(m => m.adminApproved).length} matches
+                        </span>
+                      )}
+                      {job.isExpanded ? (
+                        <ChevronDown className="h-5 w-5 text-zinc-500" />
+                      ) : (
+                        <ChevronRight className="h-5 w-5 text-zinc-500" />
+                      )}
+                    </div>
                   </button>
 
-                  {expandedJobId === job.id && (
-                    <div className="px-4 pb-4 pt-0 border-t border-zinc-800">
-                      <div className="pt-4 space-y-4">
-                        <div>
-                          <h4 className="text-xs font-secondary tracking-wide text-zinc-500 uppercase mb-2">
-                            Description
-                          </h4>
-                          <p className="text-zinc-300 font-secondary text-sm whitespace-pre-wrap">
-                            {job.description}
-                          </p>
-                        </div>
-
-                        {job.requirements && (
-                          <div>
-                            <h4 className="text-xs font-secondary tracking-wide text-zinc-500 uppercase mb-2">
-                              Requirements
-                            </h4>
-                            <p className="text-zinc-300 font-secondary text-sm whitespace-pre-wrap">
-                              {job.requirements}
-                            </p>
-                          </div>
-                        )}
-
-                        <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                          {job.budgetRange && (
-                            <div>
-                              <h4 className="text-xs font-secondary tracking-wide text-zinc-500 uppercase mb-1 flex items-center gap-1">
-                                <DollarSign className="h-3 w-3" />
-                                Budget
-                              </h4>
-                              <p className="text-zinc-300 font-secondary text-sm">
-                                {job.budgetRange}
-                              </p>
-                            </div>
-                          )}
-                          {job.timeline && (
-                            <div>
-                              <h4 className="text-xs font-secondary tracking-wide text-zinc-500 uppercase mb-1 flex items-center gap-1">
-                                <Calendar className="h-3 w-3" />
-                                Timeline
-                              </h4>
-                              <p className="text-zinc-300 font-secondary text-sm">
-                                {job.timeline}
-                              </p>
-                            </div>
-                          )}
-                        </div>
-
+                  {/* Expanded Content */}
+                  {job.isExpanded && (
+                    <div className="border-t border-zinc-800/50 p-5">
+                      {/* Job Details */}
+                      <div className="mb-6">
+                        <p className="text-zinc-400 text-sm mb-4">{job.description}</p>
                         {job.preferredSkills && job.preferredSkills.length > 0 && (
-                          <div>
-                            <h4 className="text-xs font-secondary tracking-wide text-zinc-500 uppercase mb-2">
-                              Preferred Skills
-                            </h4>
-                            <div className="flex flex-wrap gap-2">
-                              {job.preferredSkills.map((skill) => (
-                                <span
-                                  key={skill}
-                                  className="px-2 py-1 bg-zinc-800 text-zinc-300 text-xs font-secondary"
-                                >
-                                  {skill}
-                                </span>
-                              ))}
-                            </div>
+                          <div className="flex flex-wrap gap-2">
+                            {job.preferredSkills.map((skill, idx) => (
+                              <span
+                                key={idx}
+                                className="px-2 py-1 bg-zinc-800 text-zinc-300 text-xs rounded-md"
+                              >
+                                {skill}
+                              </span>
+                            ))}
                           </div>
                         )}
+                      </div>
 
-                        {job.focusAreas && job.focusAreas.length > 0 && (
-                          <div>
-                            <h4 className="text-xs font-secondary tracking-wide text-zinc-500 uppercase mb-2">
-                              Focus Areas
-                            </h4>
-                            <div className="flex flex-wrap gap-2">
-                              {job.focusAreas.map((area) => {
-                                const areaInfo = FOCUS_AREAS.find((a) => a.value === area);
-                                return (
-                                  <span
-                                    key={area}
-                                    className="px-2 py-1 bg-zinc-800 text-zinc-300 text-xs font-secondary"
-                                  >
-                                    {areaInfo?.label || area}
-                                  </span>
-                                );
-                              })}
-                            </div>
+                      {/* Matches Section */}
+                      <div>
+                        <h4 className="text-sm font-medium text-zinc-300 mb-3 flex items-center gap-2">
+                          <Users className="h-4 w-4" />
+                          Matched Candidates
+                        </h4>
+
+                        {job.isLoadingMatches ? (
+                          <div className="flex items-center justify-center py-8">
+                            <Loader2 className="h-6 w-6 animate-spin text-zinc-500" />
                           </div>
-                        )}
-
-                        {/* Pending Status Message */}
-                        {job.status === 'pending' && (
-                          <div className="pt-4 border-t border-zinc-800">
-                            <div className="flex items-center gap-3 p-4 bg-yellow-500/10 border border-yellow-500/20 rounded">
-                              <Clock className="h-5 w-5 text-yellow-500 flex-shrink-0" />
-                              <div>
-                                <p className="text-sm font-secondary text-yellow-400">
-                                  Awaiting admin review
-                                </p>
-                                <p className="text-xs font-secondary text-zinc-400 mt-1">
-                                  Our team will review your job submission and match you with suitable creative technologists.
-                                </p>
-                              </div>
-                            </div>
-                          </div>
-                        )}
-
-                        {/* Matches Section */}
-                        {job.status === 'matched' && (
-                          <div className="pt-4 border-t border-zinc-800">
-                            {loadingMatches[job.id] ? (
-                              <div className="flex items-center justify-center py-4">
-                                <Loader2 className="h-5 w-5 animate-spin text-zinc-500" />
-                              </div>
-                            ) : jobMatches[job.id] && jobMatches[job.id].length > 0 ? (
-                              <div>
-                                <div className="flex items-center gap-2 mb-4">
-                                  <Sparkles className="h-4 w-4 text-pink-500" />
-                                  <h4 className="text-sm font-primary text-white">
-                                    Approved Candidates ({jobMatches[job.id].length})
-                                  </h4>
-                                </div>
-                                <p className="text-xs font-secondary text-zinc-500 mb-4">
-                                  These candidates have been matched and approved by our team. They have been notified about this opportunity.
-                                </p>
-                                <div className="space-y-3">
-                                  {jobMatches[job.id].map((match) => (
-                                    <div
-                                      key={match.id}
-                                      className="p-4 bg-zinc-800/50 border border-zinc-700 relative"
-                                    >
-                                      {/* Blue dot for unread messages */}
-                                      {matchUnreadStatus[match.id] && (
-                                        <div className="absolute top-3 right-3 w-2.5 h-2.5 bg-blue-500 rounded-full" title="Unread messages" />
-                                      )}
-                                      <div className="flex items-start gap-4">
-                                        {/* Profile Picture */}
-                                        <a
-                                          href={`/directory/profile/${match.profile.slug}`}
-                                          target="_blank"
-                                          rel="noopener noreferrer"
-                                          className="flex-shrink-0"
-                                        >
-                                          {match.profile.profilePictureUrl ? (
-                                            <img
-                                              src={match.profile.profilePictureUrl}
-                                              alt={match.profile.fullName}
-                                              className="w-12 h-12 rounded-full object-cover border border-zinc-600 hover:border-zinc-400 transition-colors"
-                                            />
-                                          ) : (
-                                            <div className="w-12 h-12 rounded-full bg-zinc-700 flex items-center justify-center border border-zinc-600 hover:border-zinc-400 transition-colors">
-                                              <Users className="h-5 w-5 text-zinc-400" />
-                                            </div>
-                                          )}
-                                        </a>
-
-                                        {/* Match Info */}
-                                        <div className="flex-1 min-w-0">
-                                          {/* Member Name and View Profile Link */}
-                                          <div className="flex items-center gap-2 mb-2">
-                                            <a
-                                              href={`/directory/profile/${match.profile.slug}`}
-                                              target="_blank"
-                                              rel="noopener noreferrer"
-                                              className="font-primary text-white hover:text-pink-400 transition-colors"
-                                            >
-                                              {match.profile.fullName}
-                                            </a>
-                                            <a
-                                              href={`/directory/profile/${match.profile.slug}`}
-                                              target="_blank"
-                                              rel="noopener noreferrer"
-                                              className="text-zinc-500 hover:text-zinc-300 transition-colors"
-                                              title="View full profile"
-                                            >
-                                              <ExternalLink className="h-3.5 w-3.5" />
-                                            </a>
-                                          </div>
-
-                                          {/* Status Badges */}
-                                          <div className="flex items-center gap-2 mb-2 flex-wrap">
-                                            <span className="px-2 py-0.5 bg-pink-500/20 text-pink-400 text-xs font-secondary">
-                                              {match.matchScore}% match
-                                            </span>
-                                            {match.memberNotified && (
-                                              <span className="px-2 py-0.5 bg-blue-500/20 text-blue-400 text-xs font-secondary">
-                                                Notified
-                                              </span>
-                                            )}
-                                            {match.memberResponse === 'interested' && (
-                                              <span className="px-2 py-0.5 bg-green-500/20 text-green-400 text-xs font-secondary flex items-center gap-1">
-                                                <CheckCircle2 className="h-3 w-3" />
-                                                Interested
-                                              </span>
-                                            )}
-                                            {match.memberResponse === 'not-interested' && (
-                                              <span className="px-2 py-0.5 bg-zinc-500/20 text-zinc-400 text-xs font-secondary">
-                                                Not Interested
-                                              </span>
-                                            )}
-                                          </div>
-
-                                          {/* Match Reasoning */}
-                                          <p className="text-sm text-zinc-300 font-secondary mb-2">
-                                            {match.matchReasoning}
-                                          </p>
-
-                                          {/* Skill Matches */}
-                                          {match.skillMatches && match.skillMatches.length > 0 && (
-                                            <div className="flex flex-wrap gap-1">
-                                              {match.skillMatches.map((skill, idx) => (
-                                                <span
-                                                  key={idx}
-                                                  className="px-2 py-0.5 bg-zinc-700 text-zinc-300 text-xs font-secondary"
-                                                >
-                                                  {skill.skill}
-                                                </span>
-                                              ))}
-                                            </div>
-                                          )}
-                                        </div>
-
-                                        {/* Message Button */}
-                                        <div className="flex-shrink-0">
-                                          <button
-                                            onClick={(e) => {
-                                              e.stopPropagation();
-                                              setExpandedMessagingMatchId(
-                                                expandedMessagingMatchId === match.id ? null : match.id
-                                              );
-                                            }}
-                                            className={cn(
-                                              'flex items-center gap-1 px-3 py-1.5 text-xs font-secondary transition-colors',
-                                              expandedMessagingMatchId === match.id
-                                                ? 'bg-pink-500/20 text-pink-400 border border-pink-500/30'
-                                                : 'bg-zinc-700/50 text-zinc-300 hover:bg-zinc-700 border border-zinc-600'
-                                            )}
-                                          >
-                                            <MessageSquare className="h-3 w-3" />
-                                            {expandedMessagingMatchId === match.id ? 'Hide Messages' : 'Messages'}
-                                          </button>
-                                        </div>
-                                      </div>
-
-                                      {/* Messages Section */}
-                                      {expandedMessagingMatchId === match.id && (
-                                        <div className="mt-4 pt-4 border-t border-zinc-700">
-                                          <div className="flex items-center gap-2 mb-3">
-                                            <MessageSquare className="h-4 w-4 text-pink-400" />
-                                            <span className="text-sm font-secondary text-white">
-                                              Conversation with {match.profile.fullName}
-                                            </span>
-                                          </div>
-
-                                          {/* Conversation History */}
-                                          <div className="bg-zinc-900/50 border border-zinc-700 rounded p-3 mb-3 max-h-64 overflow-y-auto">
-                                            {loadingConversations[match.id] ? (
-                                              <div className="flex items-center justify-center py-6">
-                                                <Loader2 className="h-4 w-4 animate-spin text-zinc-500" />
-                                                <span className="ml-2 text-sm text-zinc-400 font-secondary">
-                                                  Loading messages...
-                                                </span>
-                                              </div>
-                                            ) : (conversations[match.id] || []).length === 0 ? (
-                                              <div className="text-center py-6">
-                                                <MessageSquare className="h-6 w-6 text-zinc-600 mx-auto mb-2" />
-                                                <p className="text-sm text-zinc-500 font-secondary">
-                                                  No messages yet. Start the conversation!
-                                                </p>
-                                              </div>
-                                            ) : (
-                                              <div className="space-y-3">
-                                                {(conversations[match.id] || []).map((msg) => (
-                                                  <div
-                                                    key={msg.id}
-                                                    className={cn(
-                                                      'flex flex-col max-w-[85%]',
-                                                      msg.senderType === 'company' ? 'ml-auto items-end' : 'items-start'
-                                                    )}
-                                                  >
-                                                    <span className="text-xs text-zinc-500 font-secondary mb-1">
-                                                      {msg.senderType === 'company' ? 'You' : match.profile.fullName} ·{' '}
-                                                      {new Date(msg.createdAt).toLocaleString(undefined, {
-                                                        month: 'short',
-                                                        day: 'numeric',
-                                                        hour: '2-digit',
-                                                        minute: '2-digit',
-                                                      })}
-                                                    </span>
-                                                    <div
-                                                      className={cn(
-                                                        'px-3 py-2 rounded text-sm font-secondary',
-                                                        msg.senderType === 'company'
-                                                          ? 'bg-pink-500/20 text-pink-100 border border-pink-500/30'
-                                                          : 'bg-zinc-800 text-zinc-200 border border-zinc-700'
-                                                      )}
-                                                    >
-                                                      {msg.content}
-                                                    </div>
-                                                  </div>
-                                                ))}
-                                                <div
-                                                  ref={(el) => {
-                                                    messagesEndRef.current[match.id] = el;
-                                                  }}
-                                                />
-                                              </div>
-                                            )}
-                                          </div>
-
-                                          {/* Message Input */}
-                                          <div className="flex gap-2">
-                                            <input
-                                              type="text"
-                                              value={messageInputs[match.id] || ''}
-                                              onChange={(e) =>
-                                                setMessageInputs((prev) => ({
-                                                  ...prev,
-                                                  [match.id]: e.target.value,
-                                                }))
-                                              }
-                                              onKeyDown={(e) => {
-                                                if (e.key === 'Enter' && !e.shiftKey) {
-                                                  e.preventDefault();
-                                                  sendMessage(match.id);
-                                                }
-                                              }}
-                                              placeholder="Type a message..."
-                                              className="flex-1 px-3 py-2 bg-zinc-900 border border-zinc-700 text-white text-sm font-secondary placeholder:text-zinc-500 focus:outline-none focus:border-zinc-500 rounded"
-                                              disabled={sendingMessages[match.id]}
-                                            />
-                                            <button
-                                              onClick={() => sendMessage(match.id)}
-                                              disabled={
-                                                sendingMessages[match.id] || !messageInputs[match.id]?.trim()
-                                              }
-                                              className="px-4 py-2 bg-pink-500 text-white text-sm font-secondary hover:bg-pink-600 disabled:opacity-50 disabled:cursor-not-allowed transition-colors rounded flex items-center gap-2"
-                                            >
-                                              {sendingMessages[match.id] ? (
-                                                <Loader2 className="h-4 w-4 animate-spin" />
-                                              ) : (
-                                                <Send className="h-4 w-4" />
-                                              )}
-                                              Send
-                                            </button>
-                                          </div>
-                                        </div>
-                                      )}
-                                    </div>
-                                  ))}
-                                </div>
-                              </div>
+                        ) : job.matches.filter(m => m.adminApproved).length === 0 ? (
+                          <div className="py-8 text-center text-zinc-500 text-sm">
+                            {job.status === 'pending' ? (
+                              'Waiting for admin review and matching'
+                            ) : job.status === 'matched' ? (
+                              'No approved matches yet'
                             ) : (
-                              <div className="flex items-center gap-2 text-zinc-400 font-secondary text-sm">
-                                <Users className="h-4 w-4" />
-                                Matches are being reviewed by our team. We'll notify you once candidates are approved.
-                              </div>
+                              'No matches available'
                             )}
+                          </div>
+                        ) : (
+                          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                            {job.matches
+                              .filter(m => m.adminApproved)
+                              .map((match) => (
+                                <div
+                                  key={match.id}
+                                  className="bg-zinc-800/30 border border-zinc-700/50 rounded-lg p-4"
+                                >
+                                  <div className="flex items-start gap-3">
+                                    {match.profile.profilePictureUrl ? (
+                                      <img
+                                        src={match.profile.profilePictureUrl}
+                                        alt={match.profile.fullName}
+                                        className="w-12 h-12 rounded-lg object-cover"
+                                      />
+                                    ) : (
+                                      <div className="w-12 h-12 rounded-lg bg-gradient-to-br from-pink-500/30 to-violet-500/30 flex items-center justify-center text-lg font-bold text-white">
+                                        {match.profile.fullName.charAt(0)}
+                                      </div>
+                                    )}
+                                    <div className="flex-1 min-w-0">
+                                      <div className="flex items-center gap-2">
+                                        <h5 className="font-medium text-white truncate">
+                                          {match.profile.fullName}
+                                        </h5>
+                                        <span className="text-xs px-2 py-0.5 bg-emerald-500/20 text-emerald-400 rounded-full">
+                                          {Math.round(match.matchScore)}% match
+                                        </span>
+                                      </div>
+                                      {match.profile.location && (
+                                        <p className="text-xs text-zinc-500 mt-1 flex items-center gap-1">
+                                          <MapPin className="h-3 w-3" />
+                                          {match.profile.location}
+                                        </p>
+                                      )}
+                                      <p className="text-sm text-zinc-400 mt-2 line-clamp-2">
+                                        {match.matchReasoning}
+                                      </p>
+                                    </div>
+                                  </div>
+                                  <div className="flex gap-2 mt-4">
+                                    <Link
+                                      to={`/directory/profile/${match.profile.slug}`}
+                                      className="flex-1 flex items-center justify-center gap-1.5 px-3 py-2 bg-zinc-700/50 text-zinc-300 rounded-lg text-xs hover:bg-zinc-700 transition-colors"
+                                    >
+                                      <ExternalLink className="h-3.5 w-3.5" />
+                                      View Profile
+                                    </Link>
+                                                    <Link
+                                                      to={`/messages?matchId=${match.id}`}
+                                                      className="flex-1 flex items-center justify-center gap-1.5 px-3 py-2 bg-pink-500/20 text-pink-400 rounded-lg text-xs hover:bg-pink-500/30 transition-colors"
+                                                    >
+                                                      <MessageSquare className="h-3.5 w-3.5" />
+                                                      Message
+                                                    </Link>
+                                  </div>
+                                </div>
+                              ))}
                           </div>
                         )}
                       </div>
@@ -975,250 +858,7 @@ const CompanyDashboardPage: React.FC = () => {
             </div>
           )}
         </div>
-
-        {/* Job Submission Modal */}
-        {showJobForm && (
-          <div className="fixed inset-0 bg-black/80 z-50 flex items-center justify-center p-4">
-            <div className="bg-zinc-900 border border-zinc-800 w-full max-w-2xl max-h-[90vh] overflow-y-auto">
-              <div className="sticky top-0 bg-zinc-900 border-b border-zinc-800 px-6 py-4 flex items-center justify-between">
-                <h2 className="text-xl font-primary">Submit New Job</h2>
-                <button
-                  onClick={() => {
-                    setShowJobForm(false);
-                    setJobFormData(initialJobFormData);
-                    setJobFormErrors({});
-                    setJobSubmitError('');
-                    setJobSubmitSuccess(false);
-                  }}
-                  className="p-2 text-zinc-500 hover:text-white transition-colors"
-                >
-                  <X className="h-5 w-5" />
-                </button>
-              </div>
-
-              {jobSubmitSuccess ? (
-                <div className="p-6 text-center">
-                  <CheckCircle2 className="h-12 w-12 text-green-500 mx-auto mb-4" />
-                  <h3 className="text-lg font-primary mb-2">Job Submitted!</h3>
-                  <p className="text-zinc-400 font-secondary text-sm">
-                    Your job has been submitted and is pending review. We'll notify you once matches
-                    are available.
-                  </p>
-                </div>
-              ) : (
-                <form onSubmit={handleSubmitJob} className="p-6 space-y-6">
-                  <div>
-                    <label className="block text-sm font-medium text-zinc-300 mb-2 font-secondary">
-                      Job Title *
-                    </label>
-                    <Input
-                      value={jobFormData.title}
-                      onChange={(e) => updateJobField('title', e.target.value)}
-                      placeholder="e.g., Creative Technologist for AR Experience"
-                      className={cn('h-12', jobFormErrors.title && 'border-red-500')}
-                    />
-                    {jobFormErrors.title && (
-                      <p className="text-red-400 text-sm mt-1">{jobFormErrors.title}</p>
-                    )}
-                  </div>
-
-                  <div>
-                    <label className="block text-sm font-medium text-zinc-300 mb-2 font-secondary">
-                      Description *
-                    </label>
-                    <Textarea
-                      value={jobFormData.description}
-                      onChange={(e) => updateJobField('description', e.target.value)}
-                      placeholder="Describe the project, goals, and what you're looking for..."
-                      rows={5}
-                      className={cn(jobFormErrors.description && 'border-red-500')}
-                    />
-                    {jobFormErrors.description && (
-                      <p className="text-red-400 text-sm mt-1">{jobFormErrors.description}</p>
-                    )}
-                  </div>
-
-                  <div>
-                    <label className="block text-sm font-medium text-zinc-300 mb-2 font-secondary">
-                      Requirements (Optional)
-                    </label>
-                    <Textarea
-                      value={jobFormData.requirements}
-                      onChange={(e) => updateJobField('requirements', e.target.value)}
-                      placeholder="Specific requirements, experience level, certifications..."
-                      rows={3}
-                    />
-                  </div>
-
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <div>
-                      <label className="block text-sm font-medium text-zinc-300 mb-2 font-secondary">
-                        Project Type *
-                      </label>
-                      <select
-                        value={jobFormData.projectType}
-                        onChange={(e) => updateJobField('projectType', e.target.value as ProjectType)}
-                        className="w-full h-12 px-4 bg-transparent border border-zinc-800 text-white font-secondary focus:border-zinc-600 focus:outline-none appearance-none cursor-pointer"
-                      >
-                        {PROJECT_TYPES.map((type) => (
-                          <option key={type.value} value={type.value} className="bg-zinc-900">
-                            {type.label}
-                          </option>
-                        ))}
-                      </select>
-                    </div>
-
-                    <div>
-                      <label className="block text-sm font-medium text-zinc-300 mb-2 font-secondary">
-                        Remote Preference *
-                      </label>
-                      <select
-                        value={jobFormData.remotePreference}
-                        onChange={(e) =>
-                          updateJobField('remotePreference', e.target.value as RemotePreference)
-                        }
-                        className="w-full h-12 px-4 bg-transparent border border-zinc-800 text-white font-secondary focus:border-zinc-600 focus:outline-none appearance-none cursor-pointer"
-                      >
-                        {REMOTE_PREFERENCES.map((pref) => (
-                          <option key={pref.value} value={pref.value} className="bg-zinc-900">
-                            {pref.label}
-                          </option>
-                        ))}
-                      </select>
-                    </div>
-                  </div>
-
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <div>
-                      <label className="block text-sm font-medium text-zinc-300 mb-2 font-secondary">
-                        Location (Optional)
-                      </label>
-                      <Input
-                        value={jobFormData.location}
-                        onChange={(e) => updateJobField('location', e.target.value)}
-                        placeholder="e.g., Amsterdam, Netherlands"
-                        className="h-12"
-                      />
-                    </div>
-
-                    <div>
-                      <label className="block text-sm font-medium text-zinc-300 mb-2 font-secondary">
-                        Budget Range (Optional)
-                      </label>
-                      <Input
-                        value={jobFormData.budgetRange}
-                        onChange={(e) => updateJobField('budgetRange', e.target.value)}
-                        placeholder="e.g., $10,000 - $25,000"
-                        className="h-12"
-                      />
-                    </div>
-                  </div>
-
-                  <div>
-                    <label className="block text-sm font-medium text-zinc-300 mb-2 font-secondary">
-                      Timeline (Optional)
-                    </label>
-                    <Input
-                      value={jobFormData.timeline}
-                      onChange={(e) => updateJobField('timeline', e.target.value)}
-                      placeholder="e.g., 3 months, Q2 2026, ASAP"
-                      className="h-12"
-                    />
-                  </div>
-
-                  <div>
-                    <label className="block text-sm font-medium text-zinc-300 mb-2 font-secondary">
-                      Focus Areas
-                    </label>
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
-                      {FOCUS_AREAS.map((area) => {
-                        const isSelected = jobFormData.focusAreas.includes(area.value);
-                        return (
-                          <button
-                            key={area.value}
-                            type="button"
-                            onClick={() => toggleFocusArea(area.value)}
-                            className={cn(
-                              'p-3 border text-left transition-all',
-                              isSelected
-                                ? 'border-white bg-white/10 text-white'
-                                : 'border-zinc-800 text-zinc-400 hover:border-zinc-600'
-                            )}
-                          >
-                            <div className="font-secondary text-sm">{area.label}</div>
-                          </button>
-                        );
-                      })}
-                    </div>
-                  </div>
-
-                  <div>
-                    <label className="block text-sm font-medium text-zinc-300 mb-2 font-secondary">
-                      Preferred Skills
-                    </label>
-                    <TagInput
-                      tags={jobFormData.preferredSkills}
-                      onTagsChange={(tags) => updateJobField('preferredSkills', tags)}
-                      suggestions={SUGGESTED_SKILLS}
-                      placeholder="Type a skill and press Enter..."
-                    />
-                  </div>
-
-                  {jobSubmitError && (
-                    <div className="flex items-center gap-2 p-4 bg-red-500/10 border border-red-500/30">
-                      <AlertCircle className="h-5 w-5 text-red-400 flex-shrink-0" />
-                      <p className="text-red-400 text-sm">{jobSubmitError}</p>
-                    </div>
-                  )}
-
-                  <div className="flex gap-4 pt-4 border-t border-zinc-800">
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setShowJobForm(false);
-                        setJobFormData(initialJobFormData);
-                        setJobFormErrors({});
-                        setJobSubmitError('');
-                      }}
-                      className="flex-1 px-6 py-3 border border-zinc-700 text-white font-secondary text-sm tracking-wide hover:border-zinc-500 transition-colors"
-                    >
-                      Cancel
-                    </button>
-                    <button
-                      type="submit"
-                      disabled={isSubmittingJob}
-                      className="flex-1 px-6 py-3 bg-white text-black font-secondary text-sm tracking-wide hover:bg-zinc-200 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
-                    >
-                      {isSubmittingJob ? (
-                        <>
-                          <Loader2 className="h-4 w-4 animate-spin" />
-                          Submitting...
-                        </>
-                      ) : (
-                        'Submit Job'
-                      )}
-                    </button>
-                  </div>
-                </form>
-              )}
-            </div>
-          </div>
-        )}
-
-        {/* Vertical Text on Left Edge */}
-        <div className="hidden lg:block fixed left-8 top-1/2 -translate-y-1/2 -rotate-90 origin-center">
-          <span className="text-xs font-secondary tracking-[0.3em] text-zinc-600 uppercase whitespace-nowrap">
-            Amsterdam London 2026
-          </span>
-        </div>
-
-        {/* Vertical Text on Right Edge */}
-        <div className="hidden lg:block fixed right-8 top-1/2 -translate-y-1/2 rotate-90 origin-center">
-          <span className="text-xs font-secondary tracking-[0.3em] text-zinc-600 uppercase whitespace-nowrap">
-            Creative Technology Collective
-          </span>
-        </div>
-      </div>
+      </main>
     </div>
   );
 };
