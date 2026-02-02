@@ -5,7 +5,7 @@ import {
   betaApplicationAdminEmail,
   EMAIL_FROM_DOMAIN,
   PUBLIC_URL,
-} from '../lib/email-templates.js';
+} from '../_lib/email-templates.js';
 
 // Initialize Supabase client
 const supabaseUrl = process.env.VITE_SUPABASE_URL || process.env.SUPABASE_URL;
@@ -240,130 +240,21 @@ async function handleStatus(
 }
 
 // ============================================================================
-// CREATE ACCOUNT HANDLER
+// CREATE ACCOUNT HANDLER (LEGACY - Redirects to auth)
 // ============================================================================
-
-async function validateToken(supabase: SupabaseClient, token: string) {
-  const { data: application, error } = await supabase
-    .from('beta_applications')
-    .select('*')
-    .eq('account_creation_token', token)
-    .single();
-
-  if (error || !application) {
-    return { valid: false, error: 'Invalid or expired token', application: null };
-  }
-
-  if (application.token_expires_at && new Date(application.token_expires_at) < new Date()) {
-    return { valid: false, error: 'Token has expired. Please contact support for a new link.', application: null };
-  }
-
-  if (application.account_created) {
-    return { valid: false, error: 'Account already created. Please sign in.', application: null };
-  }
-
-  if (application.status !== 'approved') {
-    return { valid: false, error: 'Application is not approved', application: null };
-  }
-
-  return { valid: true, error: null, application };
-}
 
 async function handleCreateAccount(
   req: VercelRequest,
   res: VercelResponse,
   supabase: SupabaseClient
 ) {
-  // GET - validate token
-  if (req.method === 'GET') {
-    const { token } = req.query;
-
-    if (!token || typeof token !== 'string') {
-      return res.status(400).json({ error: 'Token is required' });
-    }
-
-    const { valid, error, application } = await validateToken(supabase, token);
-
-    if (!valid) {
-      return res.status(400).json({ error });
-    }
-
-    return res.status(200).json({
-      valid: true,
-      name: application.name,
-      email: application.email,
-    });
-  }
-
-  // POST - create account
-  if (req.method === 'POST') {
-    const { token, password } = req.body;
-
-    if (!token || typeof token !== 'string') {
-      return res.status(400).json({ error: 'Token is required' });
-    }
-
-    if (!password || typeof password !== 'string') {
-      return res.status(400).json({ error: 'Password is required' });
-    }
-
-    if (password.length < 8) {
-      return res.status(400).json({ error: 'Password must be at least 8 characters long' });
-    }
-
-    const { valid, error, application } = await validateToken(supabase, token);
-
-    if (!valid) {
-      return res.status(400).json({ error });
-    }
-
-    // Create the user account
-    const { data: authData, error: authError } = await supabase.auth.admin.createUser({
-      email: application.email,
-      password,
-      email_confirm: true,
-      user_metadata: {
-        full_name: application.name,
-        beta_member: true,
-        beta_application_id: application.id,
-      },
-    });
-
-    if (authError) {
-      if (authError.message?.includes('already been registered') ||
-          authError.message?.includes('already exists')) {
-        return res.status(400).json({
-          error: 'An account with this email already exists. Please sign in instead.',
-          redirect: '/beta/auth'
-        });
-      }
-      return res.status(500).json({ error: 'Failed to create account' });
-    }
-
-    if (!authData.user) {
-      return res.status(500).json({ error: 'Failed to create account' });
-    }
-
-    // Update beta application
-    await supabase
-      .from('beta_applications')
-      .update({
-        account_created: true,
-        account_created_at: new Date().toISOString(),
-        user_id: authData.user.id,
-        account_creation_token: null,
-        token_expires_at: null,
-      })
-      .eq('id', application.id);
-
-    return res.status(200).json({
-      success: true,
-      message: 'Account created successfully',
-      email: application.email,
-    });
-  }
-
-  return res.status(405).json({ error: 'Method not allowed' });
+  // This endpoint is no longer used - accounts are created automatically on approval
+  // and users receive magic links. Redirect to auth page.
+  return res.status(200).json({
+    success: false,
+    error: 'This endpoint is deprecated. Please use the magic link sent to your email or sign in at /beta/auth',
+    redirect: '/beta/auth'
+  });
 }
 
 // ============================================================================
@@ -430,6 +321,15 @@ async function handleLinkGoogleAccount(
 // ============================================================================
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
+  // Handle CORS preflight requests
+  if (req.method === 'OPTIONS') {
+    res.setHeader('Access-Control-Allow-Origin', '*');
+    res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
+    res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
+    res.setHeader('Access-Control-Max-Age', '86400');
+    return res.status(204).end();
+  }
+
   if (!supabaseUrl || !supabaseServiceKey) {
     console.error('[BETA] Supabase not configured');
     return res.status(500).json({ error: 'Server configuration error' });
@@ -439,13 +339,23 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
   try {
     // Get the path segments after /api/beta/
-    const pathSegments = (req.query.path as string[]) || [];
+    // Try query.path first (Vercel catch-all), fallback to URL parsing
+    let pathSegments = (req.query.path as string[]) || [];
+    
+    // Fallback: parse from URL if query.path is empty
+    if (pathSegments.length === 0 && req.url) {
+      const urlPath = req.url.split('?')[0]; // Remove query string
+      const match = urlPath.match(/\/api\/beta\/(.+)/);
+      if (match && match[1]) {
+        pathSegments = match[1].split('/');
+      }
+    }
+    
     const route = pathSegments.join('/');
 
-    console.log(`[BETA] Route: ${route}, Method: ${req.method}`);
+    console.log(`[BETA] Route: "${route}", Method: ${req.method}, URL: ${req.url}`);
 
     switch (route) {
-      case '':
       case 'signup':
         return handleSignup(req, res, supabase);
       case 'status':
@@ -454,6 +364,12 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         return handleCreateAccount(req, res, supabase);
       case 'link-google-account':
         return handleLinkGoogleAccount(req, res, supabase);
+      case '':
+        // Empty route - only signup accepts POST at root
+        if (req.method === 'POST') {
+          return handleSignup(req, res, supabase);
+        }
+        return res.status(404).json({ error: 'Route not found: /api/beta/' });
       default:
         console.warn(`[BETA] Unknown route: ${route}`);
         return res.status(404).json({ error: `Route not found: /api/beta/${route}` });
