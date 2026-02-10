@@ -1,9 +1,10 @@
 import React, { useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { supabase } from '../super'; // Ensure the path matches your setup
 
 
 const SignupForm = () => {
-
+    const navigate = useNavigate();
     const [email, setEmail] = useState('');
 const [message, setMessage] = useState('');
 
@@ -20,8 +21,7 @@ const handleSubmit = async (event) => {
   if (error) {
     setMessage('Error: ' + error.message);
   } else {
-    setMessage('Email saved successfully!');
-    setEmail(''); // Clear the input after successful submission
+    navigate(`/create-password?email=${encodeURIComponent(email)}`);
   }
 };
 
@@ -34,9 +34,10 @@ const handleSubmit = async (event) => {
   placeholder="Enter your email here"
   value={email}
   onChange={handleEmailChange}
+  autoComplete="off"
   required
 />
-<button type="submit">Subscribe</button>
+<button type="submit">Sign Up</button>
 {message && <p>{message}</p>}
 </form> 
 

@@ -7,6 +7,8 @@ import TeamPage from './team/teampage';
 import HorizontalScrollingText from './htext/htext';
 
 import HamburgerMenu from './hamburger/hamburger'; // Adjust the path as necessary
+import CreatePassword from './form/CreatePassword';
+import AdminPage from './admin/AdminPage';
 
 // import SceneWithLumaSplats from './splat/splat'
 import ReactGA from 'react-ga';
@@ -90,39 +92,40 @@ function App() {
   }, []);
 
   return (
-    <>
-        <Router>
-        <HamburgerMenu />
-       
-    </Router>
-   
-    <div className='mobile' style={{ width: '90vw', height: '90vh', overflow: 'hidden', margin: '0px auto' }}>
-      <iframe
-        src="https://unicorn.studio/embed/0jXySgHZoWysSC5mZKqm?scale=1&fps=60"
-        style={{ width: '100%', height: '100%', border: 'none' }}
-        loading="lazy"
-        title="Unicorn Studio Embed"
-      ></iframe>
-    </div>
+    <Router>
+      <HamburgerMenu />
+      <Routes>
+        <Route path="/" element={
+          <>
+            <div className='mobile' style={{ width: '90vw', height: '90vh', overflow: 'hidden', margin: '0px auto' }}>
+              <iframe
+                src="https://unicorn.studio/embed/0jXySgHZoWysSC5mZKqm?scale=1&fps=60"
+                style={{ width: '100%', height: '100%', border: 'none' }}
+                loading="lazy"
+                title="Unicorn Studio Embed"
+              ></iframe>
+            </div>
 
-    <TeamPage />
-    {/* <HorizontalScrollingText /> */}
-    <footer className="footer team-container">
-      <div className="footer-content">
-        <div className="footer-section left">
-      
-         
-        </div>
-        <div className="footer-section right">
-          <div className="social-links">
-            <a href="https://www.instagram.com/creativetechnologist.nl/">Instagram</a>
-            <a href="https://www.linkedin.com/company/creativetechnologycollective/">Linked-in</a>
-          </div>
-        </div>
-      </div>
-    </footer>
-   
-    </>
+            <TeamPage />
+            {/* <HorizontalScrollingText /> */}
+            <footer className="footer team-container">
+              <div className="footer-content">
+                <div className="footer-section left">
+                </div>
+                <div className="footer-section right">
+                  <div className="social-links">
+                    <a href="https://www.instagram.com/creativetechnologist.nl/">Instagram</a>
+                    <a href="https://www.linkedin.com/company/creativetechnologycollective/">Linked-in</a>
+                  </div>
+                </div>
+              </div>
+            </footer>
+          </>
+        } />
+        <Route path="/create-password" element={<CreatePassword />} />
+        <Route path="/admin" element={<AdminPage />} />
+      </Routes>
+    </Router>
 );
 }
 export default App;
