@@ -261,7 +261,7 @@ const Navigation: React.FC<NavigationProps> = ({
 
             {/* Navigation Items */}
             <div className="flex-1 flex flex-col justify-center px-8">
-              <nav className="space-y-6">
+              <nav className="space-y-4">
                 {allNavItems.map((item, index) => (
                   <button
                     key={item.id}
@@ -279,11 +279,11 @@ const Navigation: React.FC<NavigationProps> = ({
                       animationDelay: `${index * 100}ms`
                     }}
                   >
-                    <span className={`text-4xl font-medium font-secondary uppercase tracking-tight leading-none flex items-center gap-3 ${
+                    <span className={`text-2xl font-medium font-secondary uppercase tracking-tight leading-none flex items-center gap-3 ${
                       'isAuth' in item && item.isAuth 
                         ? item.isSignedIn 
-                          ? 'bg-green-500 text-white px-6 py-2 rounded-full inline-flex' 
-                          : 'bg-white text-black px-6 py-2 rounded-full inline-flex'
+                          ? 'bg-green-500 text-white px-5 py-1.5 rounded-full inline-flex'
+                          : 'bg-white text-black px-5 py-1.5 rounded-full inline-flex'
                         : ''
                     }`}>
                       {item.label}

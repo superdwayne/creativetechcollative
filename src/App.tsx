@@ -240,13 +240,21 @@ function App() {
                 <MissionPage />
               } 
             />
-            <Route 
-              path="/playground" 
+            <Route
+              path="/playground"
               element={
                 <div className="w-full">
                   <PlaygroundPage />
                 </div>
-              } 
+              }
+            />
+            <Route
+              path="/playground/:experimentId"
+              element={
+                <div className="w-full">
+                  <PlaygroundPage />
+                </div>
+              }
             />
             <Route 
               path="/resources" 

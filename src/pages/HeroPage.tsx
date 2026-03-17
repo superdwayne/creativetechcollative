@@ -308,8 +308,9 @@ const HeroPage: React.FC = () => {
     };
 
     // Defer fetch to after initial render — case studies are below the fold
-    const id = requestIdleCallback ? requestIdleCallback(fetchCases) : setTimeout(fetchCases, 200) as unknown as number;
-    return () => { requestIdleCallback ? cancelIdleCallback(id) : clearTimeout(id); };
+    // Use window.requestIdleCallback (not bare requestIdleCallback) to avoid ReferenceError in Safari/WebKit
+    const id = window.requestIdleCallback ? window.requestIdleCallback(fetchCases) : setTimeout(fetchCases, 200) as unknown as number;
+    return () => { window.requestIdleCallback ? window.cancelIdleCallback(id) : clearTimeout(id); };
   }, []);
 
   const members: Member[] = [
@@ -404,8 +405,8 @@ As a creative technologist and educator, Edwin focuses on making complex technol
           </div>
         </div>
 
-        {/* Right Side - Cube */}
-        <div className="flex-1 relative flex items-center justify-center min-h-[50vh] lg:min-h-screen">
+        {/* Right Side - Cube (hidden on mobile since cube is disabled there) */}
+        <div className="hidden lg:flex flex-1 relative items-center justify-center lg:min-h-screen">
           {/* Background gradient */}
           <div className="absolute inset-0 bg-gradient-to-br from-zinc-900/50 via-black to-black" />
           

@@ -23,6 +23,7 @@ const AsciiImageCube: React.FC<AsciiImageCubeProps> = ({
   const animationRef = useRef<number | null>(null);
   const [isLoaded, setIsLoaded] = useState(false);
   const [webglFailed, setWebglFailed] = useState(false);
+  const [isMobile, setIsMobile] = useState(false);
   const scrollPositionRef = useRef(0);
   const targetRotationRef = useRef({ x: 0, y: 0, z: 0 });
   const currentRotationRef = useRef({ x: 0, y: 0, z: 0 });
@@ -31,6 +32,12 @@ const AsciiImageCube: React.FC<AsciiImageCubeProps> = ({
   const [hasDroppedIn, setHasDroppedIn] = useState(false);
   const dropAnimationRef = useRef({ progress: 0, startTime: 0 });
   const charactersRef = useRef(' .:-+*=%@#');
+
+  // Skip rendering on mobile devices — the cube is nearly invisible (20% opacity)
+  // and WebGL can fail on low-memory/restricted mobile contexts, crashing the app
+  useEffect(() => {
+    setIsMobile(window.innerWidth < 768);
+  }, []);
 
   // Generate random initial rotation on component mount
   const initialRotationRef = useRef({
@@ -215,6 +222,7 @@ const AsciiImageCube: React.FC<AsciiImageCubeProps> = ({
 
   // Handle scroll events
   useEffect(() => {
+    if (isMobile) return;
     const handleScroll = () => {
       updateCubePosition();
     };
@@ -238,6 +246,7 @@ const AsciiImageCube: React.FC<AsciiImageCubeProps> = ({
 
   // Handle wheel events for immediate feedback
   useEffect(() => {
+    if (isMobile) return;
     const handleWheel = (e: WheelEvent) => {
       const wheelDelta = e.deltaY;
       const rotationMultiplier = 0.001;
@@ -260,6 +269,7 @@ const AsciiImageCube: React.FC<AsciiImageCubeProps> = ({
 
   // Animation loop to continuously update position
   useEffect(() => {
+    if (isMobile) return;
     const animatePosition = () => {
       updateCubePosition();
       requestAnimationFrame(animatePosition);
@@ -274,7 +284,7 @@ const AsciiImageCube: React.FC<AsciiImageCubeProps> = ({
 
   // Main Three.js setup with ASCII effect
   useEffect(() => {
-    if (!containerRef.current) return;
+    if (!containerRef.current || isMobile) return;
 
     const container = containerRef.current;
 
@@ -522,7 +532,7 @@ const AsciiImageCube: React.FC<AsciiImageCubeProps> = ({
     }
   }, [forceVisible, hasDroppedIn]);
 
-  if (webglFailed) return null;
+  if (webglFailed || isMobile) return null;
 
   return (
     <div

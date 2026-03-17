@@ -1,5 +1,5 @@
-import React, { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import React, { useState, useEffect } from 'react';
+import { useNavigate, useParams } from 'react-router-dom';
 import ImageCube from '../components/ImageCube';
 
 interface Playground {
@@ -17,10 +17,35 @@ interface Playground {
 
 const PlaygroundPage: React.FC = () => {
   const navigate = useNavigate();
+  const { experimentId } = useParams<{ experimentId?: string }>();
   const [selectedPlayground, setSelectedPlayground] = useState<Playground | null>(null);
   const [iframeLoaded, setIframeLoaded] = useState(false);
 
   const playgrounds: Playground[] = [
+    {
+      id: 'figify',
+      title: 'Figify',
+      description: 'A Figma plugin that converts screenshots into fully editable Figma designs using AI. Drop in a screenshot, AI identifies every component, and Figma generates the design — real frames, real text layers, fully editable, not a flattened image.',
+      videoUrl: '/collaborations/figify.mp4',
+      externalUrl: 'https://www.linkedin.com/posts/ddpmarshall_figma-creativetechnology-innovation-activity-7422579952677523456-2XyI',
+      type: 'video'
+    },
+    {
+      id: 'touchdesigner-mcp',
+      title: 'TouchDesigner MCP',
+      description: 'A TouchDesigner MCP server that lets your AI agent control a live TD session — not generate code snippets, but actually reach in and operate the software. Create webcam experiences, hand tracking, sign language detection, and more with just a prompt.',
+      videoUrl: '/collaborations/touchdesigner-mcp.mp4',
+      externalUrl: 'https://www.linkedin.com/posts/ddpmarshall_aiagents-mcp-touchdesigner-activity-7429442023050346497-Wewc',
+      type: 'video'
+    },
+    {
+      id: 'speakeasy',
+      title: 'SpeakEasy',
+      description: 'A teleprompter that sits right next to your MacBook camera, in the notch area. It uses real-time speech recognition to track your voice and automatically scrolls the script to match what you\'re saying. Fuzzy word matching handles mispronunciations, skipped words, and ad-libs without losing your place.',
+      videoUrl: '/collaborations/speakeasy.mp4',
+      externalUrl: 'https://www.linkedin.com/posts/ddpmarshall_macos-ai-swiftui-activity-7428023740464082944-j-pL',
+      type: 'video'
+    },
     {
       id: 'localhost',
       title: 'Localhost Gallery',
@@ -46,8 +71,30 @@ const PlaygroundPage: React.FC = () => {
       image: '/playgrounds/spreed-cover.svg',
       embedUrl: 'https://spreed-sigma.vercel.app/',
       type: 'iframe'
+    },
+    {
+      id: 'safer-ai',
+      title: 'Safer AI',
+      description: 'A Chrome extension that adds contextual AI safety guidance right where you need it. Get real-time, context-aware suggestions for responsible AI use as you browse and interact with AI tools.',
+      image: 'https://lh3.googleusercontent.com/QGjJIMyKSZ4_pzFGybqU-JLnAg2DZs2yPGNfs8giGH37-qEvHXE9zPuGdsUzZEzTJ3R75z57toR6Z7YXtcUSM7G68ag=s1280-w1280-h800',
+      externalUrl: 'https://chromewebstore.google.com/detail/safer-ai-%E2%80%94-contextual-ai/dcbbpeigcjncidhhpeeiinlfkegpbipd?authuser=0&hl=en-GB',
+      type: 'image'
     }
   ];
+
+  // Sync URL param to selected experiment
+  useEffect(() => {
+    if (experimentId) {
+      const found = playgrounds.find(p => p.id === experimentId);
+      if (found) {
+        setSelectedPlayground(found);
+        setIframeLoaded(false);
+      }
+    } else {
+      setSelectedPlayground(null);
+      setIframeLoaded(false);
+    }
+  }, [experimentId]);
 
   return (
     <div className="min-h-screen bg-black text-white overflow-hidden">
@@ -162,10 +209,7 @@ const PlaygroundPage: React.FC = () => {
                 {/* Right side - Content */}
                 <div className="flex flex-col justify-center p-8 md:p-12 relative">
                   <button
-                    onClick={() => {
-                      setSelectedPlayground(null);
-                      setIframeLoaded(false);
-                    }}
+                    onClick={() => navigate('/playground')}
                     className="absolute top-6 right-6 p-2 text-zinc-400 hover:text-white transition-colors text-2xl"
                   >
                     ✕
@@ -237,10 +281,7 @@ const PlaygroundPage: React.FC = () => {
               <div 
                 key={playground.id}
                 className="group relative aspect-video overflow-hidden bg-zinc-900 cursor-pointer"
-                onClick={() => {
-                  setSelectedPlayground(playground);
-                  setIframeLoaded(false);
-                }}
+                onClick={() => navigate(`/playground/${playground.id}`)}
               >
                 {playground.type === 'video' && playground.videoUrl ? (
                   <video
