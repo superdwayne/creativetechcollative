@@ -20,6 +20,51 @@ export interface Article {
 
 export const articles: Article[] = [
   {
+    id: '6',
+    slug: 'from-tools-to-systems-the-missing-layer-of-ai-innovation',
+    title: 'From Tools to Systems: The Missing Layer of AI Innovation',
+    subtitle: 'We are adopting advanced tools faster than we are learning how to integrate them into reasonable systems',
+    excerpt: 'As an AI program leader I have observed a recurring pattern: we are adopting advanced tools faster than we are learning how to integrate them into reasonable systems.',
+    content: `
+As an AI program leader I have observed a recurring pattern: we are adopting advanced tools faster than we are learning how to integrate them into reasonable systems.
+
+## The Race Between Creation and Decision-Making
+
+Today's technology opportunities are extraordinary thanks to AI. One big win is in the Creative industry, where velocity has exploded. Now, we can generate virtual environments in minutes, prototype instantly, and produce infinite variations with instant feedback improvements. Creation is no longer limited. Decision-making is.
+
+Like the Road Runner and Wile E. Coyote, technology sprints forward while organizational systems are left chasing it. Projects still depend on human validation, governance processes, countless leadership escalations, and executive alignment. These systems move slowly by design, while generative technologies move at unprecedented speed.
+
+When creation becomes faster than decision, organizations accumulate creative overflow. Many great ideas, prototypes, and experiences never see the light of day, not because they lack quality, but because they cannot be absorbed and escale.
+
+## Innovation Without Integration
+
+In this 'Age of AI Omnipresence', another big elephant in the room no one is talking about, is lack of integration. We have powerful AI tools for coding, UX design, image and video generation, real-time 3D, world-building, and simulation. Whatever you imagine, someone is already building it. However, most tools are developed in isolation, each optimized for its own roadmap, metrics, and business model.
+
+Very few tech solutions are designed to work seamlessly with others, even within the same industry. While exploring real-time 3D and animation workflows, I was amazed by how many talented creators spend more time connecting the dots, understanding each tool, rather than using them. Forums and documentation pages are filled with workarounds rather than long-term escalable solutions.
+
+This issue is also visible across industries. In some autonomous vehicle development, AI is used to simulate camera viewpoints and reconstruct 360-degree environments, while generative world models and real-time 3D technologies advance separately in creative industries.
+
+We are missing the opportunity to integrate these systems, and start delivering meaningful and unimaginable remarkable components, as a whole.
+
+## Beyond Technical Performance
+
+The industry remains focused on technical metrics: resolution, latency, speed, and scale. These matter, off-course, but what about: how tools interact, how decisions are made, how people manage complexity and ambiguity, and how systems are sustained over time. Many workflows depend on invisible human effort to compensate for fragile integrations and fragmented architectures.
+
+The next phase of innovation will be defined not by what we can generate, but by what we can sustain.
+    `,
+    author: {
+      name: 'Fabiola Campos',
+      avatar: 'https://bjosgymtikxiliknfjvu.supabase.co/storage/v1/object/public/profile-images/e56966b0-38cb-452f-951c-3cb69ef7e8a3/profile-1768666815672.png',
+      role: 'AI Program Leader'
+    },
+    category: 'Industry Insights',
+    tags: ['AI', 'Innovation', 'Systems Thinking', 'Integration', 'Creative Technology'],
+    coverImage: '/email-images/tools-to-systems.jpg',
+    publishedAt: '2026-03-05',
+    readingTime: 5,
+    featured: false
+  },
+  {
     id: '5',
     slug: 'the-power-of-the-possible',
     title: 'The Power of the Possible',

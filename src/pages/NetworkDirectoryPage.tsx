@@ -13,7 +13,6 @@ import {
   Quote,
   ExternalLink,
   LayoutGrid,
-  Globe,
   Lock,
   Sparkles
 } from 'lucide-react';
@@ -22,6 +21,7 @@ import { getAllProfiles } from '@/lib/supabase';
 import { cn } from '@/lib/utils';
 import ArchiveGrid from '@/components/ArchiveGrid';
 import { useAuth } from '@/contexts/AuthContext';
+import { initializeWebMCP, updateWebMCPProfiles, cleanupWebMCP } from '@/lib/webmcp-directory';
 
 type ViewMode = 'feed' | 'explore';
 
@@ -63,10 +63,12 @@ const NetworkDirectoryPage: React.FC = () => {
           // User has beta access if:
           // 1. They are an admin, OR
           // 2. They have an approved beta application, OR
-          // 3. They have an approved profile (existing CTC members)
+          // 3. They have an approved profile (existing CTC members), OR
+          // 4. They have a verified company account
           const hasAccess = data.isAdmin === true ||
                            data.betaApplication?.status === 'approved' || 
-                           data.profileStatus === 'approved';
+                           data.profileStatus === 'approved' ||
+                           data.companyStatus === 'verified';
           setHasBetaAccess(hasAccess);
         } else {
           setHasBetaAccess(false);
@@ -143,6 +145,7 @@ const NetworkDirectoryPage: React.FC = () => {
       try {
         const data = await getAllProfiles();
         setProfiles(data);
+        initializeWebMCP(data);
       } catch (err) {
         console.error('Error fetching profiles:', err);
       } finally {
@@ -151,6 +154,7 @@ const NetworkDirectoryPage: React.FC = () => {
     };
 
     fetchProfiles();
+    return () => { cleanupWebMCP(); };
   }, []);
 
   const filteredProfiles = useMemo(() => {
@@ -275,29 +279,19 @@ const NetworkDirectoryPage: React.FC = () => {
               <Sparkles className="h-4 w-4" />
               Apply for Beta
             </button>
-            {user ? (
-              <button
-                onClick={() => navigate('/beta/hub')}
-                className="px-8 py-4 bg-zinc-900 text-white font-secondary text-sm tracking-wide hover:bg-zinc-800 transition-all inline-flex items-center justify-center gap-2 border border-zinc-800"
-              >
-                Go to BetaHub
-                <ArrowRight className="h-4 w-4" />
-              </button>
-            ) : (
-              <button
-                onClick={() => navigate('/beta/auth')}
-                className="px-8 py-4 bg-zinc-900 text-white font-secondary text-sm tracking-wide hover:bg-zinc-800 transition-all inline-flex items-center justify-center gap-2 border border-zinc-800"
-              >
-                Sign In
-                <ArrowRight className="h-4 w-4" />
-              </button>
-            )}
+            <button
+              onClick={() => navigate('/directory/auth')}
+              className="px-8 py-4 bg-zinc-900 text-white font-secondary text-sm tracking-wide hover:bg-zinc-800 transition-all inline-flex items-center justify-center gap-2 border border-zinc-800"
+            >
+              {user ? 'Create Account' : 'Sign In'}
+              <ArrowRight className="h-4 w-4" />
+            </button>
           </div>
 
           <p className="text-zinc-600 font-secondary text-sm mt-8">
             Already a beta member?{' '}
             <button
-              onClick={() => navigate('/beta/auth')}
+              onClick={() => navigate('/directory/auth')}
               className="text-purple-400 hover:text-purple-300"
             >
               Sign in here
@@ -314,7 +308,7 @@ const NetworkDirectoryPage: React.FC = () => {
       viewMode === 'explore' ? "h-screen overflow-hidden" : "overflow-x-hidden"
     )}>
       {/* Editorial Header - always visible */}
-      <header className="relative border-b border-white/[0.06] flex-shrink-0 z-50 bg-black">
+      <header className="relative border-b border-white/[0.06] flex-shrink-0 bg-black">
         <div className="max-w-7xl mx-auto px-6 md:px-12 py-8 md:py-12">
           <div className="flex flex-col md:flex-row md:items-end md:justify-between gap-6">
             <div>
@@ -351,51 +345,20 @@ const NetworkDirectoryPage: React.FC = () => {
               </div>
             </div>
 
-            {/* View Mode Toggle */}
-            <div className="flex items-center gap-1 p-1 bg-white/[0.03] border border-white/[0.06]">
-              <button
-                onClick={() => setViewMode('feed')}
-                className={cn(
-                  "flex items-center gap-2 px-4 py-2 text-sm font-secondary transition-all",
-                  viewMode === 'feed'
-                    ? "bg-white text-black"
-                    : "text-zinc-500 hover:text-white"
-                )}
-              >
-                <LayoutGrid className="h-4 w-4" />
-                <span className="hidden sm:inline">Feed</span>
-              </button>
-              <button
-                onClick={() => setViewMode('explore')}
-                className={cn(
-                  "flex items-center gap-2 px-4 py-2 text-sm font-secondary transition-all",
-                  viewMode === 'explore'
-                    ? "bg-white text-black"
-                    : "text-zinc-500 hover:text-white"
-                )}
-              >
-                <Globe className="h-4 w-4" />
-                <span className="hidden sm:inline">Explore</span>
-              </button>
+            {/* View Mode Label */}
+            <div className="flex items-center gap-2 text-zinc-500">
+              <LayoutGrid className="h-4 w-4" />
+              <span className="text-sm font-secondary">Feed</span>
             </div>
           </div>
         </div>
       </header>
 
-      {/* Explore View - Archive Grid (full page takeover) */}
-      {viewMode === 'explore' && (
-        <ArchiveGrid
-          profiles={profiles}
-          onClose={() => setViewMode('feed')}
-          isLoading={loading}
-        />
-      )}
-
       {/* Feed View */}
       {viewMode === 'feed' && (
         <>
           {/* Search Bar - Sticky */}
-          <div className="sticky top-0 z-40 bg-black/90 backdrop-blur-md border-b border-white/[0.04]">
+          <div className="bg-black/90 backdrop-blur-md border-b border-white/[0.04]">
             <div className="max-w-7xl mx-auto px-6 md:px-12 py-4">
               <div className="flex flex-col md:flex-row gap-3">
                 <div className="relative flex-1">
@@ -697,22 +660,6 @@ const NetworkDirectoryPage: React.FC = () => {
         )}
           </main>
 
-          {/* Footer CTA */}
-          <footer className="border-t border-white/[0.04] py-16">
-            <div className="max-w-7xl mx-auto px-6 md:px-12 text-center">
-              <h2 className="text-2xl md:text-3xl font-primary text-white mb-4">Join the collective</h2>
-              <p className="text-zinc-500 font-secondary mb-8 max-w-md mx-auto">
-                Add your profile to be discovered by teams and collaborators worldwide.
-              </p>
-              <button
-                onClick={() => navigate('/directory/auth?mode=signup')}
-                className="px-8 py-4 bg-white text-black font-secondary text-sm tracking-wide hover:bg-zinc-100 transition-all inline-flex items-center gap-2"
-              >
-                Create Your Profile
-                <ArrowRight className="h-4 w-4" />
-              </button>
-            </div>
-          </footer>
         </>
       )}
     </div>

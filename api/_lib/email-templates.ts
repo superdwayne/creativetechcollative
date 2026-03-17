@@ -6,7 +6,12 @@
  */
 
 const EMAIL_FROM_DOMAIN = process.env.EMAIL_FROM_DOMAIN || 'creativetechnologists.nl';
-const PUBLIC_URL = process.env.PUBLIC_URL || `https://${EMAIL_FROM_DOMAIN}`;
+
+// Guard against localhost being set as PUBLIC_URL (e.g. from local .env accidentally pushed to Vercel)
+const _rawPublicUrl = process.env.PUBLIC_URL || `https://${EMAIL_FROM_DOMAIN}`;
+const PUBLIC_URL = _rawPublicUrl.includes('localhost') || _rawPublicUrl.includes('127.0.0.1')
+  ? `https://${EMAIL_FROM_DOMAIN}`
+  : _rawPublicUrl;
 const LOGO_URL = 'https://di867tnz6fwga.cloudfront.net/brand-kits/0677c988-4f0e-4481-a2fe-0f7e63b0496c/icon/90cd52c8-b3c8-44e7-a014-a7407c720fdd.png';
 
 interface EmailContext {
@@ -235,16 +240,11 @@ function testBanner(): string {
 export function messageNotificationEmail(params: {
   recipientName?: string;
   senderName: string;
-  messagePreview: string;
+  messagePreview?: string;
   messagesUrl: string;
   jobTitle?: string;
 }): string {
   const greeting = params.recipientName ? `Hi ${params.recipientName},` : 'Hi there,';
-  const jobContext = params.jobTitle ? ` regarding <strong>${params.jobTitle}</strong>` : '';
-  
-  const truncatedPreview = params.messagePreview.length > 150 
-    ? params.messagePreview.slice(0, 150) + '...' 
-    : params.messagePreview;
 
   const content = contentCard(`
     <h2 style="font-size:24px; line-height:1.3; margin:0 0 20px 0; color:#18181b;">
@@ -255,17 +255,11 @@ export function messageNotificationEmail(params: {
       ${greeting}
     </p>
 
-    <p style="margin:0 0 20px 0; font-size:16px; line-height:1.6; color:#3f3f46;">
-      <strong>${params.senderName}</strong> sent you a message on the CTC Network${jobContext}.
+    <p style="margin:0 0 24px 0; font-size:16px; line-height:1.6; color:#3f3f46;">
+      <strong>${params.senderName}</strong> sent you a message on the CTC Network. Log in to read and reply.
     </p>
-
-    ${quoteBox(truncatedPreview)}
 
     ${ctaButton('View Message', params.messagesUrl)}
-
-    <p style="color:#71717a; font-size:14px; line-height:1.6; margin:24px 0 0 0;">
-      Log in to read the full message and reply to ${params.senderName}.
-    </p>
   `);
 
   return wrapInEmailStructure('Your Extended Innovation Team', content);
@@ -357,6 +351,41 @@ export function companyAccessRequestAdminEmail(params: {
 }
 
 /**
+ * Company access request received - Confirmation to company
+ */
+export function companyAccessRequestReceivedEmail(params: {
+  contactName?: string;
+  companyName: string;
+}): string {
+  const content = contentCard(`
+    <h2 style="font-size:24px; line-height:1.3; margin:0 0 20px 0; color:#18181b;">
+      We've Received Your Request
+    </h2>
+
+    <p style="margin:0 0 20px 0; font-size:16px; line-height:1.6; color:#3f3f46;">
+      Thank you for your interest in the CTC Talent Matching platform.
+    </p>
+
+    <p style="margin:0 0 24px 0; font-size:16px; line-height:1.6; color:#3f3f46;">
+      Our team will review your application and get back to you within 1-2 business days.
+    </p>
+
+    ${highlightBox(`
+      <p style="margin:0 0 12px 0; font-size:14px; line-height:1.6; color:#3f3f46;">
+        <strong>What happens next:</strong>
+      </p>
+      <ul style="color:#3f3f46; font-size:14px; line-height:1.8; padding-left:18px; margin:0;">
+        <li>We'll review your company information</li>
+        <li>You'll receive an email once your request is approved</li>
+        <li>After approval, you can view the directory</li>
+      </ul>
+    `)}
+  `);
+
+  return wrapInEmailStructure('Access Request Received', content);
+}
+
+/**
  * Company approved notification email
  */
 export function companyApprovedEmail(params: {
@@ -384,7 +413,7 @@ export function companyApprovedEmail(params: {
     ${ctaButton('Set Up Your Account', params.magicLink)}
 
     <p style="color:#71717a; font-size:14px; line-height:1.6; margin:20px 0 0 0;">
-      This link expires in 24 hours. If it expires, request a new one on the login page.
+      Use the button above to sign in, or visit the login page at any time to access your account.
     </p>
 
     ${highlightBox(`
@@ -410,30 +439,16 @@ export function companyRejectedEmail(params: {
   companyName: string;
   supportEmail?: string;
 }): string {
-  const supportEmail = params.supportEmail || `hello@${EMAIL_FROM_DOMAIN}`;
+  const supportEmail = params.supportEmail || `dwayne@${EMAIL_FROM_DOMAIN}`;
 
   const content = contentCard(`
     <h2 style="font-size:24px; line-height:1.3; margin:0 0 20px 0; color:#18181b;">
       Thank you for your interest
     </h2>
 
-    <p style="margin:0 0 16px 0; font-size:16px; line-height:1.6; color:#3f3f46;">
-      Hi ${params.contactName},
-    </p>
-
     <p style="margin:0 0 20px 0; font-size:16px; line-height:1.6; color:#3f3f46;">
-      Thank you for your interest in the CTC Talent Matching platform. After reviewing your application for <strong>${params.companyName}</strong>, we're unable to approve access at this time.
+      Apologies, you've not been selected at this time.
     </p>
-
-    <p style="margin:0 0 16px 0; font-size:16px; line-height:1.6; color:#3f3f46;">
-      This could be due to various reasons, including:
-    </p>
-
-    <ul style="color:#3f3f46; font-size:15px; line-height:1.8; padding-left:20px; margin:0 0 24px 0;">
-      <li>The information provided was incomplete</li>
-      <li>We couldn't verify your company details</li>
-      <li>Your company doesn't align with our current focus areas</li>
-    </ul>
 
     <p style="margin:0 0 0 0; font-size:16px; line-height:1.6; color:#3f3f46;">
       If you believe this was a mistake or would like to provide additional information, please reach out to us at <a href="mailto:${supportEmail}" style="color:#18181b; font-weight:500;">${supportEmail}</a>.
@@ -507,7 +522,7 @@ export function profileRejectedEmail(params: {
   reason?: string;
   supportEmail?: string;
 }): string {
-  const supportEmail = params.supportEmail || `hello@${EMAIL_FROM_DOMAIN}`;
+  const supportEmail = params.supportEmail || `dwayne@${EMAIL_FROM_DOMAIN}`;
 
   const content = contentCard(`
     <h2 style="font-size:24px; line-height:1.3; margin:0 0 20px 0; color:#18181b;">
@@ -542,6 +557,32 @@ export function profileRejectedEmail(params: {
 /**
  * Platform update / announcement email for directory members
  */
+export function quickMessageEmail(params: {
+  message: string;
+  ctaText?: string;
+  ctaUrl?: string;
+}): string {
+  const paragraphs = params.message
+    .split(/\n\s*\n/)
+    .filter(Boolean)
+    .map(p => `<p style="margin:0 0 16px 0; font-size:16px; line-height:1.6; color:#3f3f46;">${p.replace(/\n/g, '<br/>')}</p>`)
+    .join('');
+
+  const ctaHtml = params.ctaText && params.ctaUrl
+    ? ctaButton(params.ctaText, params.ctaUrl)
+    : '';
+
+  const content = contentCard(`
+    ${paragraphs}
+    ${ctaHtml}
+    <p style="margin:16px 0 0 0; font-size:14px; line-height:1.6; color:#71717a;">
+      Reply to this email or reach out at <a href="mailto:dwayne@${EMAIL_FROM_DOMAIN}" style="color:#18181b; font-weight:500;">dwayne@${EMAIL_FROM_DOMAIN}</a> if you have any questions.
+    </p>
+  `);
+
+  return wrapInEmailStructure(undefined, content, true);
+}
+
 export interface UpdateSection {
   title: string;
   description: string;
@@ -595,7 +636,7 @@ export function platformUpdateEmail(params: {
     ` : ''}
 
     <p style="margin:24px 0 0 0; font-size:14px; line-height:1.6; color:#71717a;">
-      As always, we're here to support you. Reply to this email or reach out at <a href="mailto:hello@${EMAIL_FROM_DOMAIN}" style="color:#18181b; font-weight:500;">hello@${EMAIL_FROM_DOMAIN}</a> if you have any questions.
+      As always, we're here to support you. Reply to this email or reach out at <a href="mailto:dwayne@${EMAIL_FROM_DOMAIN}" style="color:#18181b; font-weight:500;">dwayne@${EMAIL_FROM_DOMAIN}</a> if you have any questions.
     </p>
   `);
 
@@ -638,7 +679,7 @@ export function profileCompletionReminderEmail(params: {
     ${ctaButton('Complete Your Profile', params.loginLink)}
 
     <p style="color:#71717a; font-size:14px; line-height:1.6; margin:24px 0 0 0;">
-      This login link expires in 24 hours. If it expires, you can request a new one from the login page.
+      You can use the button above to sign in, or visit the login page at any time to access your account.
     </p>
 
     <p style="color:#71717a; font-size:14px; line-height:1.6; margin:16px 0 0 0;">
@@ -1007,6 +1048,99 @@ export function betaAccountCreationEmail(params: {
   `);
 
   return wrapInEmailStructure('Beta Program Approved', content);
+}
+
+/**
+ * Password reset email - Admin initiated
+ */
+export function passwordResetEmail(params: {
+  recipientName?: string;
+  resetLink: string;
+}): string {
+  const greeting = params.recipientName ? `Hi ${params.recipientName},` : 'Hi there,';
+
+  const content = contentCard(`
+    <h2 style="font-size:24px; line-height:1.3; margin:0 0 20px 0; color:#18181b;">
+      Reset Your Password
+    </h2>
+
+    <p style="margin:0 0 16px 0; font-size:16px; line-height:1.6; color:#3f3f46;">
+      ${greeting}
+    </p>
+
+    <p style="margin:0 0 20px 0; font-size:16px; line-height:1.6; color:#3f3f46;">
+      A password reset was requested for your CTC account. Click the button below to create a new password:
+    </p>
+
+    ${ctaButton('Reset Password', params.resetLink)}
+
+    ${highlightBox(`
+      <p style="margin:0; font-size:14px; line-height:1.6; color:#3f3f46;">
+        <strong>Security note:</strong><br/>
+        This link expires in 24 hours. If you didn't request this reset, you can safely ignore this email — your password will remain unchanged.
+      </p>
+    `)}
+
+    <p style="color:#71717a; font-size:14px; line-height:1.6; margin:24px 0 0 0;">
+      If you continue to have trouble accessing your account, reply to this email and we'll help you out.
+    </p>
+  `);
+
+  return wrapInEmailStructure('Password Reset', content);
+}
+
+/**
+ * Contact request notification to admin - a company wants to connect with a member
+ */
+export function contactRequestAdminEmail(params: {
+  companyName: string;
+  contactName: string;
+  contactEmail: string;
+  memberName: string;
+  memberSlug: string;
+  message?: string;
+}): string {
+  const profileUrl = `${PUBLIC_URL}/directory/profile/${params.memberSlug}`;
+  const adminUrl = `${PUBLIC_URL}/admin`;
+
+  const content = contentCard(`
+    <h2 style="font-size:24px; line-height:1.3; margin:0 0 20px 0; color:#18181b;">
+      New Contact Request
+    </h2>
+
+    <p style="margin:0 0 16px 0; font-size:16px; line-height:1.6; color:#3f3f46;">
+      <strong>${params.companyName}</strong> wants to connect with <strong>${params.memberName}</strong>.
+    </p>
+
+    ${highlightBox(`
+      <p style="margin:0 0 8px 0; font-size:14px; color:#3f3f46;">
+        <strong>Company:</strong> ${params.companyName}
+      </p>
+      <p style="margin:0 0 8px 0; font-size:14px; color:#3f3f46;">
+        <strong>Contact:</strong> ${params.contactName} (${params.contactEmail})
+      </p>
+      <p style="margin:0 0 8px 0; font-size:14px; color:#3f3f46;">
+        <strong>Member:</strong> ${params.memberName}
+      </p>
+      ${params.message ? `
+      <p style="margin:8px 0 0 0; font-size:14px; color:#3f3f46;">
+        <strong>Message:</strong><br/>${params.message}
+      </p>
+      ` : ''}
+    `)}
+
+    <p style="margin:20px 0 0 0; font-size:14px; line-height:1.6; color:#71717a;">
+      Review this request in the admin dashboard. Reach out to the member first, then connect the two parties.
+    </p>
+
+    ${ctaButton('View in Admin Dashboard', adminUrl)}
+
+    <p style="margin:16px 0 0 0; font-size:13px; color:#a1a1aa;">
+      <a href="${profileUrl}" style="color:#a855f7;">View member profile</a>
+    </p>
+  `);
+
+  return wrapInEmailStructure('New Contact Request', content);
 }
 
 export { EMAIL_FROM_DOMAIN, PUBLIC_URL, LOGO_URL };

@@ -19,11 +19,16 @@ import {
   Paperclip,
   Image as ImageIcon,
   Users,
+  SmilePlus,
 } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import { usePresence } from '@/hooks/usePresence';
+import { useHaptics } from '@/hooks/useHaptics';
 import { supabase } from '@/lib/supabase';
 import { cn } from '@/lib/utils';
+
+// Quick-pick emoji set for reactions
+const QUICK_EMOJIS = ['👍', '❤️', '😂', '😮', '😢', '🔥', '👏', '🎉'];
 
 // Types
 type ConversationType = 'job_match' | 'direct';
@@ -65,6 +70,12 @@ interface DirectConversation {
 
 type Conversation = JobMatchConversation | DirectConversation;
 
+interface MessageReaction {
+  emoji: string;
+  count: number;
+  reacted: boolean; // whether current user reacted with this emoji
+}
+
 interface Message {
   id: string;
   conversationId: string;
@@ -76,6 +87,7 @@ interface Message {
   readAt: string | null;
   editedAt: string | null;
   isOwn: boolean;
+  reactions?: MessageReaction[];
   attachments?: Array<{
     id: string;
     fileName: string;
@@ -95,7 +107,8 @@ const ChatPage: React.FC = () => {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const { user, session, loading: authLoading } = useAuth();
-  
+  const { tap, success: hapticSuccess, error: hapticError } = useHaptics();
+
   // Track user presence to avoid sending email notifications when they're active
   usePresence();
   
@@ -109,6 +122,8 @@ const ChatPage: React.FC = () => {
   const [loadingMessages, setLoadingMessages] = useState(false);
   const [sendingMessage, setSendingMessage] = useState(false);
   const [messageInput, setMessageInput] = useState('');
+  const [messageCreditError, setMessageCreditError] = useState<string | null>(null);
+  const [messageCreditsRemaining, setMessageCreditsRemaining] = useState<number | null>(null);
   const [showMobileConversations, setShowMobileConversations] = useState(true);
   
   // Enhancement state
@@ -119,11 +134,22 @@ const ChatPage: React.FC = () => {
   const [templates, setTemplates] = useState<MessageTemplate[]>([]);
   const [showTemplates, setShowTemplates] = useState(false);
   const [activeTab, setActiveTab] = useState<'all' | 'jobs' | 'direct'>('all');
+  const [showEmojiPicker, setShowEmojiPicker] = useState<string | null>(null); // message ID or null
   
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
   const typingTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const lastTypingRef = useRef<number>(0);
+  
+  // Stable refs so real-time callbacks always see fresh state
+  const selectedConversationRef = useRef<Conversation | null>(null);
+  const userTypeRef = useRef<'company' | 'member' | null>(null);
+  const profileIdRef = useRef<string | null>(null);
+  
+  // Keep refs in sync with state
+  useEffect(() => { selectedConversationRef.current = selectedConversation; }, [selectedConversation]);
+  useEffect(() => { userTypeRef.current = userType; }, [userType]);
+  useEffect(() => { profileIdRef.current = profileId; }, [profileId]);
 
   // Get conversation ID from selected conversation
   const getConversationId = (conv: Conversation) => {
@@ -176,7 +202,14 @@ const ChatPage: React.FC = () => {
         for (const conv of directData.conversations) {
           allConversations.push({
             type: 'direct',
-            ...conv,
+            conversationId: conv.id || conv.conversationId,
+            participantId: conv.participant?.id || conv.participantId,
+            participantName: conv.participant?.name || conv.participantName || 'Unknown',
+            participantAvatar: conv.participant?.avatar || conv.participantAvatar || null,
+            lastMessage: conv.lastMessage || null,
+            unreadCount: conv.unreadCount || 0,
+            createdAt: conv.createdAt || conv.updatedAt,
+            updatedAt: conv.updatedAt,
           });
         }
       }
@@ -287,10 +320,24 @@ const ChatPage: React.FC = () => {
     }
   }, [session?.access_token]);
 
+  const fetchMessageCredits = useCallback(async () => {
+    if (!session?.access_token) return;
+    try {
+      const res = await fetch('/api/company/message-credits', {
+        headers: { Authorization: `Bearer ${session.access_token}` },
+      });
+      const data = await res.json();
+      if (data.success) {
+        setMessageCreditsRemaining(data.credits.totalRemaining);
+      }
+    } catch {
+      // Not a company user or credits not initialized - ignore
+    }
+  }, [session?.access_token]);
+
   // Initial data fetch
   useEffect(() => {
     if (!authLoading && !user) {
-      // Preserve the current URL so user can be redirected back after login
       const currentUrl = window.location.pathname + window.location.search;
       navigate(`/directory/auth?returnTo=${encodeURIComponent(currentUrl)}`);
       return;
@@ -299,15 +346,25 @@ const ChatPage: React.FC = () => {
     if (user && session) {
       fetchConversations();
       fetchTemplates();
+      fetchMessageCredits();
     }
-  }, [user, authLoading, session, navigate, fetchConversations, fetchTemplates]);
+  }, [user, authLoading, session, navigate, fetchConversations, fetchTemplates, fetchMessageCredits]);
 
-  // Fetch messages when conversation changes
+  // Fetch messages when conversation changes, then load reactions
   useEffect(() => {
     if (selectedConversation) {
       fetchMessages();
     }
   }, [selectedConversation, fetchMessages]);
+
+  // Fetch reactions after messages are loaded
+  useEffect(() => {
+    if (messages.length > 0 && selectedConversation && !loadingMessages) {
+      const messageIds = messages.map(m => m.id);
+      fetchReactionsForMessages(messageIds);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [loadingMessages]);
 
   // Scroll to bottom when messages change
   useEffect(() => {
@@ -315,113 +372,212 @@ const ChatPage: React.FC = () => {
   }, [messages]);
 
   // Real-time subscription for new messages
+  // This subscribes once when the user is authenticated and stays connected.
+  // Callbacks use refs so they always see current state without re-subscribing.
   useEffect(() => {
-    if (!supabase || conversations.length === 0) return;
-
-    // Subscribe to job match messages
-    const jobMatchIds = conversations
-      .filter((c): c is JobMatchConversation => c.type === 'job_match')
-      .map(c => c.matchId);
-
-    // Subscribe to direct messages
-    const directConvIds = conversations
-      .filter((c): c is DirectConversation => c.type === 'direct')
-      .map(c => c.conversationId);
+    if (!supabase || !user) return;
 
     const channels: any[] = [];
 
-    // Job match messages channel
-    if (jobMatchIds.length > 0) {
-      const jobMatchChannel = supabase
-        .channel('job-match-messages')
-        .on(
-          'postgres_changes',
-          {
-            event: 'INSERT',
-            schema: 'public',
-            table: 'messages',
-          },
-          (payload) => {
-            const newMessage = payload.new as any;
-            if (!jobMatchIds.includes(newMessage.match_id)) return;
+    // Job match messages channel – listens for INSERTs and UPDATEs (edits/deletes)
+    const jobMatchChannel = supabase
+      .channel('rt-job-match-messages')
+      .on(
+        'postgres_changes',
+        {
+          event: 'INSERT',
+          schema: 'public',
+          table: 'messages',
+        },
+        (payload) => {
+          const newMessage = payload.new as any;
 
-            const message: Message = {
-              id: newMessage.id,
-              conversationId: newMessage.match_id,
-              senderId: newMessage.sender_id,
-              senderType: newMessage.sender_type,
-              content: newMessage.content,
-              createdAt: newMessage.created_at,
-              readAt: newMessage.read_at,
-              editedAt: newMessage.edited_at,
-              isOwn: newMessage.sender_type === userType,
-              attachments: [],
-            };
+          const message: Message = {
+            id: newMessage.id,
+            conversationId: newMessage.match_id,
+            senderId: newMessage.sender_id,
+            senderType: newMessage.sender_type,
+            content: newMessage.content,
+            createdAt: newMessage.created_at,
+            readAt: newMessage.read_at,
+            editedAt: newMessage.edited_at,
+            isOwn: newMessage.sender_type === userTypeRef.current,
+            attachments: [],
+          };
 
-            // Add to messages if viewing this conversation
-            if (selectedConversation?.type === 'job_match' && 
-                selectedConversation.matchId === newMessage.match_id) {
-              setMessages(prev => {
-                if (prev.some(m => m.id === message.id)) return prev;
-                return [...prev, message];
-              });
+          // Add to messages if viewing this conversation
+          const sel = selectedConversationRef.current;
+          if (sel?.type === 'job_match' && sel.matchId === newMessage.match_id) {
+            setMessages(prev => {
+              if (prev.some(m => m.id === message.id)) return prev;
+              return [...prev, message];
+            });
+          }
+
+          // Update conversation list
+          updateConversationWithNewMessage(newMessage.match_id, 'job_match', newMessage);
+        }
+      )
+      .on(
+        'postgres_changes',
+        {
+          event: 'UPDATE',
+          schema: 'public',
+          table: 'messages',
+        },
+        (payload) => {
+          const updated = payload.new as any;
+
+          // Update the message in-place if we're viewing this conversation
+          const sel = selectedConversationRef.current;
+          if (sel?.type === 'job_match' && sel.matchId === updated.match_id) {
+            setMessages(prev =>
+              prev.map(msg =>
+                msg.id === updated.id
+                  ? { ...msg, content: updated.content, editedAt: updated.edited_at, readAt: updated.read_at }
+                  : msg
+              )
+            );
+          }
+        }
+      )
+      .subscribe((status) => {
+        console.log('[RT] job-match-messages channel:', status);
+      });
+    channels.push(jobMatchChannel);
+
+    // Direct messages channel – listens for INSERTs and UPDATEs (edits/deletes)
+    const directChannel = supabase
+      .channel('rt-direct-messages')
+      .on(
+        'postgres_changes',
+        {
+          event: 'INSERT',
+          schema: 'public',
+          table: 'direct_messages',
+        },
+        (payload) => {
+          const newMessage = payload.new as any;
+
+          const message: Message = {
+            id: newMessage.id,
+            conversationId: newMessage.conversation_id,
+            senderId: newMessage.sender_id,
+            content: newMessage.content,
+            createdAt: newMessage.created_at,
+            readAt: newMessage.read_at,
+            editedAt: newMessage.edited_at,
+            isOwn: newMessage.sender_id === profileIdRef.current,
+            attachments: [],
+          };
+
+          // Add to messages if viewing this conversation
+          const sel = selectedConversationRef.current;
+          if (sel?.type === 'direct' && sel.conversationId === newMessage.conversation_id) {
+            setMessages(prev => {
+              if (prev.some(m => m.id === message.id)) return prev;
+              return [...prev, message];
+            });
+          }
+
+          // Update conversation list
+          updateConversationWithNewMessage(newMessage.conversation_id, 'direct', newMessage);
+        }
+      )
+      .on(
+        'postgres_changes',
+        {
+          event: 'UPDATE',
+          schema: 'public',
+          table: 'direct_messages',
+        },
+        (payload) => {
+          const updated = payload.new as any;
+
+          // Update the message in-place if we're viewing this conversation
+          const sel = selectedConversationRef.current;
+          if (sel?.type === 'direct' && sel.conversationId === updated.conversation_id) {
+            setMessages(prev =>
+              prev.map(msg =>
+                msg.id === updated.id
+                  ? { ...msg, content: updated.content, editedAt: updated.edited_at, readAt: updated.read_at }
+                  : msg
+              )
+            );
+          }
+        }
+      )
+      .subscribe((status) => {
+        console.log('[RT] direct-messages channel:', status);
+      });
+    channels.push(directChannel);
+
+    // Reactions channel – listens for INSERT and DELETE on message_reactions
+    const reactionsChannel = supabase
+      .channel('rt-message-reactions')
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'message_reactions',
+        },
+        (payload) => {
+          const reaction = (payload.new || payload.old) as any;
+          if (!reaction?.message_id) return;
+
+          // Update the reaction on the relevant message in local state
+          setMessages(prev => {
+            const msgIndex = prev.findIndex(m => m.id === reaction.message_id);
+            if (msgIndex === -1) return prev;
+
+            const msg = prev[msgIndex];
+            const reactions = [...(msg.reactions || [])];
+            const emojiIdx = reactions.findIndex(r => r.emoji === reaction.emoji);
+
+            if (payload.eventType === 'INSERT') {
+              if (emojiIdx >= 0) {
+                reactions[emojiIdx] = {
+                  ...reactions[emojiIdx],
+                  count: reactions[emojiIdx].count + 1,
+                  reacted: reaction.user_id === user?.id ? true : reactions[emojiIdx].reacted,
+                };
+              } else {
+                reactions.push({
+                  emoji: reaction.emoji,
+                  count: 1,
+                  reacted: reaction.user_id === user?.id,
+                });
+              }
+            } else if (payload.eventType === 'DELETE') {
+              if (emojiIdx >= 0) {
+                const updated = {
+                  ...reactions[emojiIdx],
+                  count: reactions[emojiIdx].count - 1,
+                  reacted: reaction.user_id === user?.id ? false : reactions[emojiIdx].reacted,
+                };
+                if (updated.count <= 0) {
+                  reactions.splice(emojiIdx, 1);
+                } else {
+                  reactions[emojiIdx] = updated;
+                }
+              }
             }
 
-            // Update conversation list
-            updateConversationWithNewMessage(newMessage.match_id, 'job_match', newMessage);
-          }
-        )
-        .subscribe();
-      channels.push(jobMatchChannel);
-    }
-
-    // Direct messages channel
-    if (directConvIds.length > 0) {
-      const directChannel = supabase
-        .channel('direct-messages')
-        .on(
-          'postgres_changes',
-          {
-            event: 'INSERT',
-            schema: 'public',
-            table: 'direct_messages',
-          },
-          (payload) => {
-            const newMessage = payload.new as any;
-            if (!directConvIds.includes(newMessage.conversation_id)) return;
-
-            const message: Message = {
-              id: newMessage.id,
-              conversationId: newMessage.conversation_id,
-              senderId: newMessage.sender_id,
-              content: newMessage.content,
-              createdAt: newMessage.created_at,
-              readAt: newMessage.read_at,
-              editedAt: newMessage.edited_at,
-              isOwn: newMessage.sender_id === profileId,
-              attachments: [],
-            };
-
-            // Add to messages if viewing this conversation
-            if (selectedConversation?.type === 'direct' && 
-                selectedConversation.conversationId === newMessage.conversation_id) {
-              setMessages(prev => {
-                if (prev.some(m => m.id === message.id)) return prev;
-                return [...prev, message];
-              });
-            }
-
-            // Update conversation list
-            updateConversationWithNewMessage(newMessage.conversation_id, 'direct', newMessage);
-          }
-        )
-        .subscribe();
-      channels.push(directChannel);
-    }
+            const updated = [...prev];
+            updated[msgIndex] = { ...msg, reactions };
+            return updated;
+          });
+        }
+      )
+      .subscribe((status) => {
+        console.log('[RT] message-reactions channel:', status);
+      });
+    channels.push(reactionsChannel);
 
     // Typing indicators channel
     const typingChannel = supabase
-      .channel('typing-indicators')
+      .channel('rt-typing-indicators')
       .on(
         'postgres_changes',
         {
@@ -432,9 +588,8 @@ const ChatPage: React.FC = () => {
         (payload) => {
           if (payload.eventType === 'INSERT' || payload.eventType === 'UPDATE') {
             const indicator = payload.new as any;
-            const currentConvId = selectedConversation 
-              ? getConversationId(selectedConversation) 
-              : null;
+            const sel = selectedConversationRef.current;
+            const currentConvId = sel ? getConversationId(sel) : null;
             
             if (indicator.conversation_id === currentConvId && 
                 indicator.user_id !== user?.id) {
@@ -453,16 +608,26 @@ const ChatPage: React.FC = () => {
           }
         }
       )
-      .subscribe();
+      .subscribe((status) => {
+        console.log('[RT] typing-indicators channel:', status);
+      });
     channels.push(typingChannel);
 
     return () => {
       channels.forEach(channel => supabase.removeChannel(channel));
     };
-  }, [conversations, selectedConversation, userType, profileId, user?.id]);
+    // Only re-subscribe when the user changes (login/logout), NOT on
+    // conversation changes – the callbacks read refs for fresh state.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [user?.id]);
 
   // Update conversation list when new message arrives
+  // Note: message may use camelCase (from API responses) or snake_case (from realtime)
   const updateConversationWithNewMessage = (convId: string, type: ConversationType, message: any) => {
+    const msgCreatedAt = message.createdAt || message.created_at || new Date().toISOString();
+    const msgSenderType = message.senderType || message.sender_type;
+    const msgSenderId = message.senderId || message.sender_id;
+
     setConversations(prev => 
       prev.map(conv => {
         const matches = type === 'job_match' 
@@ -472,17 +637,17 @@ const ChatPage: React.FC = () => {
         if (matches) {
           const isViewing = selectedConversation && getConversationId(selectedConversation) === convId;
           const isFromOther = type === 'job_match' 
-            ? message.sender_type !== userType
-            : message.sender_id !== profileId;
+            ? msgSenderType !== userType
+            : msgSenderId !== profileId;
 
           return {
             ...conv,
             lastMessage: {
               content: message.content,
-              createdAt: message.created_at,
+              createdAt: msgCreatedAt,
               ...(type === 'job_match' 
-                ? { senderType: message.sender_type }
-                : { senderId: message.sender_id, isOwn: message.sender_id === profileId }
+                ? { senderType: msgSenderType }
+                : { senderId: msgSenderId, isOwn: msgSenderId === profileId }
               ),
             },
             unreadCount: !isViewing && isFromOther 
@@ -506,6 +671,11 @@ const ChatPage: React.FC = () => {
     const content = messageInput.trim();
     setMessageInput('');
     setSendingMessage(true);
+
+    // Reset textarea height after clearing
+    if (inputRef.current) {
+      inputRef.current.style.height = '44px';
+    }
 
     // Clear typing indicator
     sendTypingIndicator(false);
@@ -540,9 +710,50 @@ const ChatPage: React.FC = () => {
 
       const data = await response.json();
 
-      if (!data.success) {
+      if (data.success && data.message) {
+        hapticSuccess();
+        // Optimistically add the sent message to the local state
+        const sentMessage: Message = {
+          id: data.message.id,
+          conversationId: data.message.conversationId || data.message.matchId || selectedConversation.type === 'direct' ? (selectedConversation as any).conversationId : (selectedConversation as any).matchId,
+          senderId: data.message.senderId || data.message.sender_id || '',
+          senderName: data.message.senderName,
+          senderType: data.message.senderType,
+          content: data.message.content,
+          createdAt: data.message.createdAt || data.message.created_at || new Date().toISOString(),
+          readAt: null,
+          editedAt: null,
+          isOwn: true,
+          attachments: [],
+        };
+
+        setMessages(prev => {
+          // Avoid duplicates (in case real-time also fires)
+          if (prev.some(m => m.id === sentMessage.id)) return prev;
+          return [...prev, sentMessage];
+        });
+
+        // Update conversation list with last message
+        updateConversationWithNewMessage(
+          selectedConversation.type === 'direct' 
+            ? (selectedConversation as any).conversationId 
+            : (selectedConversation as any).matchId,
+          selectedConversation.type,
+          data.message
+        );
+        // Decrement local credit counter for company users
+        if (userType === 'company' && messageCreditsRemaining !== null) {
+          setMessageCreditsRemaining(prev => prev !== null ? Math.max(0, prev - 1) : null);
+        }
+      } else if (!data.success) {
+        hapticError();
         setMessageInput(content);
-        console.error('Failed to send message:', data.error);
+        if (data.code === 'NO_MESSAGE_CREDITS') {
+          setMessageCreditError('NO_MESSAGE_CREDITS');
+          setMessageCreditsRemaining(0);
+        } else {
+          console.error('Failed to send message:', data.error);
+        }
       }
     } catch (error) {
       console.error('Error sending message:', error);
@@ -575,9 +786,20 @@ const ChatPage: React.FC = () => {
     }
   };
 
+  // Auto-resize textarea to fit content
+  const autoResizeTextarea = useCallback((textarea: HTMLTextAreaElement | null) => {
+    if (!textarea) return;
+    // Reset height to auto so scrollHeight recalculates properly
+    textarea.style.height = 'auto';
+    // Clamp between min (44px = ~1 row) and max (160px = ~6 rows)
+    const newHeight = Math.min(Math.max(textarea.scrollHeight, 44), 160);
+    textarea.style.height = `${newHeight}px`;
+  }, []);
+
   // Handle typing
   const handleInputChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
     setMessageInput(e.target.value);
+    autoResizeTextarea(e.target);
 
     // Debounce typing indicator
     const now = Date.now();
@@ -595,9 +817,30 @@ const ChatPage: React.FC = () => {
     }, 3000);
   };
 
-  // Edit message
+  // Edit message (optimistic update – UI updates immediately, reverts on failure)
   const handleEditMessage = async () => {
     if (!session?.access_token || !editingMessageId || !editContent.trim()) return;
+
+    const trimmedContent = editContent.trim();
+    const messageId = editingMessageId;
+
+    // Capture original content for rollback
+    const originalMessage = messages.find(m => m.id === messageId);
+    const originalContent = originalMessage?.content ?? '';
+    const originalEditedAt = originalMessage?.editedAt ?? null;
+
+    // Optimistic update – show the edit immediately
+    setMessages(prev =>
+      prev.map(msg =>
+        msg.id === messageId
+          ? { ...msg, content: trimmedContent, editedAt: new Date().toISOString() }
+          : msg
+      )
+    );
+
+    // Clear editing state right away so the UI feels snappy
+    setEditingMessageId(null);
+    setEditContent('');
 
     try {
       const response = await fetch('/api/messages/edit', {
@@ -607,33 +850,55 @@ const ChatPage: React.FC = () => {
           Authorization: `Bearer ${session.access_token}`,
         },
         body: JSON.stringify({
-          messageId: editingMessageId,
+          messageId,
           messageType: selectedConversation?.type === 'job_match' ? 'job_match' : 'direct',
-          content: editContent.trim(),
+          content: trimmedContent,
         }),
       });
 
       const data = await response.json();
-      if (data.success) {
-        setMessages(prev => 
-          prev.map(msg => 
-            msg.id === editingMessageId 
-              ? { ...msg, content: editContent.trim(), editedAt: new Date().toISOString() }
+      if (!data.success) {
+        console.error('Edit failed, reverting:', data.error);
+        // Revert on failure
+        setMessages(prev =>
+          prev.map(msg =>
+            msg.id === messageId
+              ? { ...msg, content: originalContent, editedAt: originalEditedAt }
               : msg
           )
         );
       }
     } catch (error) {
       console.error('Error editing message:', error);
-    } finally {
-      setEditingMessageId(null);
-      setEditContent('');
+      // Revert on network error
+      setMessages(prev =>
+        prev.map(msg =>
+          msg.id === messageId
+            ? { ...msg, content: originalContent, editedAt: originalEditedAt }
+            : msg
+        )
+      );
     }
   };
 
-  // Delete message
+  // Delete message (optimistic update)
   const handleDeleteMessage = async (messageId: string) => {
     if (!session?.access_token) return;
+
+    // Capture original for rollback
+    const originalMessage = messages.find(m => m.id === messageId);
+    const originalContent = originalMessage?.content ?? '';
+    const originalEditedAt = originalMessage?.editedAt ?? null;
+
+    // Optimistic update
+    setMessages(prev =>
+      prev.map(msg =>
+        msg.id === messageId
+          ? { ...msg, content: '[Message deleted]', editedAt: null }
+          : msg
+      )
+    );
+    setShowMessageMenu(null);
 
     try {
       const response = await fetch('/api/messages/delete', {
@@ -649,27 +914,119 @@ const ChatPage: React.FC = () => {
       });
 
       const data = await response.json();
-      if (data.success) {
-        setMessages(prev => 
-          prev.map(msg => 
-            msg.id === messageId 
-              ? { ...msg, content: '[Message deleted]', editedAt: null }
+      if (!data.success) {
+        console.error('Delete failed, reverting:', data.error);
+        // Revert on failure
+        setMessages(prev =>
+          prev.map(msg =>
+            msg.id === messageId
+              ? { ...msg, content: originalContent, editedAt: originalEditedAt }
               : msg
           )
         );
       }
     } catch (error) {
       console.error('Error deleting message:', error);
-    } finally {
-      setShowMessageMenu(null);
+      // Revert on network error
+      setMessages(prev =>
+        prev.map(msg =>
+          msg.id === messageId
+            ? { ...msg, content: originalContent, editedAt: originalEditedAt }
+            : msg
+        )
+      );
     }
   };
+
+  // Toggle reaction on a message
+  const handleToggleReaction = async (messageId: string, emoji: string) => {
+    if (!session?.access_token || !selectedConversation) return;
+    tap();
+
+    const messageType = selectedConversation.type === 'job_match' ? 'job_match' : 'direct';
+
+    // Optimistic update
+    setMessages(prev =>
+      prev.map(msg => {
+        if (msg.id !== messageId) return msg;
+        const reactions = [...(msg.reactions || [])];
+        const existingIdx = reactions.findIndex(r => r.emoji === emoji);
+
+        if (existingIdx >= 0) {
+          const existing = reactions[existingIdx];
+          if (existing.reacted) {
+            // Remove own reaction
+            if (existing.count <= 1) {
+              reactions.splice(existingIdx, 1);
+            } else {
+              reactions[existingIdx] = { ...existing, count: existing.count - 1, reacted: false };
+            }
+          } else {
+            // Add own reaction
+            reactions[existingIdx] = { ...existing, count: existing.count + 1, reacted: true };
+          }
+        } else {
+          // New emoji reaction
+          reactions.push({ emoji, count: 1, reacted: true });
+        }
+
+        return { ...msg, reactions };
+      })
+    );
+
+    setShowEmojiPicker(null);
+
+    try {
+      await fetch('/api/messages/reactions/toggle', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${session.access_token}`,
+        },
+        body: JSON.stringify({ messageId, messageType, emoji }),
+      });
+    } catch (error) {
+      console.error('Error toggling reaction:', error);
+      // Revert on error by refetching reactions
+      fetchReactionsForMessages(messages.map(m => m.id));
+    }
+  };
+
+  // Fetch reactions for a set of message IDs
+  const fetchReactionsForMessages = useCallback(async (messageIds: string[]) => {
+    if (!session?.access_token || !selectedConversation || messageIds.length === 0) return;
+
+    const messageType = selectedConversation.type === 'job_match' ? 'job_match' : 'direct';
+
+    try {
+      const response = await fetch(
+        `/api/messages/reactions?messageIds=${messageIds.join(',')}&messageType=${messageType}`,
+        { headers: { Authorization: `Bearer ${session.access_token}` } }
+      );
+      const data = await response.json();
+
+      if (data.success) {
+        setMessages(prev =>
+          prev.map(msg => ({
+            ...msg,
+            reactions: data.reactions[msg.id] || [],
+          }))
+        );
+      }
+    } catch (error) {
+      console.error('Error fetching reactions:', error);
+    }
+  }, [session?.access_token, selectedConversation]);
 
   // Use template
   const handleUseTemplate = (template: MessageTemplate) => {
     setMessageInput(template.content);
     setShowTemplates(false);
-    inputRef.current?.focus();
+    // Resize textarea to fit template content after state update
+    setTimeout(() => {
+      autoResizeTextarea(inputRef.current);
+      inputRef.current?.focus();
+    }, 0);
   };
 
   // Handle keyboard submit
@@ -682,7 +1039,9 @@ const ChatPage: React.FC = () => {
 
   // Format relative time
   const formatTime = (dateString: string) => {
+    if (!dateString) return '';
     const date = new Date(dateString);
+    if (isNaN(date.getTime())) return '';
     const now = new Date();
     const diffMs = now.getTime() - date.getTime();
     const diffMins = Math.floor(diffMs / 60000);
@@ -698,7 +1057,9 @@ const ChatPage: React.FC = () => {
 
   // Format message time
   const formatMessageTime = (dateString: string) => {
+    if (!dateString) return '';
     const date = new Date(dateString);
+    if (isNaN(date.getTime())) return '';
     return date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
   };
 
@@ -727,9 +1088,9 @@ const ChatPage: React.FC = () => {
   }
 
   return (
-    <div className="min-h-screen bg-black text-white flex flex-col">
+    <div className="h-screen bg-black text-white flex flex-col overflow-hidden">
       {/* Header */}
-      <header className="border-b border-zinc-800/50 backdrop-blur-sm bg-black/50 sticky top-0 z-40">
+      <header className="border-b border-zinc-800/50 backdrop-blur-sm bg-black/50">
         <div className="max-w-6xl mx-auto px-4 md:px-6 py-4 flex items-center justify-between">
           <div className="flex items-center gap-3">
             <Link
@@ -741,10 +1102,10 @@ const ChatPage: React.FC = () => {
             </Link>
           </div>
           <div className="flex items-center gap-2">
-            <MessageSquare className="h-5 w-5 text-pink-400" />
+            <MessageSquare className="h-5 w-5 text-white" />
             <span className="text-sm font-medium">Messages</span>
             {totalUnread > 0 && (
-              <span className="ml-1 px-1.5 py-0.5 rounded-full bg-pink-500 text-white text-xs">
+              <span className="ml-1 px-1.5 py-0.5 rounded-full bg-white text-black text-xs font-medium">
                 {totalUnread}
               </span>
             )}
@@ -753,7 +1114,7 @@ const ChatPage: React.FC = () => {
       </header>
 
       {/* Main Content */}
-      <div className="flex-1 flex max-w-6xl mx-auto w-full">
+      <div className="flex-1 flex max-w-6xl mx-auto w-full min-h-0">
         {/* Conversations Sidebar */}
         <div className={cn(
           "w-full md:w-80 lg:w-96 border-r border-zinc-800/50 flex flex-col",
@@ -840,7 +1201,7 @@ const ChatPage: React.FC = () => {
                             className="w-10 h-10 rounded-lg object-cover"
                           />
                         ) : (
-                          <div className="w-10 h-10 rounded-lg bg-gradient-to-br from-pink-500/30 to-violet-500/30 flex items-center justify-center">
+                          <div className="w-10 h-10 rounded-lg bg-white/[0.06] border border-white/[0.06] flex items-center justify-center">
                             {conv.type === 'job_match' && conv.participantType === 'company' ? (
                               <Building2 className="h-5 w-5 text-zinc-400" />
                             ) : (
@@ -872,8 +1233,8 @@ const ChatPage: React.FC = () => {
                           {/* Direct message indicator */}
                           {conv.type === 'direct' && (
                             <div className="flex items-center gap-1 mt-0.5">
-                              <Users className="h-3 w-3 text-violet-500/60 flex-shrink-0" />
-                              <span className="text-xs text-violet-400/60">Direct message</span>
+                              <Users className="h-3 w-3 text-zinc-600 flex-shrink-0" />
+                              <span className="text-xs text-zinc-500">Direct message</span>
                             </div>
                           )}
                           
@@ -888,7 +1249,7 @@ const ChatPage: React.FC = () => {
                         </div>
                         
                         {conv.unreadCount > 0 && (
-                          <span className="w-5 h-5 rounded-full bg-pink-500 text-white text-xs flex items-center justify-center flex-shrink-0">
+                          <span className="w-5 h-5 rounded-full bg-white text-black text-xs font-medium flex items-center justify-center flex-shrink-0">
                             {conv.unreadCount}
                           </span>
                         )}
@@ -924,7 +1285,7 @@ const ChatPage: React.FC = () => {
                     className="w-10 h-10 rounded-lg object-cover"
                   />
                 ) : (
-                  <div className="w-10 h-10 rounded-lg bg-gradient-to-br from-pink-500/30 to-violet-500/30 flex items-center justify-center">
+                  <div className="w-10 h-10 rounded-lg bg-white/[0.06] border border-white/[0.06] flex items-center justify-center">
                     {selectedConversation.type === 'job_match' && selectedConversation.participantType === 'company' ? (
                       <Building2 className="h-5 w-5 text-zinc-400" />
                     ) : (
@@ -978,8 +1339,10 @@ const ChatPage: React.FC = () => {
                 ) : (
                   <>
                     {messages.map((message, index) => {
+                      const currTime = new Date(message.createdAt).getTime();
+                      const prevTime = index > 0 ? new Date(messages[index - 1].createdAt).getTime() : 0;
                       const showTime = index === 0 || 
-                        new Date(message.createdAt).getTime() - new Date(messages[index - 1].createdAt).getTime() > 300000;
+                        isNaN(currTime) || isNaN(prevTime) || (currTime - prevTime > 300000);
                       const isDeleted = message.content === '[Message deleted]';
                       
                       return (
@@ -997,18 +1360,27 @@ const ChatPage: React.FC = () => {
                           )}>
                             {/* Message actions for own messages */}
                             {message.isOwn && !isDeleted && (
-                              <div className="opacity-0 group-hover:opacity-100 transition-opacity flex items-center mr-2">
+                              <div className={cn(
+                                "transition-opacity flex items-center mr-2",
+                                showMessageMenu === message.id
+                                  ? "opacity-100"
+                                  : "opacity-0 group-hover:opacity-100"
+                              )}>
                                 <div className="relative">
                                   <button
-                                    onClick={() => setShowMessageMenu(showMessageMenu === message.id ? null : message.id)}
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      setShowMessageMenu(showMessageMenu === message.id ? null : message.id);
+                                    }}
                                     className="p-1 hover:bg-zinc-800 rounded transition-colors"
                                   >
                                     <MoreVertical className="h-4 w-4 text-zinc-500" />
                                   </button>
                                   {showMessageMenu === message.id && (
-                                    <div className="absolute right-0 top-full mt-1 bg-zinc-900 border border-zinc-800 rounded-lg shadow-lg py-1 z-10 min-w-[120px]">
+                                    <div className="absolute right-0 top-full mt-1 bg-zinc-900 border border-zinc-800 rounded-lg shadow-lg py-1 z-[60] min-w-[120px]">
                                       <button
-                                        onClick={() => {
+                                        onClick={(e) => {
+                                          e.stopPropagation();
                                           setEditingMessageId(message.id);
                                           setEditContent(message.content);
                                           setShowMessageMenu(null);
@@ -1019,7 +1391,10 @@ const ChatPage: React.FC = () => {
                                         Edit
                                       </button>
                                       <button
-                                        onClick={() => handleDeleteMessage(message.id)}
+                                        onClick={(e) => {
+                                          e.stopPropagation();
+                                          handleDeleteMessage(message.id);
+                                        }}
                                         className="w-full px-3 py-1.5 text-sm text-left text-red-400 hover:bg-zinc-800 flex items-center gap-2"
                                       >
                                         <Trash2 className="h-3.5 w-3.5" />
@@ -1030,21 +1405,50 @@ const ChatPage: React.FC = () => {
                                 </div>
                               </div>
                             )}
+
+                            {/* Emoji reaction button for OTHER people's messages (shown on left side) */}
+                            {!message.isOwn && !isDeleted && (
+                              <div className={cn(
+                                "transition-opacity flex items-center mr-1.5 self-start mt-1",
+                                showEmojiPicker === message.id
+                                  ? "opacity-100"
+                                  : "opacity-0 group-hover:opacity-100"
+                              )}>
+                                <div className="relative">
+                                  <button
+                                    onClick={() => setShowEmojiPicker(showEmojiPicker === message.id ? null : message.id)}
+                                    className="p-1 hover:bg-zinc-800 rounded-full transition-colors"
+                                    title="React"
+                                  >
+                                    <SmilePlus className="h-3.5 w-3.5 text-zinc-500" />
+                                  </button>
+                                </div>
+                              </div>
+                            )}
                             
-                            <div className={cn(
-                              "max-w-[75%] rounded-2xl px-4 py-2.5",
-                              message.isOwn
-                                ? "bg-pink-500/20 text-pink-50 rounded-br-md"
-                                : "bg-zinc-800 text-zinc-100 rounded-bl-md",
-                              isDeleted && "opacity-50 italic"
-                            )}>
+                            <div className="max-w-[75%] relative">
+                            <div
+                              className={cn(
+                                "rounded-2xl px-4 py-2.5",
+                                message.isOwn
+                                  ? "bg-white rounded-br-md"
+                                  : "bg-zinc-800/80 rounded-bl-md",
+                                isDeleted && "opacity-50 italic"
+                              )}
+                              style={{ color: message.isOwn ? '#18181b' : '#f4f4f5' }}
+                            >
                               {/* Edit mode */}
                               {editingMessageId === message.id ? (
                                 <div className="space-y-2">
                                   <textarea
                                     value={editContent}
                                     onChange={(e) => setEditContent(e.target.value)}
-                                    className="w-full px-3 py-2 bg-zinc-900 border border-zinc-700 rounded-lg text-sm text-white resize-none"
+                                    className={cn(
+                                      "w-full px-3 py-2 border rounded-lg text-sm resize-none",
+                                      message.isOwn
+                                        ? "bg-zinc-100 border-zinc-300 text-zinc-900 placeholder:text-zinc-500"
+                                        : "bg-zinc-900 border-zinc-700 text-white"
+                                    )}
                                     rows={2}
                                     autoFocus
                                   />
@@ -1054,13 +1458,21 @@ const ChatPage: React.FC = () => {
                                         setEditingMessageId(null);
                                         setEditContent('');
                                       }}
-                                      className="px-3 py-1 text-xs text-zinc-400 hover:text-white transition-colors"
+                                      className={cn(
+                                        "px-3 py-1 text-xs transition-colors",
+                                        message.isOwn ? "text-zinc-500 hover:text-zinc-900" : "text-zinc-400 hover:text-white"
+                                      )}
                                     >
                                       Cancel
                                     </button>
                                     <button
                                       onClick={handleEditMessage}
-                                      className="px-3 py-1 text-xs bg-pink-500 text-white rounded hover:bg-pink-600 transition-colors"
+                                      className={cn(
+                                        "px-3 py-1 text-xs rounded font-medium transition-colors",
+                                        message.isOwn
+                                          ? "bg-zinc-900 text-white hover:bg-zinc-800"
+                                          : "bg-white text-black hover:bg-zinc-200"
+                                      )}
                                     >
                                       Save
                                     </button>
@@ -1068,7 +1480,10 @@ const ChatPage: React.FC = () => {
                                 </div>
                               ) : (
                                 <>
-                                  <p className="text-sm whitespace-pre-wrap break-words">{message.content}</p>
+                                  <span
+                                    className="block text-sm whitespace-pre-wrap break-words"
+                                    style={{ color: message.isOwn ? '#18181b' : '#f4f4f5' }}
+                                  >{message.content}</span>
                                   
                                   {/* Attachments */}
                                   {message.attachments && message.attachments.length > 0 && (
@@ -1098,20 +1513,23 @@ const ChatPage: React.FC = () => {
                                   )}>
                                     <span className={cn(
                                       "text-xs",
-                                      message.isOwn ? "text-pink-300/50" : "text-zinc-500"
+                                      message.isOwn ? "text-zinc-400" : "text-zinc-500"
                                     )}>
                                       {formatMessageTime(message.createdAt)}
                                     </span>
                                     {message.editedAt && (
-                                      <span className="text-xs text-zinc-600">(edited)</span>
+                                      <span className={cn(
+                                        "text-xs",
+                                        message.isOwn ? "text-zinc-400" : "text-zinc-600"
+                                      )}>(edited)</span>
                                     )}
                                     {/* Read receipt */}
                                     {message.isOwn && (
                                       <span className="text-xs">
                                         {message.readAt ? (
-                                          <CheckCheck className="h-3.5 w-3.5 text-blue-400" />
+                                          <CheckCheck className="h-3.5 w-3.5 text-zinc-500" />
                                         ) : (
-                                          <Check className="h-3.5 w-3.5 text-zinc-500" />
+                                          <Check className="h-3.5 w-3.5 text-zinc-400" />
                                         )}
                                       </span>
                                     )}
@@ -1119,6 +1537,93 @@ const ChatPage: React.FC = () => {
                                 </>
                               )}
                             </div>
+
+                            {/* Reaction pills */}
+                            {message.reactions && message.reactions.length > 0 && (
+                              <div className={cn(
+                                "flex flex-wrap gap-1 mt-1",
+                                message.isOwn ? "justify-end" : "justify-start"
+                              )}>
+                                {message.reactions.map((reaction) => (
+                                  <button
+                                    key={reaction.emoji}
+                                    onClick={() => handleToggleReaction(message.id, reaction.emoji)}
+                                    className={cn(
+                                      "inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs transition-all border",
+                                      reaction.reacted
+                                        ? "bg-white/10 border-white/20 text-white"
+                                        : "bg-zinc-800/60 border-zinc-700/50 text-zinc-400 hover:bg-zinc-800 hover:border-zinc-600"
+                                    )}
+                                    title={reaction.reacted ? 'Click to remove reaction' : 'Click to react'}
+                                  >
+                                    <span className="text-sm leading-none">{reaction.emoji}</span>
+                                    {reaction.count > 1 && (
+                                      <span className="text-[10px] font-medium tabular-nums">{reaction.count}</span>
+                                    )}
+                                  </button>
+                                ))}
+                                {/* Quick add reaction button inline with existing reactions */}
+                                {!isDeleted && (
+                                  <button
+                                    onClick={() => setShowEmojiPicker(showEmojiPicker === message.id ? null : message.id)}
+                                    className="inline-flex items-center px-1.5 py-0.5 rounded-full text-xs bg-zinc-800/40 border border-zinc-700/30 text-zinc-500 hover:bg-zinc-800 hover:text-zinc-300 transition-all"
+                                    title="Add reaction"
+                                  >
+                                    <SmilePlus className="h-3 w-3" />
+                                  </button>
+                                )}
+                              </div>
+                            )}
+
+                            {/* Emoji Picker Popover */}
+                            {showEmojiPicker === message.id && (
+                              <div className={cn(
+                                "absolute z-[60] mt-1",
+                                message.isOwn ? "right-0" : "left-0"
+                              )}>
+                                <div className="bg-zinc-900 border border-zinc-700 rounded-xl shadow-xl p-2 flex gap-1 flex-wrap max-w-[240px]">
+                                  {QUICK_EMOJIS.map((emoji) => {
+                                    const alreadyReacted = message.reactions?.some(
+                                      r => r.emoji === emoji && r.reacted
+                                    );
+                                    return (
+                                      <button
+                                        key={emoji}
+                                        onClick={() => handleToggleReaction(message.id, emoji)}
+                                        className={cn(
+                                          "w-9 h-9 flex items-center justify-center rounded-lg text-lg transition-all hover:scale-110",
+                                          alreadyReacted
+                                            ? "bg-white/10 ring-1 ring-white/20"
+                                            : "hover:bg-zinc-800"
+                                        )}
+                                        title={alreadyReacted ? 'Remove reaction' : 'React'}
+                                      >
+                                        {emoji}
+                                      </button>
+                                    );
+                                  })}
+                                </div>
+                              </div>
+                            )}
+                            </div>{/* end max-w-[75%] wrapper */}
+
+                            {/* Emoji reaction button for OWN messages (shown on right side) */}
+                            {message.isOwn && !isDeleted && (
+                              <div className={cn(
+                                "transition-opacity flex items-center ml-1.5 self-start mt-1",
+                                showEmojiPicker === message.id
+                                  ? "opacity-100"
+                                  : "opacity-0 group-hover:opacity-100"
+                              )}>
+                                <button
+                                  onClick={() => setShowEmojiPicker(showEmojiPicker === message.id ? null : message.id)}
+                                  className="p-1 hover:bg-zinc-800 rounded-full transition-colors"
+                                  title="React"
+                                >
+                                  <SmilePlus className="h-3.5 w-3.5" />
+                                </button>
+                              </div>
+                            )}
                           </div>
                         </div>
                       );
@@ -1143,10 +1648,10 @@ const ChatPage: React.FC = () => {
               </div>
 
               {/* Message Input */}
-              <div className="p-4 border-t border-zinc-800/50">
-                {/* Templates */}
+              <div className="border-t border-zinc-800/50">
+                {/* Templates dropdown */}
                 {showTemplates && templates.length > 0 && (
-                  <div className="mb-3 p-2 bg-zinc-900/50 border border-zinc-800 rounded-lg max-h-40 overflow-y-auto">
+                  <div className="mx-4 mt-3 p-2 bg-zinc-900/50 border border-zinc-800 rounded-lg max-h-40 overflow-y-auto">
                     <div className="flex items-center justify-between mb-2">
                       <span className="text-xs text-zinc-500 font-medium">Templates</span>
                       <button
@@ -1170,48 +1675,135 @@ const ChatPage: React.FC = () => {
                     </div>
                   </div>
                 )}
-                
-                <div className="flex items-end gap-3">
-                  {/* Template button */}
-                  {templates.length > 0 && (
-                    <button
-                      onClick={() => setShowTemplates(!showTemplates)}
+
+                {/* Message credit error banner */}
+                {messageCreditError && (
+                  <div className="mx-3 mt-2 p-4 bg-red-500/10 border border-red-500/30 rounded-lg">
+                    <div className="flex items-start justify-between gap-3">
+                      <div className="flex items-start gap-3 flex-1">
+                        <MessageSquare className="h-5 w-5 text-red-400 mt-0.5 flex-shrink-0" />
+                        <div>
+                          <p className="text-sm font-medium text-red-300">No message credits remaining</p>
+                          <p className="text-xs text-red-400/80 mt-1">
+                            You've used all your available messages. To continue messaging talent, please contact the CTC team to top up your account.
+                          </p>
+                          <a
+                            href="mailto:info@creativetechnologists.nl?subject=Message%20Credit%20Top%20Up%20Request"
+                            className="inline-flex items-center gap-1.5 mt-2 px-3 py-1.5 bg-red-500/20 hover:bg-red-500/30 border border-red-500/30 rounded text-xs font-medium text-red-300 hover:text-red-200 transition-colors"
+                          >
+                            <Send className="h-3 w-3" />
+                            Contact CTC Team
+                          </a>
+                        </div>
+                      </div>
+                      <button
+                        onClick={() => setMessageCreditError(null)}
+                        className="shrink-0 text-red-400/60 hover:text-red-300"
+                      >
+                        <X className="h-4 w-4" />
+                      </button>
+                    </div>
+                  </div>
+                )}
+
+                {/* Low credits warning */}
+                {userType === 'company' && messageCreditsRemaining !== null && messageCreditsRemaining > 0 && messageCreditsRemaining <= 5 && !messageCreditError && (
+                  <div className="mx-3 mt-2 px-3 py-2 bg-amber-500/10 border border-amber-500/20 rounded-lg flex items-center gap-2">
+                    <MessageSquare className="h-3.5 w-3.5 text-amber-400 flex-shrink-0" />
+                    <p className="text-xs text-amber-400">
+                      {messageCreditsRemaining} message{messageCreditsRemaining === 1 ? '' : 's'} remaining.{' '}
+                      <a href="mailto:info@creativetechnologists.nl" className="underline hover:text-amber-300">Contact CTC</a> to top up.
+                    </p>
+                  </div>
+                )}
+
+                {/* Input row */}
+                <div className="p-3">
+                  <div className="flex items-end gap-2 bg-zinc-900/60 border border-zinc-800 rounded-2xl focus-within:border-zinc-600 transition-colors">
+                    {/* Template button */}
+                    {templates.length > 0 && (
+                      <button
+                        onClick={() => setShowTemplates(!showTemplates)}
+                        className={cn(
+                          "shrink-0 p-2.5 ml-1 mb-0.5 rounded-xl transition-all",
+                          showTemplates ? "text-white" : "text-zinc-500 hover:text-zinc-300"
+                        )}
+                        title="Message templates"
+                      >
+                        <FileText className="h-4 w-4" />
+                      </button>
+                    )}
+
+                    {/* Textarea */}
+                    <textarea
+                      ref={inputRef}
+                      value={messageInput}
+                      onChange={handleInputChange}
+                      onKeyDown={handleKeyDown}
+                      placeholder={
+                        userType === 'company' && messageCreditsRemaining === 0
+                          ? "No message credits remaining..."
+                          : "Type a message..."
+                      }
+                      disabled={userType === 'company' && messageCreditsRemaining === 0}
+                      rows={1}
                       className={cn(
-                        "p-3 rounded-xl transition-all",
-                        showTemplates ? "bg-pink-500/20 text-pink-400" : "bg-zinc-800 text-zinc-400 hover:text-white"
+                        "flex-1 bg-transparent text-white placeholder:text-zinc-500 focus:outline-none resize-none text-sm leading-relaxed py-3",
+                        templates.length === 0 && "pl-4",
+                        userType === 'company' && messageCreditsRemaining === 0 && "opacity-50 cursor-not-allowed"
                       )}
-                      title="Message templates"
+                      style={{ height: '44px', maxHeight: '160px', overflowY: messageInput.split('\n').length > 6 ? 'auto' : 'hidden' }}
+                    />
+
+                    {/* Send button */}
+                    <button
+                      onClick={handleSendMessage}
+                      disabled={!messageInput.trim() || sendingMessage || (userType === 'company' && messageCreditsRemaining === 0)}
+                      className={cn(
+                        "shrink-0 p-2.5 mr-1 mb-0.5 rounded-xl transition-all",
+                        messageInput.trim() && !sendingMessage && !(userType === 'company' && messageCreditsRemaining === 0)
+                          ? "bg-white text-black hover:bg-zinc-200"
+                          : "text-zinc-600 cursor-not-allowed"
+                      )}
                     >
-                      <FileText className="h-5 w-5" />
+                      {sendingMessage ? (
+                        <Loader2 className="h-4 w-4 animate-spin" />
+                      ) : (
+                        <Send className="h-4 w-4" />
+                      )}
                     </button>
-                  )}
-                  
-                  <textarea
-                    ref={inputRef}
-                    value={messageInput}
-                    onChange={handleInputChange}
-                    onKeyDown={handleKeyDown}
-                    placeholder="Type a message..."
-                    rows={1}
-                    className="flex-1 px-4 py-3 bg-zinc-900/50 border border-zinc-800 rounded-xl text-white placeholder:text-zinc-500 focus:outline-none focus:border-zinc-600 resize-none text-sm"
-                    style={{ minHeight: '44px', maxHeight: '120px' }}
-                  />
-                  <button
-                    onClick={handleSendMessage}
-                    disabled={!messageInput.trim() || sendingMessage}
-                    className={cn(
-                      "p-3 rounded-xl transition-all",
-                      messageInput.trim() && !sendingMessage
-                        ? "bg-pink-500 text-white hover:bg-pink-600"
-                        : "bg-zinc-800 text-zinc-600 cursor-not-allowed"
-                    )}
-                  >
-                    {sendingMessage ? (
-                      <Loader2 className="h-5 w-5 animate-spin" />
-                    ) : (
-                      <Send className="h-5 w-5" />
-                    )}
-                  </button>
+                  </div>
+
+                  {/* Hint text */}
+                  <div className="flex items-center justify-between mt-1.5 px-1">
+                    <p className="text-[11px] text-zinc-600">
+                      <kbd className="px-1 py-0.5 rounded bg-zinc-800/60 text-zinc-500 font-mono text-[10px]">Enter</kbd> to send
+                      {' · '}
+                      <kbd className="px-1 py-0.5 rounded bg-zinc-800/60 text-zinc-500 font-mono text-[10px]">Shift+Enter</kbd> for new line
+                    </p>
+                    <div className="flex items-center gap-2">
+                      {userType === 'company' && messageCreditsRemaining !== null && (
+                        <span className={cn(
+                          "text-[11px] tabular-nums",
+                          messageCreditsRemaining === 0
+                            ? "text-red-400"
+                            : messageCreditsRemaining <= 5
+                            ? "text-amber-400"
+                            : "text-zinc-500"
+                        )}>
+                          {messageCreditsRemaining} credit{messageCreditsRemaining === 1 ? '' : 's'}
+                        </span>
+                      )}
+                      {messageInput.length > 100 && (
+                        <span className={cn(
+                          "text-[11px] tabular-nums",
+                          messageInput.length > 1800 ? "text-amber-500" : "text-zinc-600"
+                        )}>
+                          {messageInput.length.toLocaleString()}
+                        </span>
+                      )}
+                    </div>
+                  </div>
                 </div>
               </div>
             </>
@@ -1230,12 +1822,13 @@ const ChatPage: React.FC = () => {
       </div>
       
       {/* Click outside to close menus */}
-      {(showMessageMenu || showTemplates) && (
+      {(showMessageMenu || showTemplates || showEmojiPicker) && (
         <div 
-          className="fixed inset-0 z-0" 
+          className="fixed inset-0 z-[50]" 
           onClick={() => {
             setShowMessageMenu(null);
             setShowTemplates(false);
+            setShowEmojiPicker(null);
           }}
         />
       )}

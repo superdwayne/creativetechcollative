@@ -22,6 +22,7 @@ const AsciiImageCube: React.FC<AsciiImageCubeProps> = ({
   const cubeRef = useRef<THREE.Mesh | null>(null);
   const animationRef = useRef<number | null>(null);
   const [isLoaded, setIsLoaded] = useState(false);
+  const [webglFailed, setWebglFailed] = useState(false);
   const scrollPositionRef = useRef(0);
   const targetRotationRef = useRef({ x: 0, y: 0, z: 0 });
   const currentRotationRef = useRef({ x: 0, y: 0, z: 0 });
@@ -97,7 +98,7 @@ const AsciiImageCube: React.FC<AsciiImageCubeProps> = ({
   // Create CTC text texture for cube faces
   const createCTCTexture = (gradientColors: string[]) => {
     const canvas = document.createElement('canvas');
-    const ctx = canvas.getContext('2d');
+    const ctx = canvas.getContext('2d', { willReadFrequently: true });
     if (!ctx) return null;
 
     canvas.width = 512;
@@ -276,7 +277,7 @@ const AsciiImageCube: React.FC<AsciiImageCubeProps> = ({
     if (!containerRef.current) return;
 
     const container = containerRef.current;
-    
+
     // Scene setup
     const scene = new THREE.Scene();
     sceneRef.current = scene;
@@ -285,22 +286,37 @@ const AsciiImageCube: React.FC<AsciiImageCubeProps> = ({
     const camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
     camera.position.z = 6;
 
-    // Renderer setup
-    const renderer = new THREE.WebGLRenderer({ 
-      alpha: true, 
-      antialias: true,
-      premultipliedAlpha: false,
-      powerPreference: "high-performance"
-    });
+    // Renderer setup - wrapped in try-catch to prevent crash when WebGL is unavailable
+    let renderer: THREE.WebGLRenderer;
+    try {
+      renderer = new THREE.WebGLRenderer({
+        alpha: true,
+        antialias: true,
+        premultipliedAlpha: false,
+        powerPreference: "high-performance"
+      });
+    } catch (e) {
+      console.warn('WebGL not available, skipping ASCII cube:', e);
+      setWebglFailed(true);
+      return;
+    }
     renderer.setSize(window.innerWidth, window.innerHeight);
     renderer.setClearColor(0x000000, 0);
     rendererRef.current = renderer;
 
     // ASCII Effect setup
-    const effect = new AsciiEffect(renderer, charactersRef.current, {
-      invert: false,
-      resolution: 0.15
-    });
+    let effect: any;
+    try {
+      effect = new AsciiEffect(renderer, charactersRef.current, {
+        invert: false,
+        resolution: 0.15
+      });
+    } catch (e) {
+      console.warn('AsciiEffect initialization failed, skipping ASCII cube:', e);
+      renderer.dispose();
+      setWebglFailed(true);
+      return;
+    }
     effect.setSize(window.innerWidth, window.innerHeight);
     effect.domElement.style.color = 'white';
     effect.domElement.style.backgroundColor = 'transparent';
@@ -506,11 +522,13 @@ const AsciiImageCube: React.FC<AsciiImageCubeProps> = ({
     }
   }, [forceVisible, hasDroppedIn]);
 
+  if (webglFailed) return null;
+
   return (
-    <div 
+    <div
       ref={containerRef}
       className={`transition-all duration-300 ease-out ascii-cube-container ${
-        isLoaded ? 'opacity-100' : 'opacity-0'
+        isLoaded ? 'opacity-20 md:opacity-100' : 'opacity-0'
       }`}
       style={{ 
         width: '100vw', 

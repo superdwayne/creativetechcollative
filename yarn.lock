@@ -4653,6 +4653,11 @@ vite@^5.4.2:
   optionalDependencies:
     fsevents "~2.3.3"
 
+web-haptics@^0.0.6:
+  version "0.0.6"
+  resolved "https://registry.npmjs.org/web-haptics/-/web-haptics-0.0.6.tgz"
+  integrity sha512-eCzcf1LDi20+Fr0x9V3OkX92k0gxEQXaHajmhXHitsnk6SxPeshv8TBtBRqxyst8HI1uf2FyFVE7QS3jo1gkrw==
+
 web-vitals@0.2.4:
   version "0.2.4"
   resolved "https://registry.npmjs.org/web-vitals/-/web-vitals-0.2.4.tgz"

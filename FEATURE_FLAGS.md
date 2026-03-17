@@ -127,4 +127,148 @@ To add new feature flags:
 1. Extend the `FeatureFlags` interface in `src/utils/featureFlags.ts`
 2. Add default values to `defaultFeatureFlags`
 3. Update the admin panel component if needed
-4. Use the `useFeatureFlags` hook in your components 
+4. Use the `useFeatureFlags` hook in your components
+
+---
+
+## Agent Browser Integration
+
+The project includes integration with [agent-browser](https://github.com/vercel-labs/agent-browser) for extracting content from JavaScript-heavy portfolio websites.
+
+### What is Agent Browser?
+
+Agent-browser is a headless browser automation CLI from Vercel Labs designed for AI agents. It provides:
+
+- **JavaScript rendering** - Handles JS-heavy sites like Behance, Dribbble, WebGL portfolios
+- **Content extraction** - Uses accessibility tree snapshots for structured data
+- **Local Chromium** - Runs locally without cloud dependencies
+
+### Use Case
+
+Agent-browser is used for **content extraction** from discovered portfolio URLs, NOT for web searching:
+
+1. **Jina/SerpAPI/Google Custom Search** → Find portfolio URLs
+2. **Agent-browser** → Extract content from JS-heavy sites that don't render with simple HTTP fetches
+
+### Environment Variables
+
+| Variable | Description | Required |
+|----------|-------------|----------|
+| `USE_AGENT_BROWSER` | Set to `"true"` to enable agent-browser for JS-heavy sites | No |
+
+### API Endpoints
+
+#### `/api/search-person`
+
+Endpoint for extracting content from portfolio URLs using agent-browser.
+
+**Request:**
+```json
+{
+  "urls": [
+    "https://lusion.co",
+    "https://behance.net/johndoe"
+  ],
+  "analyze": true,
+  "personName": "John Doe",
+  "currentSkills": ["React", "Three.js"]
+}
+```
+
+**Response:**
+```json
+{
+  "success": true,
+  "extracted": [
+    {
+      "url": "https://lusion.co",
+      "title": "Lusion - Realise Your Creative Ideas",
+      "contentLength": 5432,
+      "contentPreview": "We help brands create digital experiences...",
+      "linksCount": 28
+    }
+  ],
+  "analysis": {
+    "projects": [...],
+    "skills": [...],
+    "workHistory": [...],
+    "bio": "...",
+    "summary": "..."
+  }
+}
+```
+
+#### `/api/enrich-profile-search`
+
+Profile enrichment endpoint. When `USE_AGENT_BROWSER=true`, uses agent-browser for JS-heavy sites like:
+- behance.net
+- dribbble.com
+- linkedin.com
+- webflow.io
+- framer.website
+- cargo.site
+- lusion.co
+
+### Local Development
+
+```bash
+# Install agent-browser (already done)
+npm install agent-browser
+
+# Install Chromium browser
+npx agent-browser install
+
+# Enable agent-browser in .env.local
+echo "USE_AGENT_BROWSER=true" >> .env.local
+
+# Test content extraction
+curl -X POST http://localhost:3000/api/search-person \
+  -H "Content-Type: application/json" \
+  -d '{"urls": ["https://lusion.co"], "analyze": false}'
+```
+
+### How It Works
+
+```
+┌─────────────────────────────────────────────────────────────┐
+│                    Profile Enrichment                        │
+├─────────────────────────────────────────────────────────────┤
+│                                                              │
+│  1. Search APIs (Jina/SerpAPI/Google)                       │
+│     └─→ Find portfolio URLs                                 │
+│                                                              │
+│  2. Content Extraction                                       │
+│     ├─→ Simple HTTP fetch (static sites)                    │
+│     └─→ Agent-browser (JS-heavy sites) ← NEW                │
+│                                                              │
+│  3. AI Analysis (Claude)                                     │
+│     └─→ Extract projects, skills, work history              │
+│                                                              │
+└─────────────────────────────────────────────────────────────┘
+```
+
+### Supported JS-Heavy Sites
+
+Agent-browser automatically activates for these domains:
+- behance.net, dribbble.com
+- linkedin.com (public profiles)
+- webflow.io, framer.website
+- wix.com, squarespace.com
+- cargo.site, notion.site
+- readcv.com, bento.me, contra.com
+- lusion.co, awwwards.com, thefwa.com
+
+### Troubleshooting
+
+| Issue | Solution |
+|-------|----------|
+| Chromium not found | Run `npx agent-browser install` |
+| Timeout errors | Increase timeout in options (default: 25s) |
+| Empty content | Some sites block headless browsers; use Jina fallback |
+| LinkedIn empty | LinkedIn requires login; use Jina Reader instead |
+
+### Files
+
+- `api/lib/agent-browser-search.ts` - Content extraction utilities
+- `api/search-person.ts` - Content extraction API endpoint
+- `api/enrich-profile-search.ts` - Enhanced with agent-browser fallback

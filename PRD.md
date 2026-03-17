@@ -1,269 +1,169 @@
-# PRD: Token-Based AI Analysis Billing System
+# PRD: Lighthouse Audit Fixes & Performance Optimization
 
 ## Introduction
 
-Implement a usage-based billing system for the AI job analysis feature. Companies receive a fixed number of free analyses (5), after which they must purchase analysis bundles to continue using the feature. This creates a sustainable revenue model while providing initial value for free.
+The Creative Technologists Collective website (creativetechnologists.nl) scored 92 across Accessibility, Best Practices, and SEO in Lighthouse audits, with 6 specific failures. This PRD addresses all 6 failures plus performance optimizations identified via a Chrome DevTools performance trace, targeting perfect 100 scores across all categories.
 
-**Key Decisions (from user input):**
-- Token counting: Both input and output tokens combined
-- Free tier: Fixed number of free analyses (5 per company)
-- Payment: Pre-purchase token/analysis bundles
-- Out of credits: Block analysis with "buy more" message
-- Management: Companies see usage, CTC admins manage billing
+**Tech Stack:** React 19 + Vite + Tailwind CSS 3.4 + Supabase + Three.js, deployed on Vercel.
+
+**Current Scores:** Accessibility 92 | Best Practices 92 | SEO 92
+**Target Scores:** Accessibility 100 | Best Practices 100 | SEO 100
 
 ## Goals
 
-- Give each company 5 free AI job analyses to experience the feature
-- Track analysis usage per company with logging
-- Block analysis requests when a company has no remaining credits
-- Allow companies to purchase analysis bundles via Stripe (pre-paid credits)
-- Provide usage visibility to companies on their dashboard
-- Enable CTC admins to view usage, revenue, and grant bonus credits
+- Achieve Lighthouse score of 100 for Accessibility
+- Achieve Lighthouse score of 100 for Best Practices
+- Achieve Lighthouse score of 100 for SEO
+- Reduce critical path latency (currently 343ms) below 300ms
+- Eliminate all console errors and warnings
+- Maintain current CLS of 0.00 and LCP under 250ms
 
 ## User Stories
 
 ---
 
-### US-001: Create analysis credits database schema
-**Description:** As a developer, I need database tables to track company analysis credits and usage history.
+### US-001: Add `<main>` landmark to page layout
+
+**Description:** As a screen reader user, I need a `<main>` landmark so I can skip directly to the primary content.
 
 **Acceptance Criteria:**
-- [x] Create `company_analysis_credits` table with columns:
-  - `id` (UUID, primary key)
-  - `company_id` (UUID, FK to companies, unique, not null)
-  - `free_analyses_remaining` (INTEGER, default 5)
-  - `purchased_credits` (INTEGER, default 0)
-  - `created_at` (TIMESTAMP, default now())
-  - `updated_at` (TIMESTAMP, default now())
-- [x] Create `analysis_usage_logs` table with columns:
-  - `id` (UUID, primary key)
-  - `company_id` (UUID, FK to companies, not null)
-  - `job_title` (VARCHAR, not null)
-  - `credit_type` (VARCHAR, 'free' or 'purchased')
-  - `created_at` (TIMESTAMP, default now())
-- [x] Create `credit_purchases` table with columns:
-  - `id` (UUID, primary key)
-  - `company_id` (UUID, FK to companies, not null)
-  - `credits_amount` (INTEGER, not null)
-  - `price_cents` (INTEGER, not null)
-  - `stripe_payment_id` (VARCHAR)
-  - `created_at` (TIMESTAMP, default now())
-- [x] Add indexes on company_id columns for all tables
-- [x] Add RLS policies: companies read own records, service role full access
-- [x] Migration runs successfully
-- [x] Typecheck passes
+- [ ] Wrap the primary content area in `src/App.tsx` with a `<main>` element
+- [ ] The `<main>` element wraps the `<Routes>` section (not nav or footer)
+- [ ] Existing flex layout and `pt-[72px]` styling is preserved
+- [ ] Typecheck passes
+- [ ] Verify changes work in browser
 
 ---
 
-### US-002: Initialize credits for new companies
-**Description:** As a new company, I should automatically receive 5 free analysis credits when I register.
+### US-002: Fix heading hierarchy (skip levels)
+
+**Description:** As a screen reader user, I need headings in sequential order so I can navigate the page structure logically.
 
 **Acceptance Criteria:**
-- [x] Modify `api/register-company.ts` to create a `company_analysis_credits` record
-- [x] Set `free_analyses_remaining: 5` and `purchased_credits: 0`
-- [x] Credits record created in the same request as company registration
-- [x] Handle case where credits record already exists (idempotent)
-- [x] Typecheck passes
+- [ ] Audit all heading usage across components: `alert.tsx` (h5), `faq3.tsx`, `contact-2.tsx`, `AnalysisCreditsCard.tsx`, and page components
+- [ ] Replace any `<h5>` elements that skip levels with the correct sequential heading (e.g., h3 or h4 depending on parent context)
+- [ ] Ensure no heading level is skipped (h1 → h2 → h3, never h1 → h3 or h2 → h5)
+- [ ] Visual appearance is preserved using Tailwind classes (e.g., `text-sm font-semibold` to maintain small heading style)
+- [ ] Typecheck passes
+- [ ] Verify changes work in browser
 
 ---
 
-### US-003: Add credit check to analyze-job API
-**Description:** As the system, I need to verify a company has available credits before allowing an analysis.
+### US-003: Fix color contrast for zinc text classes
+
+**Description:** As a visually impaired user, I need sufficient contrast between text and background so I can read all content.
 
 **Acceptance Criteria:**
-- [x] Add `company_id` parameter to analyze-job request schema (required)
-- [x] Query `company_analysis_credits` to check balance
-- [x] Allow if `free_analyses_remaining > 0` OR `purchased_credits > 0`
-- [x] Return 402 Payment Required with JSON body: `{ error: 'No analysis credits remaining', code: 'CREDITS_EXHAUSTED' }`
-- [x] Include `X-Credits-Remaining` header in successful response
-- [x] Typecheck passes
+- [ ] Identify all instances of `text-zinc-500` and `text-zinc-400` used on dark backgrounds (`bg-black`, `bg-zinc-900`, etc.)
+- [ ] Replace `text-zinc-500` (#71717a) with `text-zinc-400` (#a1a1aa) or lighter where contrast ratio is below 4.5:1
+- [ ] Replace `text-zinc-400` with `text-zinc-300` (#d4d4d8) where contrast ratio is below 4.5:1
+- [ ] Affected files include: `image-upload.tsx`, `creative-spectrum-slider.tsx`, `MessageNotification.tsx`, `faq3.tsx`, and any other files using these classes on dark backgrounds
+- [ ] All text meets WCAG AA contrast ratio of 4.5:1 for normal text, 3:1 for large text
+- [ ] Typecheck passes
+- [ ] Verify changes work in browser — visual style remains consistent (subtle secondary text, not jarring)
 
 ---
 
-### US-004: Deduct credits after successful analysis
-**Description:** As the system, I need to deduct one credit after an analysis stream completes.
+### US-004: Defer notification permission to user gesture
+
+**Description:** As a user, I don't want to be asked for notification permission before I've interacted with the site, as this is intrusive and violates best practices.
 
 **Acceptance Criteria:**
-- [x] After streaming completes successfully, deduct 1 credit
-- [x] Deduct from `free_analyses_remaining` first (if > 0), else from `purchased_credits`
-- [x] Create entry in `analysis_usage_logs` with job title and credit type
-- [x] Use database transaction to ensure atomicity
-- [x] Update `company_analysis_credits.updated_at` timestamp
-- [x] Typecheck passes
+- [ ] Remove the `useEffect` auto-trigger of `requestNotificationPermission()` in `src/components/MessageNotification.tsx`
+- [ ] Add a UI element (e.g., bell icon button or inline prompt) that the user can click to enable notifications
+- [ ] Only call `Notification.requestPermission()` in response to that user click
+- [ ] Existing notification functionality (sound, auto-close, desktop notifications) continues to work after permission is granted
+- [ ] Typecheck passes
+- [ ] Verify changes work in browser
 
 ---
 
-### US-005: Update useJobAnalysis hook for credit errors
-**Description:** As a company user, I should see a clear message when I'm out of credits.
+### US-005: Fix console errors and warnings
+
+**Description:** As a developer, I need to eliminate console errors so the site passes Lighthouse Best Practices and underlying issues are resolved.
 
 **Acceptance Criteria:**
-- [x] Detect 402 status code in `useJobAnalysis` hook
-- [x] Parse response JSON to extract error code
-- [x] Set error state with type: `{ type: 'credits_exhausted', message: string }`
-- [x] Add `creditsRemaining` state (from X-Credits-Remaining header)
-- [x] Update hook return type to include new states
-- [x] Typecheck passes
+- [ ] Fix the 401 error — identify the failing network request (likely a Supabase or API call made without auth) and add proper error handling or conditional fetching
+- [ ] Fix Canvas2D `willReadFrequently` warnings — locate the canvas/Three.js component and add `willReadFrequently: true` to the canvas context options
+- [ ] Fix form field elements missing `id` or `name` attributes — add `id` and `name` to all `<input>`, `<select>`, and `<textarea>` elements
+- [ ] No errors or warnings appear in the console on a fresh page load (excluding third-party scripts outside our control)
+- [ ] Typecheck passes
+- [ ] Verify changes work in browser
 
 ---
 
-### US-006: Show "Buy More Credits" prompt when exhausted
-**Description:** As a company user who has run out of credits, I should see a prompt to purchase more.
+### US-006: Create valid robots.txt
+
+**Description:** As a search engine crawler, I need a valid robots.txt so I can correctly index the site.
 
 **Acceptance Criteria:**
-- [x] When analysis fails with credits_exhausted error, show alert/modal
-- [x] Display message: "You've used all your analysis credits"
-- [x] Show "Purchase More Credits" button linking to `/company/purchase-credits`
-- [x] Display current credit balance (0 free, 0 purchased)
-- [x] Typecheck passes
-- [x] Verify changes work in browser
+- [ ] Create `public/robots.txt` with valid syntax
+- [ ] Allow all crawlers to index the site: `User-agent: *` with `Allow: /`
+- [ ] Disallow sensitive paths: `/api/`, `/admin/`
+- [ ] Include sitemap reference: `Sitemap: https://www.creativetechnologists.nl/sitemap.xml`
+- [ ] Verify the file is accessible at `https://www.creativetechnologists.nl/robots.txt` after deploy
+- [ ] Lighthouse SEO audit passes with no robots.txt errors
 
 ---
 
-### US-007: Add credits section to company dashboard
-**Description:** As a company user, I want to see my credit balance and usage history on my dashboard.
+### US-007: Optimize render-blocking resources and fonts
+
+**Description:** As a user, I want the page to render as fast as possible without being blocked by non-critical CSS or duplicate font downloads.
 
 **Acceptance Criteria:**
-- [x] Create `api/company/credits.ts` endpoint to fetch company's credit balance and recent usage
-- [x] Add "Analysis Credits" card to company dashboard (above or beside job submissions)
-- [x] Display: free credits remaining, purchased credits, total analyses used
-- [x] Show last 5 analyses with job title and date
-- [x] Include "Purchase More" button
-- [x] Typecheck passes
-- [x] Verify changes work in browser
+- [ ] Add `font-display: swap` to all @font-face declarations (verify cdnfonts behavior)
+- [ ] Remove unused preconnect to `https://fonts.gstatic.com/` (flagged as unused in trace)
+- [ ] Eliminate duplicate PP Neue Montreal font downloads — currently 6 requests for 3 fonts (bold, medium, book each downloaded twice)
+- [ ] Verify the main CSS bundle is loaded efficiently
+- [ ] Typecheck passes
+- [ ] Verify changes work in browser — fonts render without FOUT/FOIT issues
 
 ---
 
-### US-008: Create credit bundle purchase page
-**Description:** As a company user, I want to see available credit bundles and their pricing.
+### US-008: Optimize third-party script loading
+
+**Description:** As a user, I want third-party scripts to not delay my interaction with the page.
 
 **Acceptance Criteria:**
-- [x] Create `/company/purchase-credits` route and page
-- [x] Display 3 bundle options:
-  - 10 analyses for $29 ($2.90/analysis)
-  - 25 analyses for $59 ($2.36/analysis)
-  - 50 analyses for $99 ($1.98/analysis)
-- [x] Each bundle card shows: credit count, price, price per analysis
-- [x] Highlight "Most Popular" on middle tier
-- [x] "Buy Now" button on each (placeholder action for now)
-- [x] Typecheck passes
-- [x] Verify changes work in browser
+- [ ] Defer Google Tag Manager loading using `async` or load it after initial render
+- [ ] Lazy-load images from external CDNs (imagekit.io, letsgetdigital.com, leonardo.ai) — use `loading="lazy"` on all below-the-fold `<img>` tags
+- [ ] Total third-party transfer currently ~2MB (imagekit 639KB, letsgetdigital 519KB, GTM 459KB, cdnfonts 388KB) — defer non-critical assets
+- [ ] LCP remains under 250ms
+- [ ] CLS remains at 0.00
+- [ ] Typecheck passes
+- [ ] Verify changes work in browser
 
 ---
 
-### US-009: Create Stripe checkout API endpoint
-**Description:** As a company, I need to start a Stripe checkout session to purchase credits.
+### US-009: Optimize critical API path
+
+**Description:** As a developer, I want to reduce the critical path latency by optimizing the n8n webhook fetch which sits on the longest dependency chain (343ms).
 
 **Acceptance Criteria:**
-- [x] Create `api/company/checkout.ts` endpoint
-- [x] Accept `bundle_id` ('basic' | 'popular' | 'pro') in request body
-- [x] Map bundle_id to correct price in cents (2900, 5900, 9900)
-- [x] Create Stripe Checkout session with:
-  - mode: 'payment'
-  - line_items with bundle description and price
-  - metadata: { company_id, bundle_id, credits_amount }
-  - success_url: `/company/purchase-credits?success=true`
-  - cancel_url: `/company/purchase-credits?canceled=true`
-- [x] Return `{ url: checkoutSession.url }`
-- [x] Typecheck passes
-
----
-
-### US-010: Connect purchase page to Stripe checkout
-**Description:** As a company, clicking "Buy Now" should redirect me to Stripe payment.
-
-**Acceptance Criteria:**
-- [x] "Buy Now" buttons call `/api/company/checkout` with bundle_id
-- [x] Show loading state while creating checkout session
-- [x] Redirect to Stripe checkout URL on success
-- [x] Handle success/canceled URL params with toast messages
-- [x] Typecheck passes
-- [x] Verify changes work in browser
-
----
-
-### US-011: Create Stripe webhook for payment completion
-**Description:** As the system, I need to add purchased credits when Stripe payment succeeds.
-
-**Acceptance Criteria:**
-- [x] Create `api/webhooks/stripe.ts` endpoint
-- [x] Verify Stripe webhook signature using STRIPE_WEBHOOK_SECRET
-- [x] Handle `checkout.session.completed` event
-- [x] Extract company_id and credits_amount from session metadata
-- [x] Add credits to `company_analysis_credits.purchased_credits`
-- [x] Create record in `credit_purchases` table with stripe_payment_id
-- [x] Return 200 OK to acknowledge receipt
-- [x] Typecheck passes
-
----
-
-### US-012: Add credit usage to admin dashboard
-**Description:** As a CTC admin, I want to see credit usage and revenue across all companies.
-
-**Acceptance Criteria:**
-- [x] Create `api/admin/credit-usage.ts` endpoint
-- [x] Add "Credit Usage" section to admin dashboard
-- [x] Show table with columns: company name, free used, purchased remaining, total analyses, total revenue
-- [x] Sort by total analyses (most active first)
-- [x] Show platform totals: total analyses, total revenue
-- [x] Typecheck passes
-- [x] Verify changes work in browser
-
----
-
-### US-013: Add admin ability to grant bonus credits
-**Description:** As a CTC admin, I want to manually add credits to a company account for support or promotions.
-
-**Acceptance Criteria:**
-- [x] Add "Grant Credits" button in admin credit usage section for each company
-- [x] Button opens modal with: credit amount input, optional note textarea
-- [x] Create `api/admin/grant-credits.ts` endpoint
-- [x] Add credits to `purchased_credits` (not free credits)
-- [x] Log grant in `credit_purchases` with stripe_payment_id = 'ADMIN_GRANT' and note
-- [x] Show success toast: "Added X credits to [Company Name]"
-- [x] Typecheck passes
-- [x] Verify changes work in browser
+- [ ] Verify `<link rel="preconnect" href="https://n8n.creativetechnologists.nl">` exists in `index.html`
+- [ ] If the `/webhook/cases` data is not needed for above-the-fold content, defer the fetch to after initial render
+- [ ] If needed for initial render, consider prefetching the endpoint
+- [ ] Critical path latency is reduced below 300ms
+- [ ] Typecheck passes
+- [ ] Verify changes work in browser
 
 ---
 
 ## Non-Goals
 
-- Subscription/recurring billing (bundle purchase only)
-- Refunds or credit expiration
-- Different pricing tiers per company
-- Usage-based pricing tied to actual AI token counts (we count analyses, not tokens)
-- Credit transfer between companies
-- Automatic top-up when credits run low
-- Invoicing or receipts (Stripe handles this)
+- No visual redesign or layout changes beyond contrast adjustments
+- No migration away from current tech stack (Vite, React, Tailwind)
+- No SEO content strategy (meta descriptions, structured data, etc.) — only robots.txt fix
+- No mobile-specific performance optimizations beyond what benefits both platforms
+- No changes to Supabase backend or API logic
+- No sitemap XML generation (referenced in robots.txt but creation is a separate effort)
 
 ## Technical Considerations
 
-### Existing Infrastructure
-- Supabase for database with RLS
-- Vercel Edge Functions for API
-- Companies table already exists with user_id FK to auth.users
-- `api/analyze-job.ts` is an edge function using streaming
-
-### Stripe Integration
-- Use Stripe Checkout for payments (simplest integration)
-- Store STRIPE_SECRET_KEY and STRIPE_WEBHOOK_SECRET in environment
-- Webhook endpoint must be registered in Stripe dashboard
-- Use `stripe` npm package for API calls
-
-### Credit Deduction Logic
-```
-if (free_analyses_remaining > 0) {
-  deduct from free_analyses_remaining
-  log with credit_type = 'free'
-} else if (purchased_credits > 0) {
-  deduct from purchased_credits
-  log with credit_type = 'purchased'
-} else {
-  return 402 CREDITS_EXHAUSTED
-}
-```
-
-### Key Patterns to Follow
-- Service role key for admin operations (bypasses RLS)
-- Edge runtime for API endpoints
-- Toast notifications for user feedback
-- React Query or direct fetch for data loading
+- **Vite build:** CSS is bundled into a single file (`index-*.css`); Tailwind class changes are picked up automatically
+- **Vercel deployment:** `robots.txt` in `/public/` will be served at root automatically
+- **Three.js canvas:** The `willReadFrequently` fix may need to be applied at the React Three Fiber `<Canvas>` component level via the `gl` prop or canvas context
+- **Font loading:** PP Neue Montreal is loaded from cdnfonts.com — we don't control their CSS, so `font-display` may need to be overridden locally
+- **Notification API:** Feature-detect `'Notification' in window` before showing the enable button
+- **Existing preconnects** in `index.html`: `fonts.cdnfonts.com`, `fonts.googleapis.com`, `fonts.gstatic.com` (unused — remove), `n8n.creativetechnologists.nl`
+- **Console errors found:** 401 resource error, Canvas2D willReadFrequently (x3), form field missing id/name (x2)

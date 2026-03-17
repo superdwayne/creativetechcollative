@@ -39,14 +39,14 @@ const RadioGroup = React.forwardRef<HTMLDivElement, RadioGroupProps>(
               />
               <div
                 className={cn(
-                  "h-5 w-5 rounded-full border border-zinc-600 bg-zinc-900 transition-colors",
+                  "h-5 w-5 rounded-full border border-zinc-600 bg-zinc-900 transition-colors pointer-events-none",
                   "peer-focus-visible:ring-2 peer-focus-visible:ring-pink-500 peer-focus-visible:ring-offset-2 peer-focus-visible:ring-offset-black",
                   value === option.value && "border-pink-500"
                 )}
               />
               <div
                 className={cn(
-                  "absolute h-2.5 w-2.5 rounded-full bg-pink-500 transition-transform scale-0",
+                  "absolute h-2.5 w-2.5 rounded-full bg-pink-500 transition-transform scale-0 pointer-events-none",
                   value === option.value && "scale-100"
                 )}
               />

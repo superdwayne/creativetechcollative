@@ -83,7 +83,7 @@ export const ImageUpload: React.FC<ImageUploadProps> = ({
   return (
     <div className={cn("w-full", className)}>
       {label && (
-        <label className="block text-xs font-secondary tracking-wide text-zinc-500 uppercase mb-2">
+        <label className="block text-xs font-secondary tracking-wide text-zinc-400 uppercase mb-2">
           {label}
         </label>
       )}
@@ -126,14 +126,14 @@ export const ImageUpload: React.FC<ImageUploadProps> = ({
           )}
         >
           {isUploading ? (
-            <Loader2 className="h-8 w-8 text-zinc-500 animate-spin" />
+            <Loader2 className="h-8 w-8 text-zinc-400 animate-spin" />
           ) : (
             <>
               <div className="p-3 border border-zinc-700 mb-3">
                 {type === 'profile' ? (
-                  <ImageIcon className="h-6 w-6 text-zinc-500" />
+                  <ImageIcon className="h-6 w-6 text-zinc-400" />
                 ) : (
-                  <Upload className="h-6 w-6 text-zinc-500" />
+                  <Upload className="h-6 w-6 text-zinc-400" />
                 )}
               </div>
               <p className="text-sm font-secondary text-zinc-400 mb-1">

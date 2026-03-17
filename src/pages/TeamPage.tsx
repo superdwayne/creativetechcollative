@@ -256,7 +256,7 @@ const TeamPage: React.FC = () => {
       </div>
 
       {/* Filter Tabs - 100 Lost Species Style */}
-      <div className="sticky top-0 z-40 bg-black/80 backdrop-blur-md border-b border-white/10">
+      <div className="bg-black/80 backdrop-blur-md border-b border-white/10">
         <div className="max-w-7xl mx-auto px-6 md:px-12 py-4">
           <div className="flex flex-wrap items-center justify-between gap-4">
             {/* View Mode Tabs */}

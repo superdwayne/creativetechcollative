@@ -55,7 +55,7 @@ const InfinityGrid: React.FC<InfinityGridProps> = ({ memberData, isLoading, setI
             const canvas = document.createElement('canvas');
             canvas.width = cardWidth;
             canvas.height = cardHeight;
-            const ctx = canvas.getContext('2d');
+            const ctx = canvas.getContext('2d', { willReadFrequently: true });
             if (ctx) {
               ctx.fillStyle = '#f0f0f0';
               ctx.fillRect(0, 0, cardWidth, cardHeight);
@@ -85,7 +85,7 @@ const InfinityGrid: React.FC<InfinityGridProps> = ({ memberData, isLoading, setI
   // Canvas rendering function
   const render = useCallback(() => {
     const canvas = canvasRef.current;
-    const ctx = canvas?.getContext('2d');
+    const ctx = canvas?.getContext('2d', { willReadFrequently: true });
     if (!canvas || !ctx || memberData.length === 0) return;
 
     // Clear canvas

@@ -157,20 +157,20 @@ export const AnalysisCreditsCard: React.FC<AnalysisCreditsCardProps> = ({
             <div className="text-2xl font-bold text-emerald-400">
               {credits.freeAnalysesRemaining}
             </div>
-            <div className="text-xs text-zinc-500 mt-1">Free Credits</div>
+            <div className="text-xs text-zinc-400 mt-1">Free Credits</div>
           </div>
           <div className="text-center p-4 bg-zinc-800/30 rounded-xl">
             <div className="text-2xl font-bold text-violet-400">
               {credits.purchasedCredits}
             </div>
-            <div className="text-xs text-zinc-500 mt-1">Purchased</div>
+            <div className="text-xs text-zinc-400 mt-1">Purchased</div>
           </div>
           <div className="text-center p-4 bg-zinc-800/30 rounded-xl">
             <div className="text-2xl font-bold text-white flex items-center justify-center gap-1">
-              <TrendingUp className="w-5 h-5 text-zinc-500" />
+              <TrendingUp className="w-5 h-5 text-zinc-400" />
               {totalAnalysesUsed}
             </div>
-            <div className="text-xs text-zinc-500 mt-1">Total Used</div>
+            <div className="text-xs text-zinc-400 mt-1">Total Used</div>
           </div>
         </div>
       </div>
@@ -184,8 +184,8 @@ export const AnalysisCreditsCard: React.FC<AnalysisCreditsCardProps> = ({
 
         {recentUsage.length === 0 ? (
           <div className="text-center py-6">
-            <p className="text-zinc-500 text-sm">No analyses yet</p>
-            <p className="text-zinc-600 text-xs mt-1">
+            <p className="text-zinc-400 text-sm">No analyses yet</p>
+            <p className="text-zinc-400 text-xs mt-1">
               Your analysis history will appear here
             </p>
           </div>
@@ -198,7 +198,7 @@ export const AnalysisCreditsCard: React.FC<AnalysisCreditsCardProps> = ({
               >
                 <div className="flex-1 min-w-0">
                   <p className="text-sm text-white truncate">{log.jobTitle}</p>
-                  <p className="text-xs text-zinc-500">{formatDate(log.createdAt)}</p>
+                  <p className="text-xs text-zinc-400">{formatDate(log.createdAt)}</p>
                 </div>
                 <span
                   className={cn(

@@ -1,0 +1,122 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 800 450">
+  <defs>
+    <linearGradient id="bgGradient" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#0a0a0a"/>
+      <stop offset="50%" style="stop-color:#1a1a2e"/>
+      <stop offset="100%" style="stop-color:#16213e"/>
+    </linearGradient>
+    <linearGradient id="glowGradient" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#667eea"/>
+      <stop offset="100%" style="stop-color:#764ba2"/>
+    </linearGradient>
+    <filter id="glow">
+      <feGaussianBlur stdDeviation="3" result="coloredBlur"/>
+      <feMerge>
+        <feMergeNode in="coloredBlur"/>
+        <feMergeNode in="SourceGraphic"/>
+      </feMerge>
+    </filter>
+  </defs>
+  
+  <!-- Background -->
+  <rect width="800" height="450" fill="url(#bgGradient)"/>
+  
+  <!-- Grid pattern -->
+  <g opacity="0.1" stroke="#667eea" stroke-width="0.5">
+    <line x1="0" y1="50" x2="800" y2="50"/>
+    <line x1="0" y1="100" x2="800" y2="100"/>
+    <line x1="0" y1="150" x2="800" y2="150"/>
+    <line x1="0" y1="200" x2="800" y2="200"/>
+    <line x1="0" y1="250" x2="800" y2="250"/>
+    <line x1="0" y1="300" x2="800" y2="300"/>
+    <line x1="0" y1="350" x2="800" y2="350"/>
+    <line x1="0" y1="400" x2="800" y2="400"/>
+    <line x1="100" y1="0" x2="100" y2="450"/>
+    <line x1="200" y1="0" x2="200" y2="450"/>
+    <line x1="300" y1="0" x2="300" y2="450"/>
+    <line x1="400" y1="0" x2="400" y2="450"/>
+    <line x1="500" y1="0" x2="500" y2="450"/>
+    <line x1="600" y1="0" x2="600" y2="450"/>
+    <line x1="700" y1="0" x2="700" y2="450"/>
+  </g>
+  
+  <!-- Decorative circles -->
+  <circle cx="650" cy="80" r="120" fill="none" stroke="#667eea" stroke-width="1" opacity="0.2"/>
+  <circle cx="650" cy="80" r="80" fill="none" stroke="#764ba2" stroke-width="1" opacity="0.3"/>
+  <circle cx="150" cy="370" r="100" fill="none" stroke="#667eea" stroke-width="1" opacity="0.15"/>
+  
+  <!-- AI Brain/Head representation -->
+  <g transform="translate(400, 200)" filter="url(#glow)">
+    <!-- Outer ring -->
+    <circle cx="0" cy="0" r="100" fill="none" stroke="url(#glowGradient)" stroke-width="2" opacity="0.8"/>
+    <circle cx="0" cy="0" r="85" fill="none" stroke="#667eea" stroke-width="1" opacity="0.5"/>
+    
+    <!-- Inner AI core -->
+    <circle cx="0" cy="0" r="50" fill="#1a1a2e" stroke="#667eea" stroke-width="2"/>
+    
+    <!-- AI Eyes -->
+    <circle cx="-18" cy="-10" r="8" fill="#667eea">
+      <animate attributeName="opacity" values="1;0.5;1" dur="2s" repeatCount="indefinite"/>
+    </circle>
+    <circle cx="18" cy="-10" r="8" fill="#667eea">
+      <animate attributeName="opacity" values="1;0.5;1" dur="2s" repeatCount="indefinite" begin="0.5s"/>
+    </circle>
+    
+    <!-- Smile -->
+    <path d="M -15 15 Q 0 30 15 15" fill="none" stroke="#667eea" stroke-width="3" stroke-linecap="round"/>
+    
+    <!-- Neural connections -->
+    <g stroke="#764ba2" stroke-width="1" opacity="0.6">
+      <line x1="-70" y1="-70" x2="-40" y2="-35"/>
+      <line x1="70" y1="-70" x2="40" y2="-35"/>
+      <line x1="-80" y1="20" x2="-50" y2="10"/>
+      <line x1="80" y1="20" x2="50" y2="10"/>
+      <line x1="-60" y1="80" x2="-30" y2="45"/>
+      <line x1="60" y1="80" x2="30" y2="45"/>
+    </g>
+    
+    <!-- Orbiting dots -->
+    <circle r="5" fill="#667eea">
+      <animateMotion dur="4s" repeatCount="indefinite" path="M 0,-100 A 100,100 0 1,1 0,100 A 100,100 0 1,1 0,-100"/>
+    </circle>
+    <circle r="4" fill="#764ba2">
+      <animateMotion dur="4s" repeatCount="indefinite" begin="2s" path="M 0,-100 A 100,100 0 1,1 0,100 A 100,100 0 1,1 0,-100"/>
+    </circle>
+  </g>
+  
+  <!-- Chat bubbles -->
+  <g opacity="0.7">
+    <!-- Left bubble -->
+    <rect x="100" y="120" width="120" height="40" rx="20" fill="#2d2d44"/>
+    <circle cx="100" cy="155" r="8" fill="#2d2d44"/>
+    <g fill="#667eea">
+      <rect x="115" y="133" width="40" height="4" rx="2"/>
+      <rect x="115" y="143" width="70" height="4" rx="2"/>
+    </g>
+    
+    <!-- Right bubble -->
+    <rect x="580" y="280" width="140" height="50" rx="20" fill="#667eea"/>
+    <circle cx="720" cy="325" r="8" fill="#667eea"/>
+    <g fill="#1a1a2e">
+      <rect x="595" y="295" width="60" height="4" rx="2"/>
+      <rect x="595" y="305" width="100" height="4" rx="2"/>
+      <rect x="595" y="315" width="45" height="4" rx="2"/>
+    </g>
+  </g>
+  
+  <!-- Floating particles -->
+  <g fill="#667eea">
+    <circle cx="200" cy="200" r="2" opacity="0.5">
+      <animate attributeName="cy" values="200;190;200" dur="3s" repeatCount="indefinite"/>
+    </circle>
+    <circle cx="600" cy="150" r="3" opacity="0.4">
+      <animate attributeName="cy" values="150;160;150" dur="2.5s" repeatCount="indefinite"/>
+    </circle>
+    <circle cx="700" cy="350" r="2" opacity="0.6">
+      <animate attributeName="cy" values="350;340;350" dur="4s" repeatCount="indefinite"/>
+    </circle>
+    <circle cx="100" cy="300" r="2" opacity="0.3">
+      <animate attributeName="cy" values="300;310;300" dur="3.5s" repeatCount="indefinite"/>
+    </circle>
+  </g>
+</svg>

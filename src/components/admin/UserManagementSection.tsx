@@ -339,6 +339,8 @@ export const UserManagementSection: React.FC<Props> = ({ accessToken, onToast })
     if (!userToDelete) return;
     
     setDeletingUserId(userToDelete.id);
+    console.log('[UserManagement] Attempting to delete user:', userToDelete.email, userToDelete.id);
+    
     try {
       const response = await fetch('/api/admin/users/delete', {
         method: 'POST',
@@ -350,11 +352,14 @@ export const UserManagementSection: React.FC<Props> = ({ accessToken, onToast })
       });
 
       const data = await response.json();
+      console.log('[UserManagement] Delete response:', data);
 
       if (!response.ok) {
-        throw new Error(data.error || 'Failed to delete user');
+        const errorMessage = data.details ? `${data.error}: ${data.details}` : data.error;
+        throw new Error(errorMessage || 'Failed to delete user');
       }
 
+      console.log('[UserManagement] User deleted successfully');
       onToast(`User ${userToDelete.email} has been deleted`, 'success');
       setShowDeleteModal(false);
       setUserToDelete(null);
@@ -363,7 +368,7 @@ export const UserManagementSection: React.FC<Props> = ({ accessToken, onToast })
       // Refresh the user list
       await fetchUsers();
     } catch (err) {
-      console.error('Error deleting user:', err);
+      console.error('[UserManagement] Error deleting user:', err);
       onToast(err instanceof Error ? err.message : 'Failed to delete user', 'error');
     } finally {
       setDeletingUserId(null);

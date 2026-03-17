@@ -1,0 +1,353 @@
+{
+  "name": "CTC Viral Post Generator",
+  "nodes": [
+    {
+      "parameters": {},
+      "id": "manual-trigger",
+      "name": "Generate Viral Post",
+      "type": "n8n-nodes-base.manualTrigger",
+      "typeVersion": 1,
+      "position": [0, 0]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.anthropic.com/v1/messages",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "anthropic-version",
+              "value": "2023-06-01"
+            },
+            {
+              "name": "content-type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"model\": \"claude-sonnet-4-20250514\",\n  \"max_tokens\": 4096,\n  \"messages\": [\n    {\n      \"role\": \"user\",\n      \"content\": \"You are a viral content strategist who has generated posts with millions of impressions. Your specialty is creating scroll-stopping content for the Creative Technology Collective (CTC) - a network of creative technologists, designers, AI artists, and innovators.\\n\\n## YOUR TASK\\nGenerate 3 VIRAL post variations for LinkedIn. Each must be completely different in approach.\\n\\n## VIRAL CONTENT FORMULAS (use one per variation):\\n\\n**Formula 1: Controversial Hot Take**\\n- Start with a bold, slightly controversial statement that challenges conventional wisdom\\n- Pattern: \\\"[Common belief] is wrong. Here's why...\\\"\\n- Creates debate and comments\\n\\n**Formula 2: Story-Driven Transformation**\\n- Personal or relatable story with emotional arc\\n- Pattern: \\\"X years ago I [struggle]. Today I [success]. Here's what changed...\\\"\\n- List 5-7 lessons learned\\n- Each point is 1 line max\\n\\n**Formula 3: Counterintuitive Insight**\\n- Share a surprising truth that goes against expectations\\n- Pattern: \\\"Everyone says [do X]. But the best [role] I know do the opposite...\\\"\\n- Reveal the hidden insight\\n\\n## VIRAL MECHANICS (include in ALL posts):\\n- HOOK: First line must stop the scroll (pattern interrupt, curiosity gap, bold claim)\\n- WHITE SPACE: Short paragraphs, 1-2 sentences max\\n- LINE BREAKS: After every sentence for mobile readability\\n- SPECIFICITY: Use specific numbers, names, timeframes (not \\\"many\\\" but \\\"847\\\")\\n- EMOTION: Hit curiosity, aspiration, or \\\"I feel seen\\\" moments\\n- CTA: End with engaging question or \\\"Follow for more\\\"\\n- NO HASHTAGS IN BODY: Put 3-5 hashtags in first comment only\\n\\n## CTC CONTEXT:\\n- Community of 500+ creative technologists\\n- Topics: AI/ML in creative work, creative coding, immersive tech, design systems, future of work\\n- Tone: Insider knowledge, forward-thinking, authentic, not corporate\\n- Goal: Position CTC as THE community for creative technologists\\n\\n## OUTPUT FORMAT (JSON):\\n{\\n  \\\"posts\\\": [\\n    {\\n      \\\"formula\\\": \\\"name of formula used\\\",\\n      \\\"hook\\\": \\\"the first line only\\\",\\n      \\\"full_post\\\": \\\"complete post with formatting\\\",\\n      \\\"first_comment_hashtags\\\": \\\"#hashtag1 #hashtag2 ...\\\",\\n      \\\"why_viral\\\": \\\"1 sentence on why this will perform\\\",\\n      \\\"best_time_to_post\\\": \\\"suggested posting time\\\"\\n    }\\n  ]\\n}\\n\\nGenerate 3 completely different viral posts NOW.\"\n    }\n  ]\n}"
+      },
+      "id": "generate-linkedin-viral",
+      "name": "Generate LinkedIn Viral Posts",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [240, -120],
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "anthropic-api",
+          "name": "Anthropic API Key"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.anthropic.com/v1/messages",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "anthropic-version",
+              "value": "2023-06-01"
+            },
+            {
+              "name": "content-type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"model\": \"claude-sonnet-4-20250514\",\n  \"max_tokens\": 4096,\n  \"messages\": [\n    {\n      \"role\": \"user\",\n      \"content\": \"You are a viral Instagram content creator who has built accounts to 100K+ followers. Your specialty is creating share-worthy carousel and reel concepts for the Creative Technology Collective (CTC) - a network of creative technologists, designers, AI artists, and innovators.\\n\\n## YOUR TASK\\nGenerate 3 VIRAL Instagram post concepts. Each must be completely different in format.\\n\\n## VIRAL INSTAGRAM FORMULAS:\\n\\n**Format 1: Carousel (10 slides)**\\n- Slide 1: Bold hook statement + eye-catching visual concept\\n- Slides 2-9: Value-packed tips/insights (one per slide)\\n- Slide 10: CTA to save/share/follow\\n- Caption: Expand on the hook, ask engaging question\\n\\n**Format 2: Single Image with Story Caption**\\n- Visual: Describe the image concept (quote graphic, behind-scenes, workspace)\\n- Caption: Mini-story format (hook → struggle → insight → lesson → CTA)\\n- Must feel personal and authentic\\n\\n**Format 3: Reel Concept (30-60 sec)**\\n- Hook in first 2 seconds\\n- Script the full reel with timestamps\\n- Trending audio suggestion\\n- Text overlay instructions\\n\\n## VIRAL MECHANICS FOR INSTAGRAM:\\n- SAVE-WORTHY: Content people bookmark for later\\n- SHARE-WORTHY: Content people send to friends (\\\"this is so you\\\")\\n- HOOK: First 3 seconds/words are everything\\n- RELATABILITY: \\\"I feel seen\\\" moments\\n- SPECIFICITY: \\\"5 tools\\\" beats \\\"some tools\\\"\\n- CAPTION: Start strong, use line breaks, end with question\\n- HASHTAGS: 5-10 relevant hashtags at end of caption\\n\\n## CTC CONTEXT:\\n- Community of 500+ creative technologists\\n- Topics: AI art, creative coding, design tools, tech careers, future of creativity\\n- Aesthetic: Clean, modern, tech-forward but human\\n- Tone: Insider tips, authentic, inspiring, not preachy\\n- Target: Designers wanting to learn tech, developers wanting to be creative\\n\\n## OUTPUT FORMAT (JSON):\\n{\\n  \\\"posts\\\": [\\n    {\\n      \\\"format\\\": \\\"Carousel/Single Image/Reel\\\",\\n      \\\"hook\\\": \\\"the scroll-stopping hook\\\",\\n      \\\"visual_concept\\\": \\\"describe the visual/slides/video\\\",\\n      \\\"caption\\\": \\\"full caption with formatting\\\",\\n      \\\"hashtags\\\": \\\"#hashtag1 #hashtag2 ...\\\",\\n      \\\"why_viral\\\": \\\"why this will get saves/shares\\\",\\n      \\\"content_pillar\\\": \\\"education/inspiration/entertainment/community\\\"\\n    }\\n  ]\\n}\\n\\nGenerate 3 viral Instagram concepts NOW.\"\n    }\n  ]\n}"
+      },
+      "id": "generate-instagram-viral",
+      "name": "Generate Instagram Viral Posts",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [240, 120],
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "anthropic-api",
+          "name": "Anthropic API Key"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "mode": "combine",
+        "combineBy": "combineAll",
+        "options": {}
+      },
+      "id": "merge-content",
+      "name": "Merge Results",
+      "type": "n8n-nodes-base.merge",
+      "typeVersion": 3,
+      "position": [480, 0]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Parse LinkedIn and Instagram viral content\nconst items = $input.all();\n\nlet linkedinPosts = [];\nlet instagramPosts = [];\n\n// Process LinkedIn response\ntry {\n  const linkedinResponse = items[0]?.json;\n  if (linkedinResponse?.content?.[0]?.text) {\n    const text = linkedinResponse.content[0].text;\n    const jsonMatch = text.match(/\\{[\\s\\S]*\\}/);\n    if (jsonMatch) {\n      const parsed = JSON.parse(jsonMatch[0]);\n      linkedinPosts = parsed.posts || [];\n    }\n  }\n} catch (e) {\n  console.log('LinkedIn parse error:', e.message);\n}\n\n// Process Instagram response\ntry {\n  const instagramResponse = items[1]?.json;\n  if (instagramResponse?.content?.[0]?.text) {\n    const text = instagramResponse.content[0].text;\n    const jsonMatch = text.match(/\\{[\\s\\S]*\\}/);\n    if (jsonMatch) {\n      const parsed = JSON.parse(jsonMatch[0]);\n      instagramPosts = parsed.posts || [];\n    }\n  }\n} catch (e) {\n  console.log('Instagram parse error:', e.message);\n}\n\nconst today = new Date().toISOString().split('T')[0];\nconst output = [];\n\n// Format LinkedIn posts\nlinkedinPosts.forEach((post, index) => {\n  output.push({\n    json: {\n      date: today,\n      platform: 'LinkedIn',\n      variation: index + 1,\n      formula: post.formula || 'N/A',\n      hook: post.hook || '',\n      full_post: post.full_post || '',\n      hashtags: post.first_comment_hashtags || '',\n      why_viral: post.why_viral || '',\n      best_time: post.best_time_to_post || 'Tue-Thu 8-10am',\n      status: 'Ready to Review'\n    }\n  });\n});\n\n// Format Instagram posts\ninstagramPosts.forEach((post, index) => {\n  output.push({\n    json: {\n      date: today,\n      platform: 'Instagram',\n      variation: index + 1,\n      format: post.format || 'N/A',\n      hook: post.hook || '',\n      visual_concept: post.visual_concept || '',\n      caption: post.caption || '',\n      hashtags: post.hashtags || '',\n      why_viral: post.why_viral || '',\n      content_pillar: post.content_pillar || '',\n      status: 'Ready to Review'\n    }\n  });\n});\n\nreturn output.length > 0 ? output : [{ json: { error: 'No posts generated' } }];"
+      },
+      "id": "parse-viral-content",
+      "name": "Parse Viral Content",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [700, 0]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict"
+          },
+          "conditions": [
+            {
+              "id": "linkedin-filter",
+              "leftValue": "={{ $json.platform }}",
+              "rightValue": "LinkedIn",
+              "operator": {
+                "type": "string",
+                "operation": "equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "split-platforms",
+      "name": "Split by Platform",
+      "type": "n8n-nodes-base.filter",
+      "typeVersion": 2,
+      "position": [920, -100]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict"
+          },
+          "conditions": [
+            {
+              "id": "instagram-filter",
+              "leftValue": "={{ $json.platform }}",
+              "rightValue": "Instagram",
+              "operator": {
+                "type": "string",
+                "operation": "equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "split-platforms-ig",
+      "name": "Filter Instagram",
+      "type": "n8n-nodes-base.filter",
+      "typeVersion": 2,
+      "position": [920, 100]
+    },
+    {
+      "parameters": {
+        "operation": "append",
+        "documentId": {
+          "__rl": true,
+          "mode": "id",
+          "value": "={{ $env.GOOGLE_SHEET_ID }}"
+        },
+        "sheetName": {
+          "__rl": true,
+          "mode": "list",
+          "value": "LinkedIn Viral"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "Date": "={{ $json.date }}",
+            "Variation": "={{ $json.variation }}",
+            "Formula": "={{ $json.formula }}",
+            "Hook": "={{ $json.hook }}",
+            "Full Post": "={{ $json.full_post }}",
+            "Hashtags (1st Comment)": "={{ $json.hashtags }}",
+            "Why It Will Go Viral": "={{ $json.why_viral }}",
+            "Best Time to Post": "={{ $json.best_time }}",
+            "Status": "={{ $json.status }}"
+          }
+        },
+        "options": {}
+      },
+      "id": "save-linkedin",
+      "name": "Save LinkedIn Posts",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.5,
+      "position": [1140, -100],
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "google-sheets",
+          "name": "Google Sheets OAuth2"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "append",
+        "documentId": {
+          "__rl": true,
+          "mode": "id",
+          "value": "={{ $env.GOOGLE_SHEET_ID }}"
+        },
+        "sheetName": {
+          "__rl": true,
+          "mode": "list",
+          "value": "Instagram Viral"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "Date": "={{ $json.date }}",
+            "Variation": "={{ $json.variation }}",
+            "Format": "={{ $json.format }}",
+            "Hook": "={{ $json.hook }}",
+            "Visual Concept": "={{ $json.visual_concept }}",
+            "Caption": "={{ $json.caption }}",
+            "Hashtags": "={{ $json.hashtags }}",
+            "Why It Will Go Viral": "={{ $json.why_viral }}",
+            "Content Pillar": "={{ $json.content_pillar }}",
+            "Status": "={{ $json.status }}"
+          }
+        },
+        "options": {}
+      },
+      "id": "save-instagram",
+      "name": "Save Instagram Posts",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.5,
+      "position": [1140, 100],
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "google-sheets",
+          "name": "Google Sheets OAuth2"
+        }
+      }
+    }
+  ],
+  "connections": {
+    "Generate Viral Post": {
+      "main": [
+        [
+          {
+            "node": "Generate LinkedIn Viral Posts",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Generate Instagram Viral Posts",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Generate LinkedIn Viral Posts": {
+      "main": [
+        [
+          {
+            "node": "Merge Results",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Generate Instagram Viral Posts": {
+      "main": [
+        [
+          {
+            "node": "Merge Results",
+            "type": "main",
+            "index": 1
+          }
+        ]
+      ]
+    },
+    "Merge Results": {
+      "main": [
+        [
+          {
+            "node": "Parse Viral Content",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Parse Viral Content": {
+      "main": [
+        [
+          {
+            "node": "Split by Platform",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Filter Instagram",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Split by Platform": {
+      "main": [
+        [
+          {
+            "node": "Save LinkedIn Posts",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Filter Instagram": {
+      "main": [
+        [
+          {
+            "node": "Save Instagram Posts",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "staticData": null,
+  "tags": [
+    {
+      "name": "viral",
+      "createdAt": "2024-01-01T00:00:00.000Z",
+      "updatedAt": "2024-01-01T00:00:00.000Z"
+    },
+    {
+      "name": "CTC",
+      "createdAt": "2024-01-01T00:00:00.000Z",
+      "updatedAt": "2024-01-01T00:00:00.000Z"
+    }
+  ],
+  "triggerCount": 1,
+  "pinData": {}
+}

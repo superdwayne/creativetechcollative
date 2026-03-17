@@ -53,13 +53,16 @@
     <!-- Preconnect to external domains -->
     <link rel="preconnect" href="https://fonts.cdnfonts.com">
     <link rel="preconnect" href="https://fonts.googleapis.com">
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link rel="preconnect" href="https://n8n.creativetechnologists.nl">
-    
-    <!-- Fonts -->
-    <link href="https://fonts.cdnfonts.com/css/thegoodmonolith" rel="stylesheet">
+
+    <!-- Fonts - critical font loaded normally, others deferred -->
     <link href="https://fonts.cdnfonts.com/css/pp-neue-montreal" rel="stylesheet">
-    <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,400;0,500;0,600;0,700;1,400;1,500&display=swap" rel="stylesheet">
+    <link href="https://fonts.cdnfonts.com/css/thegoodmonolith" rel="stylesheet" media="print" onload="this.media='all'">
+    <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,400;0,500;0,600;0,700;1,400;1,500&display=swap" rel="stylesheet" media="print" onload="this.media='all'">
+    <noscript>
+      <link href="https://fonts.cdnfonts.com/css/thegoodmonolith" rel="stylesheet">
+      <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,400;0,500;0,600;0,700;1,400;1,500&display=swap" rel="stylesheet">
+    </noscript>
     
     <!-- Structured Data -->
     <script type="application/ld+json">
@@ -88,14 +91,20 @@
     }
     </script>
 
-    <!-- Google tag (gtag.js) -->
-<script async src="https://www.googletagmanager.com/gtag/js?id=G-Z517VSCQWM"></script>
+    <!-- Google tag (gtag.js) - deferred to avoid blocking initial render -->
 <script>
   window.dataLayer = window.dataLayer || [];
   function gtag(){dataLayer.push(arguments);}
   gtag('js', new Date());
-
   gtag('config', 'G-Z517VSCQWM');
+
+  // Load gtag script after page is interactive
+  window.addEventListener('load', function() {
+    var s = document.createElement('script');
+    s.src = 'https://www.googletagmanager.com/gtag/js?id=G-Z517VSCQWM';
+    s.async = true;
+    document.head.appendChild(s);
+  });
 </script>
     
     <!-- Security Headers (set via HTTP headers in vercel.json, not meta tags) -->

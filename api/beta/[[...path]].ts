@@ -230,11 +230,28 @@ async function handleStatus(
     profileStatus = profile.approved ? 'approved' : 'pending';
   }
 
+  // Check if user has a company account
+  let hasCompany = false;
+  let companyStatus: 'none' | 'unverified' | 'verified' = 'none';
+
+  const { data: company } = await supabase
+    .from('companies')
+    .select('id, verified')
+    .eq('user_id', user.id)
+    .single();
+
+  if (company) {
+    hasCompany = true;
+    companyStatus = company.verified ? 'verified' : 'unverified';
+  }
+
   return res.status(200).json({
     success: true,
     betaApplication,
     hasProfile,
     profileStatus,
+    hasCompany,
+    companyStatus,
     isAdmin: isAdmin(user.id),
   });
 }

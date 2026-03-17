@@ -3,6 +3,7 @@ import { ScrollTriggeredText } from './ui/scroll-triggered-text';
 import { Input } from './ui/input';
 import { ButtonColorful } from './ui/button-colorful';
 import { getWebhookUrl } from '@/utils/webhookUtils';
+import { useHaptics } from '@/hooks/useHaptics';
 
 interface EmailSignupProps {
   hideIntro?: boolean;
@@ -14,6 +15,7 @@ const EmailSignup: React.FC<EmailSignupProps> = ({ hideIntro = false, minimal = 
   const [email, setEmail] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [submitMessage, setSubmitMessage] = useState('');
+  const { success: hapticSuccess, error: hapticError } = useHaptics();
 
   // Function to capitalize first letter of each word
   const capitalizeName = (name: string): string => {
@@ -37,16 +39,19 @@ const EmailSignup: React.FC<EmailSignupProps> = ({ hideIntro = false, minimal = 
     
     if (!capitalizedName) {
       setSubmitMessage('Please enter your name');
+      hapticError();
       return;
     }
 
     if (!email.trim()) {
       setSubmitMessage('Please enter an email address');
+      hapticError();
       return;
     }
 
     if (!isValidEmail(email)) {
       setSubmitMessage('Please enter a valid email address');
+      hapticError();
       return;
     }
 
@@ -84,12 +89,14 @@ const EmailSignup: React.FC<EmailSignupProps> = ({ hideIntro = false, minimal = 
       console.log('Success response:', result);
       
       setSubmitMessage(`Thank you, ${capitalizedName}! You've been added to our newsletter.`);
+      hapticSuccess();
       setName('');
       setEmail('');
-      
+
     } catch (error) {
       console.error('Error submitting form:', error);
       setSubmitMessage('Sorry, there was an error signing you up. Please try again.');
+      hapticError();
     } finally {
       setIsSubmitting(false);
     }
@@ -102,6 +109,8 @@ const EmailSignup: React.FC<EmailSignupProps> = ({ hideIntro = false, minimal = 
         <div className="flex flex-col sm:flex-row gap-3 mb-4">
           <input
             type="text"
+            id="signup-name-minimal"
+            name="name"
             placeholder="Your name"
             value={name}
             onChange={(e) => setName(e.target.value)}
@@ -111,6 +120,8 @@ const EmailSignup: React.FC<EmailSignupProps> = ({ hideIntro = false, minimal = 
           />
           <input
             type="email"
+            id="signup-email-minimal"
+            name="email"
             placeholder="Your email"
             value={email}
             onChange={(e) => setEmail(e.target.value)}
@@ -161,6 +172,8 @@ const EmailSignup: React.FC<EmailSignupProps> = ({ hideIntro = false, minimal = 
           <div className="flex flex-col sm:flex-row gap-3 sm:gap-0 mb-4">
             <Input
               type="text"
+              id="signup-name"
+              name="name"
               placeholder="Your name"
               value={name}
               onChange={(e) => {
@@ -177,6 +190,8 @@ const EmailSignup: React.FC<EmailSignupProps> = ({ hideIntro = false, minimal = 
             />
             <Input
               type="email"
+              id="signup-email"
+              name="email"
               placeholder="Enter your email for updates"
               value={email}
               onChange={(e) => setEmail(e.target.value)}

@@ -38,6 +38,8 @@ export interface NetworkProfile {
   createdAt: string;
   updatedAt: string;
   slug: string;
+  // Creative Tech Spectrum: 0=design-focused, 50=hybrid, 100=dev-focused (all within creative technology)
+  creativeSpectrum: number;
   // Membership type: 'beta' for approved beta members, 'full' for upgraded/direct members
   membershipType?: MembershipType;
   // Embedding fields for AI-powered job matching
@@ -60,6 +62,33 @@ export interface ProfileFormData {
   availability: AvailabilityStatus;
   isCtcMember: boolean;
   profilePictureUrl: string;
+  // Creative Tech Spectrum: 0=design-focused, 50=hybrid, 100=dev-focused (all within creative technology)
+  creativeSpectrum: number;
+}
+
+/**
+ * Get a human-readable label for a creative tech spectrum value (0-100).
+ * Both ends are creative technologists — this indicates whether they lean
+ * more toward design or development in their creative practice.
+ */
+export function getSpectrumLabel(value: number): string {
+  if (value <= 15) return 'Design-Focused';
+  if (value <= 35) return 'Design-Leaning';
+  if (value <= 64) return 'Hybrid Creative';
+  if (value <= 84) return 'Dev-Leaning';
+  return 'Dev-Focused';
+}
+
+/**
+ * Get the gradient color for a spectrum position.
+ * Violet (design-focused) → neutral (hybrid) → cyan (dev-focused)
+ */
+export function getSpectrumColor(value: number): string {
+  if (value <= 20) return 'rgb(139, 92, 246)'; // violet-500
+  if (value <= 40) return 'rgb(167, 139, 250)'; // violet-400
+  if (value <= 60) return 'rgb(161, 161, 170)'; // zinc-400
+  if (value <= 80) return 'rgb(103, 232, 249)'; // cyan-300
+  return 'rgb(6, 182, 212)'; // cyan-500
 }
 
 // Suggested focus areas - users can select from these or add their own

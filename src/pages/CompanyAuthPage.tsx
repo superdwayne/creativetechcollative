@@ -1,20 +1,25 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { Input } from '../components/ui/input';
-import { Loader2, Mail, Lock, AlertCircle, Building2, ArrowRight } from 'lucide-react';
+import { Loader2, Mail, Lock, AlertCircle, Building2, ArrowRight, Sparkles, KeyRound } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
+import { useHaptics } from '@/hooks/useHaptics';
 import { getCompanyByUserId, supabase } from '@/lib/supabase';
+
+type AuthMode = 'magic-link' | 'password';
 
 const CompanyAuthPage: React.FC = () => {
   const navigate = useNavigate();
-  const { user, signIn, signInWithGoogle, loading: authLoading } = useAuth();
-  const [isGoogleLoading, setIsGoogleLoading] = useState(false);
+  const { user, signIn, signInWithMagicLink, loading: authLoading } = useAuth();
+  const { success: hapticSuccess, error: hapticError } = useHaptics();
 
+  const [authMode, setAuthMode] = useState<AuthMode>('magic-link');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState('');
   const [infoMessage, setInfoMessage] = useState('');
+  const [magicLinkSent, setMagicLinkSent] = useState(false);
 
   useEffect(() => {
     const checkExistingCompany = async () => {
@@ -54,7 +59,7 @@ const CompanyAuthPage: React.FC = () => {
       }
 
       const { error: resetError } = await supabase.auth.resetPasswordForEmail(email.trim(), {
-        redirectTo: `${window.location.origin}/company/auth`,
+        redirectTo: `${window.location.origin}/reset-password`,
       });
       if (resetError) {
         setError(resetError.message || 'Failed to send reset email.');
@@ -66,22 +71,37 @@ const CompanyAuthPage: React.FC = () => {
     }
   };
 
-  const handleGoogleSignIn = async () => {
+  const handleMagicLinkSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
     setError('');
-    setIsGoogleLoading(true);
+    setInfoMessage('');
+
+    if (!email.trim()) {
+      setError('Please enter your email');
+      return;
+    }
+
+    setIsSubmitting(true);
+
     try {
-      const { error } = await signInWithGoogle('/company');
+      const { error } = await signInWithMagicLink(email.trim(), '/company/dashboard');
       if (error) {
+        hapticError();
         setError(error.message);
+      } else {
+        hapticSuccess();
+        setMagicLinkSent(true);
+        setInfoMessage('Check your email for a magic link to sign in.');
       }
     } catch (err: any) {
-      setError(err.message || 'Failed to sign in with Google');
+      hapticError();
+      setError(err.message || 'An error occurred');
     } finally {
-      setIsGoogleLoading(false);
+      setIsSubmitting(false);
     }
   };
 
-  const handleSubmit = async (e: React.FormEvent) => {
+  const handlePasswordSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError('');
     setInfoMessage('');
@@ -101,13 +121,24 @@ const CompanyAuthPage: React.FC = () => {
     try {
       const { error } = await signIn(email, password);
       if (error) {
+        hapticError();
         setError(error.message);
+      } else {
+        hapticSuccess();
       }
     } catch (err: any) {
+      hapticError();
       setError(err.message || 'An error occurred');
     } finally {
       setIsSubmitting(false);
     }
+  };
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    if (authMode === 'magic-link') {
+      return handleMagicLinkSubmit(e);
+    }
+    return handlePasswordSubmit(e);
   };
 
   if (authLoading) {
@@ -140,119 +171,161 @@ const CompanyAuthPage: React.FC = () => {
             Log in to manage your job listings, review matches, and connect with creative technologists.
           </p>
 
-          {/* Google Sign In */}
-          <button
-            type="button"
-            onClick={handleGoogleSignIn}
-            disabled={isGoogleLoading || isSubmitting}
-            className="w-full max-w-md px-6 py-4 border border-zinc-700 hover:border-zinc-500 text-white font-secondary text-sm tracking-wide transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-3 mb-6"
-          >
-            {isGoogleLoading ? (
-              <Loader2 className="h-5 w-5 animate-spin" />
-            ) : (
-              <svg className="h-5 w-5" viewBox="0 0 24 24">
-                <path
-                  fill="currentColor"
-                  d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"
-                />
-                <path
-                  fill="currentColor"
-                  d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"
-                />
-                <path
-                  fill="currentColor"
-                  d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z"
-                />
-                <path
-                  fill="currentColor"
-                  d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"
-                />
-              </svg>
-            )}
-            Continue with Google
-          </button>
-
-          {/* Divider */}
-          <div className="flex items-center gap-4 max-w-md mb-6">
-            <div className="flex-1 h-px bg-zinc-800" />
-            <span className="text-xs font-secondary text-zinc-600 uppercase tracking-wider">or</span>
-            <div className="flex-1 h-px bg-zinc-800" />
-          </div>
-
-          {infoMessage && (
-            <div className="mb-6 p-4 border border-blue-500/30 text-blue-400 text-sm font-secondary max-w-md">
-              {infoMessage}
-            </div>
-          )}
-
-          {error && (
-            <div className="mb-6 p-4 border border-red-500/30 flex items-center gap-3 text-red-400 text-sm font-secondary max-w-md">
-              <AlertCircle className="h-4 w-4 flex-shrink-0" />
-              {error}
-            </div>
-          )}
-
-          <form onSubmit={handleSubmit} className="space-y-5 max-w-md">
-            <div>
-              <label className="block text-xs font-secondary tracking-wide text-zinc-500 uppercase mb-2">
-                Email
-              </label>
-              <div className="relative">
-                <Mail className="absolute left-4 top-1/2 -translate-y-1/2 h-5 w-5 text-zinc-500" />
-                <Input
-                  type="email"
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
-                  placeholder="your@email.com"
-                  className="pl-12 h-14 bg-transparent border-zinc-800 focus:border-zinc-600 font-secondary"
-                  disabled={isSubmitting}
-                />
+          {/* Magic Link Sent Success State */}
+          {magicLinkSent ? (
+            <div className="max-w-md">
+              <div className="mb-6 p-6 border border-green-500/30 bg-green-500/5 rounded-lg">
+                <div className="flex items-center gap-3 mb-4">
+                  <div className="w-10 h-10 rounded-full bg-green-500/20 flex items-center justify-center">
+                    <Mail className="h-5 w-5 text-green-400" />
+                  </div>
+                  <div>
+                    <h3 className="text-white font-medium">Check your email</h3>
+                    <p className="text-zinc-400 text-sm">We sent a magic link to <span className="text-white">{email}</span></p>
+                  </div>
+                </div>
+                <p className="text-zinc-400 text-sm mb-4">
+                  Click the link in your email to sign in. The link expires in 1 hour.
+                </p>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setMagicLinkSent(false);
+                    setInfoMessage('');
+                  }}
+                  className="text-xs font-secondary text-zinc-500 hover:text-white transition-colors"
+                >
+                  Use a different email
+                </button>
               </div>
             </div>
-
-            <div>
-              <label className="block text-xs font-secondary tracking-wide text-zinc-500 uppercase mb-2">
-                Password
-              </label>
-              <div className="relative">
-                <Lock className="absolute left-4 top-1/2 -translate-y-1/2 h-5 w-5 text-zinc-500" />
-                <Input
-                  type="password"
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
-                  placeholder="Your password"
-                  className="pl-12 h-14 bg-transparent border-zinc-800 focus:border-zinc-600 font-secondary"
-                  disabled={isSubmitting}
-                />
-              </div>
-            </div>
-
-            <button
-              type="submit"
-              disabled={isSubmitting}
-              className="w-full px-8 py-4 bg-white text-black font-secondary text-sm tracking-wide hover:bg-zinc-200 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2 mt-8"
-            >
-              {isSubmitting ? (
-                <>
-                  <Loader2 className="h-5 w-5 animate-spin" />
-                  Logging in...
-                </>
-              ) : (
-                'Log In'
+          ) : (
+            <>
+              {infoMessage && (
+                <div className="mb-6 p-4 border border-blue-500/30 text-blue-400 text-sm font-secondary max-w-md">
+                  {infoMessage}
+                </div>
               )}
-            </button>
 
-            <div className="flex justify-center">
-              <button
-                type="button"
-                onClick={handleForgotPassword}
-                className="text-xs font-secondary text-zinc-500 hover:text-white transition-colors"
-                disabled={isSubmitting}
-              >
-                Forgot your password?
-              </button>
-            </div>
-          </form>
+              {error && (
+                <div className="mb-6 p-4 border border-red-500/30 flex items-center gap-3 text-red-400 text-sm font-secondary max-w-md">
+                  <AlertCircle className="h-4 w-4 flex-shrink-0" />
+                  {error}
+                </div>
+              )}
+
+              {/* Auth Mode Toggle */}
+              <div className="flex gap-2 mb-6 max-w-md">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setAuthMode('magic-link');
+                    setError('');
+                  }}
+                  className={`flex-1 px-4 py-3 border font-secondary text-sm tracking-wide transition-all flex items-center justify-center gap-2 ${
+                    authMode === 'magic-link'
+                      ? 'border-white text-white bg-white/5'
+                      : 'border-zinc-800 text-zinc-500 hover:border-zinc-600'
+                  }`}
+                >
+                  <Sparkles className="h-4 w-4" />
+                  Magic Link
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setAuthMode('password');
+                    setError('');
+                  }}
+                  className={`flex-1 px-4 py-3 border font-secondary text-sm tracking-wide transition-all flex items-center justify-center gap-2 ${
+                    authMode === 'password'
+                      ? 'border-white text-white bg-white/5'
+                      : 'border-zinc-800 text-zinc-500 hover:border-zinc-600'
+                  }`}
+                >
+                  <KeyRound className="h-4 w-4" />
+                  Password
+                </button>
+              </div>
+
+              <form onSubmit={handleSubmit} className="space-y-5 max-w-md">
+                <div>
+                  <label className="block text-xs font-secondary tracking-wide text-zinc-500 uppercase mb-2">
+                    Email
+                  </label>
+                  <div className="relative">
+                    <Mail className="absolute left-4 top-1/2 -translate-y-1/2 h-5 w-5 text-zinc-500" />
+                    <Input
+                      type="email"
+                      value={email}
+                      onChange={(e) => setEmail(e.target.value)}
+                      placeholder="your@email.com"
+                      className="pl-12 h-14 bg-transparent border-zinc-800 focus:border-zinc-600 font-secondary"
+                      disabled={isSubmitting}
+                    />
+                  </div>
+                </div>
+
+                {authMode === 'password' && (
+                  <div>
+                    <label className="block text-xs font-secondary tracking-wide text-zinc-500 uppercase mb-2">
+                      Password
+                    </label>
+                    <div className="relative">
+                      <Lock className="absolute left-4 top-1/2 -translate-y-1/2 h-5 w-5 text-zinc-500" />
+                      <Input
+                        type="password"
+                        value={password}
+                        onChange={(e) => setPassword(e.target.value)}
+                        placeholder="Your password"
+                        className="pl-12 h-14 bg-transparent border-zinc-800 focus:border-zinc-600 font-secondary"
+                        disabled={isSubmitting}
+                      />
+                    </div>
+                  </div>
+                )}
+
+                <button
+                  type="submit"
+                  disabled={isSubmitting}
+                  className="w-full px-8 py-4 bg-white text-black font-secondary text-sm tracking-wide hover:bg-zinc-200 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2 mt-8"
+                >
+                  {isSubmitting ? (
+                    <>
+                      <Loader2 className="h-5 w-5 animate-spin" />
+                      {authMode === 'magic-link' ? 'Sending link...' : 'Logging in...'}
+                    </>
+                  ) : authMode === 'magic-link' ? (
+                    <>
+                      <Sparkles className="h-4 w-4" />
+                      Send Magic Link
+                    </>
+                  ) : (
+                    'Log In'
+                  )}
+                </button>
+
+                {authMode === 'password' && (
+                  <div className="flex justify-center">
+                    <button
+                      type="button"
+                      onClick={handleForgotPassword}
+                      className="text-xs font-secondary text-zinc-500 hover:text-white transition-colors"
+                      disabled={isSubmitting}
+                    >
+                      Forgot your password?
+                    </button>
+                  </div>
+                )}
+
+                {authMode === 'magic-link' && (
+                  <p className="text-center text-xs text-zinc-600 font-secondary">
+                    We'll send you a secure link to sign in instantly — no password needed.
+                  </p>
+                )}
+              </form>
+            </>
+          )}
 
           {/* Request Access CTA */}
           <div className="mt-12 pt-8 border-t border-zinc-800 max-w-md">

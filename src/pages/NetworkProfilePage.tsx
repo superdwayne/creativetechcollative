@@ -16,21 +16,38 @@ import {
   FolderOpen,
   Link2,
   MessageSquare,
+  LogOut,
+  Edit,
+  LayoutDashboard,
+  ChevronDown,
+  ChevronUp,
+  UserPlus,
+  CheckCircle2,
+  Clock,
 } from 'lucide-react';
 import { NetworkProfile, FOCUS_AREAS, AVAILABILITY_OPTIONS } from '@/types/network-profile';
 import { getProfileBySlug } from '@/lib/supabase';
 import { cn } from '@/lib/utils';
 import { useAuth } from '@/contexts/AuthContext';
+import { CreativeSpectrumSlider } from '@/components/ui/creative-spectrum-slider';
 
 const NetworkProfilePage: React.FC = () => {
   const { slug } = useParams<{ slug: string }>();
   const navigate = useNavigate();
-  const { user, session } = useAuth();
+  const { user, session, signOut, isCompanyUser } = useAuth();
   const [profile, setProfile] = useState<NetworkProfile | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [startingConversation, setStartingConversation] = useState(false);
   const [isOwnProfile, setIsOwnProfile] = useState(false);
+  const [showAllProjects, setShowAllProjects] = useState(false);
+
+  // Contact request state (for company users)
+  const [contactRequestStatus, setContactRequestStatus] = useState<string | null>(null);
+  const [submittingRequest, setSubmittingRequest] = useState(false);
+  const [requestMessage, setRequestMessage] = useState('');
+  const [showRequestForm, setShowRequestForm] = useState(false);
+  const [requestError, setRequestError] = useState('');
 
   useEffect(() => {
     const fetchProfile = async () => {
@@ -62,6 +79,65 @@ const NetworkProfilePage: React.FC = () => {
     fetchProfile();
   }, [slug, user]);
 
+  // Check existing contact request status for company users
+  useEffect(() => {
+    if (!isCompanyUser || !session?.access_token || !profile?.id || isOwnProfile) return;
+
+    const checkStatus = async () => {
+      try {
+        const res = await fetch(`/api/company/contact-request/status?profileId=${profile.id}`, {
+          headers: { Authorization: `Bearer ${session.access_token}` },
+        });
+        const data = await res.json();
+        if (data.exists) {
+          setContactRequestStatus(data.status);
+        }
+      } catch (err) {
+        console.error('Error checking contact request status:', err);
+      }
+    };
+
+    checkStatus();
+  }, [isCompanyUser, session?.access_token, profile?.id, isOwnProfile]);
+
+  const handleSubmitContactRequest = async () => {
+    if (!session?.access_token || !profile?.id) return;
+
+    setSubmittingRequest(true);
+    setRequestError('');
+
+    try {
+      const res = await fetch('/api/company/contact-request', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${session.access_token}`,
+        },
+        body: JSON.stringify({
+          profileId: profile.id,
+          message: requestMessage.trim() || undefined,
+        }),
+      });
+
+      const data = await res.json();
+
+      if (data.success) {
+        setContactRequestStatus('pending');
+        setShowRequestForm(false);
+        setRequestMessage('');
+      } else {
+        setRequestError(data.error || 'Failed to submit request.');
+        if (data.existingStatus) {
+          setContactRequestStatus(data.existingStatus);
+        }
+      }
+    } catch (err) {
+      setRequestError('Something went wrong. Please try again.');
+    } finally {
+      setSubmittingRequest(false);
+    }
+  };
+
   // Start a direct conversation with this member
   const handleStartConversation = async () => {
     if (!session?.access_token || !profile?.id) {
@@ -86,12 +162,11 @@ const NetworkProfilePage: React.FC = () => {
 
       const data = await response.json();
 
-      if (data.success) {
+      if (data.success && data.conversation?.id) {
         // Navigate to the chat page with the conversation
-        navigate(`/messages?type=direct&id=${data.conversationId}`);
+        navigate(`/messages?type=direct&id=${data.conversation.id}`);
       } else {
         console.error('Failed to start conversation:', data.error);
-        // Could show a toast error here
       }
     } catch (error) {
       console.error('Error starting conversation:', error);
@@ -182,7 +257,7 @@ const NetworkProfilePage: React.FC = () => {
       </div>
 
       {/* Header */}
-      <header className="relative border-b border-zinc-800/50 backdrop-blur-sm bg-black/50 sticky top-0 z-40">
+      <header className="relative border-b border-zinc-800/50 backdrop-blur-sm bg-black/50">
         <div className="max-w-6xl mx-auto px-6 py-4 flex items-center justify-between">
           <div className="flex items-center gap-3">
             <Link to="/directory" className="text-xs font-medium tracking-[0.2em] text-zinc-500 uppercase hover:text-zinc-300 transition-colors">
@@ -272,35 +347,140 @@ const NetworkProfilePage: React.FC = () => {
                 )}
 
                 {/* Action Buttons */}
-                <div className="flex items-center gap-3">
-                  {/* Message Button - only show if not own profile and user is logged in */}
-                  {!isOwnProfile && (
-                    <button
-                      onClick={handleStartConversation}
-                      disabled={startingConversation}
-                      className="group inline-flex items-center gap-2 px-5 py-2.5 bg-pink-500 text-white rounded-xl text-sm font-medium hover:bg-pink-600 transition-all shadow-lg shadow-pink-500/20 disabled:opacity-50 disabled:cursor-not-allowed"
-                    >
-                      {startingConversation ? (
-                        <Loader2 className="h-4 w-4 animate-spin" />
-                      ) : (
-                        <MessageSquare className="h-4 w-4" />
-                      )}
-                      Message
-                    </button>
+                <div className="flex flex-wrap items-center gap-3">
+                  {/* Own Profile Actions */}
+                  {isOwnProfile && (
+                    <>
+                      <Link
+                        to="/directory/edit"
+                        className="group inline-flex items-center gap-2 px-5 py-2.5 bg-white text-black rounded-xl text-sm font-medium hover:bg-zinc-100 transition-all shadow-lg shadow-white/5"
+                      >
+                        <Edit className="h-4 w-4" />
+                        Edit Profile
+                      </Link>
+                      <Link
+                        to="/directory/dashboard"
+                        className="group inline-flex items-center gap-2 px-5 py-2.5 bg-zinc-800/80 text-white rounded-xl text-sm font-medium hover:bg-zinc-700 transition-all border border-zinc-700/50"
+                      >
+                        <LayoutDashboard className="h-4 w-4" />
+                        Dashboard
+                      </Link>
+                      <button
+                        onClick={async () => {
+                          await signOut();
+                          navigate('/');
+                        }}
+                        className="group inline-flex items-center gap-2 px-5 py-2.5 bg-zinc-900/50 text-zinc-400 rounded-xl text-sm font-medium hover:text-white hover:bg-zinc-800 transition-all border border-zinc-800/50"
+                      >
+                        <LogOut className="h-4 w-4" />
+                        Sign Out
+                      </button>
+                    </>
                   )}
-                  
-                  {/* Email Button */}
-                  <a
-                    href={`mailto:${profile.email}`}
-                    className="group inline-flex items-center gap-2 px-5 py-2.5 bg-white text-black rounded-xl text-sm font-medium hover:bg-zinc-100 transition-all shadow-lg shadow-white/5"
-                  >
-                    <Mail className="h-4 w-4" />
-                    Email
-                  </a>
+
+                  {/* Company users: Request Contact flow */}
+                  {!isOwnProfile && isCompanyUser && (
+                    <>
+                      {contactRequestStatus === 'pending' ? (
+                        <span className="inline-flex items-center gap-2 px-5 py-2.5 bg-amber-500/15 text-amber-400 rounded-xl text-sm font-medium border border-amber-500/20">
+                          <Clock className="h-4 w-4" />
+                          Request Pending
+                        </span>
+                      ) : contactRequestStatus === 'approved' ? (
+                        <span className="inline-flex items-center gap-2 px-5 py-2.5 bg-emerald-500/15 text-emerald-400 rounded-xl text-sm font-medium border border-emerald-500/20">
+                          <CheckCircle2 className="h-4 w-4" />
+                          Connected
+                        </span>
+                      ) : (
+                        <button
+                          onClick={() => setShowRequestForm(!showRequestForm)}
+                          className="group inline-flex items-center gap-2 px-5 py-2.5 bg-pink-500 text-white rounded-xl text-sm font-medium hover:bg-pink-600 transition-all shadow-lg shadow-pink-500/20"
+                        >
+                          <UserPlus className="h-4 w-4" />
+                          Request Contact Details
+                        </button>
+                      )}
+                    </>
+                  )}
+
+                  {/* Regular users: Message & Email */}
+                  {!isOwnProfile && !isCompanyUser && (
+                    <>
+                      <button
+                        onClick={handleStartConversation}
+                        disabled={startingConversation}
+                        className="group inline-flex items-center gap-2 px-5 py-2.5 bg-pink-500 text-white rounded-xl text-sm font-medium hover:bg-pink-600 transition-all shadow-lg shadow-pink-500/20 disabled:opacity-50 disabled:cursor-not-allowed"
+                      >
+                        {startingConversation ? (
+                          <Loader2 className="h-4 w-4 animate-spin" />
+                        ) : (
+                          <MessageSquare className="h-4 w-4" />
+                        )}
+                        Message
+                      </button>
+                      <a
+                        href={`mailto:${profile.email}`}
+                        className="group inline-flex items-center gap-2 px-5 py-2.5 bg-white text-black rounded-xl text-sm font-medium hover:bg-zinc-100 transition-all shadow-lg shadow-white/5"
+                      >
+                        <Mail className="h-4 w-4" />
+                        Email
+                      </a>
+                    </>
+                  )}
                 </div>
+
+                {/* Contact Request Form (Company users) */}
+                {showRequestForm && isCompanyUser && !contactRequestStatus && (
+                  <div className="mt-6 p-5 bg-zinc-900/80 border border-zinc-700/50 rounded-xl animate-in fade-in slide-in-from-top-2 duration-300">
+                    <h4 className="text-sm font-semibold text-white mb-1">Request Contact Details</h4>
+                    <p className="text-xs text-zinc-500 mb-4">
+                      We'll review your request and reach out to {profile.fullName.split(' ')[0]} on your behalf before connecting you.
+                    </p>
+                    <textarea
+                      value={requestMessage}
+                      onChange={(e) => setRequestMessage(e.target.value)}
+                      placeholder={`Why would you like to connect with ${profile.fullName.split(' ')[0]}? (optional)`}
+                      rows={3}
+                      className="w-full bg-white/5 border border-white/10 rounded-lg px-3 py-2 text-sm text-white placeholder-white/25 focus:outline-none focus:ring-1 focus:ring-pink-500/50 focus:border-pink-500/50 resize-none mb-3"
+                    />
+                    {requestError && (
+                      <p className="text-xs text-red-400 mb-3">{requestError}</p>
+                    )}
+                    <div className="flex gap-2">
+                      <button
+                        onClick={handleSubmitContactRequest}
+                        disabled={submittingRequest}
+                        className="inline-flex items-center gap-2 px-4 py-2 bg-pink-500 text-white rounded-lg text-sm font-medium hover:bg-pink-600 transition-colors disabled:opacity-50"
+                      >
+                        {submittingRequest ? (
+                          <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                        ) : (
+                          <UserPlus className="h-3.5 w-3.5" />
+                        )}
+                        Submit Request
+                      </button>
+                      <button
+                        onClick={() => { setShowRequestForm(false); setRequestError(''); }}
+                        className="px-4 py-2 text-zinc-400 hover:text-white text-sm transition-colors"
+                      >
+                        Cancel
+                      </button>
+                    </div>
+                  </div>
+                )}
               </div>
             </div>
           </div>
+
+          {/* Creative Spectrum */}
+          {profile.creativeSpectrum !== undefined && profile.creativeSpectrum !== null && (
+            <div className="animate-in fade-in slide-in-from-bottom-4 duration-500 delay-75">
+              <CreativeSpectrumSlider
+                value={profile.creativeSpectrum}
+                readOnly
+              />
+            </div>
+          )}
 
           {/* Links Section */}
           {(profile.portfolioUrl || profile.linkedinUrl || (profile.otherSocialLinks && profile.otherSocialLinks.length > 0)) && (
@@ -394,54 +574,83 @@ const NetworkProfilePage: React.FC = () => {
           </section>
 
           {/* Projects */}
-          {profile.projects && profile.projects.length > 0 && (
-            <section className="animate-in fade-in slide-in-from-bottom-4 duration-500 delay-300">
-              <h2 className="text-xs font-semibold tracking-[0.2em] text-zinc-500 uppercase mb-4 flex items-center gap-2">
-                <FolderOpen className="w-4 h-4" />
-                Projects
-                <span className="text-zinc-600">({profile.projects.length})</span>
-              </h2>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                {profile.projects.map((project) => (
-                  <div
-                    key={project.id}
-                    className="group relative p-5 bg-zinc-900/30 border border-zinc-800/50 rounded-xl hover:border-zinc-700 hover:bg-zinc-900/50 transition-all"
+          {profile.projects && profile.projects.length > 0 && (() => {
+            const PROJECT_COLLAPSE_THRESHOLD = 6;
+            const hasMoreProjects = profile.projects.length > PROJECT_COLLAPSE_THRESHOLD;
+            const visibleProjects = showAllProjects
+              ? profile.projects
+              : profile.projects.slice(0, PROJECT_COLLAPSE_THRESHOLD);
+
+            return (
+              <section className="animate-in fade-in slide-in-from-bottom-4 duration-500 delay-300">
+                <h2 className="text-xs font-semibold tracking-[0.2em] text-zinc-500 uppercase mb-4 flex items-center gap-2">
+                  <FolderOpen className="w-4 h-4" />
+                  Projects
+                  <span className="text-zinc-600">({profile.projects.length})</span>
+                </h2>
+                <div
+                  className="grid grid-cols-1 md:grid-cols-2 gap-4 transition-all duration-500 ease-in-out"
+                >
+                  {visibleProjects.map((project) => (
+                    <div
+                      key={project.id}
+                      className="group relative p-5 bg-zinc-900/30 border border-zinc-800/50 rounded-xl hover:border-zinc-700 hover:bg-zinc-900/50 transition-all"
+                    >
+                      <div className="absolute inset-0 rounded-xl bg-gradient-to-br from-violet-500/5 to-transparent opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none" />
+
+                      {project.imageUrl && (
+                        <div className="relative aspect-video rounded-lg overflow-hidden bg-zinc-800 mb-4">
+                          <img
+                            src={project.imageUrl}
+                            alt={project.title}
+                            className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"
+                            onError={(e) => {
+                              (e.target as HTMLImageElement).parentElement!.style.display = 'none';
+                            }}
+                          />
+                        </div>
+                      )}
+
+                      <h3 className="relative font-medium text-white mb-2 group-hover:text-violet-200 transition-colors">{project.title}</h3>
+                      <p className="relative text-sm text-zinc-400 line-clamp-2 mb-3">
+                        {project.description}
+                      </p>
+                      {project.link && (
+                        <a
+                          href={project.link.startsWith('http') ? project.link : `https://${project.link}`}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="relative inline-flex items-center gap-1.5 text-sm text-violet-400 hover:text-violet-300 transition-colors"
+                        >
+                          <ExternalLink className="h-3.5 w-3.5" />
+                          View Project
+                        </a>
+                      )}
+                    </div>
+                  ))}
+                </div>
+
+                {hasMoreProjects && (
+                  <button
+                    onClick={() => setShowAllProjects(!showAllProjects)}
+                    className="mt-4 w-full flex items-center justify-center gap-2 px-4 py-3 bg-zinc-900/50 border border-zinc-800/50 rounded-xl text-sm text-zinc-400 hover:text-white hover:border-zinc-600 hover:bg-zinc-800/50 transition-all"
                   >
-                    <div className="absolute inset-0 rounded-xl bg-gradient-to-br from-violet-500/5 to-transparent opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none" />
-
-                    {project.imageUrl && (
-                      <div className="relative aspect-video rounded-lg overflow-hidden bg-zinc-800 mb-4">
-                        <img
-                          src={project.imageUrl}
-                          alt={project.title}
-                          className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"
-                          onError={(e) => {
-                            (e.target as HTMLImageElement).parentElement!.style.display = 'none';
-                          }}
-                        />
-                      </div>
+                    {showAllProjects ? (
+                      <>
+                        <ChevronUp className="h-4 w-4" />
+                        Show fewer projects
+                      </>
+                    ) : (
+                      <>
+                        <ChevronDown className="h-4 w-4" />
+                        Show all {profile.projects.length} projects
+                      </>
                     )}
-
-                    <h3 className="relative font-medium text-white mb-2 group-hover:text-violet-200 transition-colors">{project.title}</h3>
-                    <p className="relative text-sm text-zinc-400 line-clamp-2 mb-3">
-                      {project.description}
-                    </p>
-                    {project.link && (
-                      <a
-                        href={project.link.startsWith('http') ? project.link : `https://${project.link}`}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="relative inline-flex items-center gap-1.5 text-sm text-violet-400 hover:text-violet-300 transition-colors"
-                      >
-                        <ExternalLink className="h-3.5 w-3.5" />
-                        View Project
-                      </a>
-                    )}
-                  </div>
-                ))}
-              </div>
-            </section>
-          )}
+                  </button>
+                )}
+              </section>
+            );
+          })()}
 
           {/* Footer */}
           <div className="pt-8 border-t border-zinc-800/50 animate-in fade-in slide-in-from-bottom-4 duration-500 delay-400">

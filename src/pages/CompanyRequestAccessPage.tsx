@@ -68,7 +68,7 @@ const CompanyRequestAccessPage: React.FC = () => {
     setError('');
 
     try {
-      const response = await fetch('/api/request-company-access', {
+      const response = await fetch('/api/company/request-access', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',

@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Input } from '../components/ui/input';
 import { Textarea } from '../components/ui/textarea';
@@ -20,7 +20,8 @@ import {
   AlertCircle,
   ArrowLeft,
   Sparkles,
-  AlertTriangle
+  AlertTriangle,
+  Wand2
 } from 'lucide-react';
 import { 
   ProfileFormData, 
@@ -30,9 +31,11 @@ import {
   AVAILABILITY_OPTIONS, 
   SUGGESTED_SKILLS 
 } from '@/types/network-profile';
+import { CreativeSpectrumSlider } from '@/components/ui/creative-spectrum-slider';
 import { updateProfile, getProfileByUserId } from '@/lib/supabase';
 import { useAuth } from '@/contexts/AuthContext';
 import { cn } from '@/lib/utils';
+import { initializeProfileWebMCP, cleanupProfileWebMCP } from '@/lib/webmcp-profile';
 
 const STEPS = [
   { id: 1, title: 'Basic Info', icon: User },
@@ -59,7 +62,7 @@ const NetworkEditProfilePage: React.FC = () => {
     if (formData.bio && formData.bio.length >= 50) score++;
     if (formData.focusAreas.length > 0) score++;
     if (formData.skills.length >= 3) score++;
-    if (formData.projects.filter(p => p.title && p.description && p.imageUrl).length >= 2) score++;
+    if (formData.projects.filter(p => p.title && p.description).length >= 1) score++;
     if (formData.availability) score++;
     if (formData.profilePictureUrl) score++;
 
@@ -86,6 +89,10 @@ const NetworkEditProfilePage: React.FC = () => {
     portfolioUrl: '',
     linkedinUrl: '',
   });
+  const [isAutoFilling, setIsAutoFilling] = useState(false);
+  const [autoFillError, setAutoFillError] = useState('');
+  const [autoFillSuccess, setAutoFillSuccess] = useState(false);
+  const [autoFillSummary, setAutoFillSummary] = useState('');
   
   const [formData, setFormData] = useState<ProfileFormData>({
     fullName: '',
@@ -101,9 +108,148 @@ const NetworkEditProfilePage: React.FC = () => {
     availability: 'open-to-collaborations',
     isCtcMember: false,
     profilePictureUrl: '',
+    creativeSpectrum: 50,
   });
 
   const [errors, setErrors] = useState<Record<string, string>>({});
+
+  const formDataRef = useRef(formData);
+  useEffect(() => { formDataRef.current = formData; }, [formData]);
+
+  const addProjectToForm = useCallback((project: Omit<Project, 'id'>) => {
+    setFormData(prev => {
+      const emptyIdx = prev.projects.findIndex(p => !p.title.trim());
+      const newProject: Project = { ...project, id: crypto.randomUUID() };
+      if (emptyIdx >= 0) {
+        const updated = [...prev.projects];
+        updated[emptyIdx] = newProject;
+        return { ...prev, projects: updated };
+      }
+      if (prev.projects.length < 10) {
+        return { ...prev, projects: [...prev.projects, newProject] };
+      }
+      return prev;
+    });
+  }, []);
+
+  const handleAutoFillRef = useRef<() => Promise<void>>(() => Promise.resolve());
+
+  const handleAutoFill = async () => {
+    if (!formData.fullName.trim()) {
+      setAutoFillError('Please enter your full name first');
+      return;
+    }
+
+    setIsAutoFilling(true);
+    setAutoFillError('');
+    setAutoFillSuccess(false);
+    setAutoFillSummary('');
+
+    try {
+      const response = await fetch('/api/enrich-profile-search', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          fullName: formData.fullName.trim(),
+          currentSkills: formData.skills,
+          currentBio: formData.bio,
+          linkedinUrl: formData.linkedinUrl?.trim() || '',
+          portfolioUrl: formData.portfolioUrl?.trim() || '',
+          location: formData.location?.trim() || '',
+          focusAreas: formData.focusAreas || [],
+          existingProjects: formData.projects.filter(p => p.title.trim()),
+        }),
+      });
+
+      if (response.status === 504) {
+        throw new Error('The search took too long. Try adding your LinkedIn or portfolio URL for faster results.');
+      }
+
+      const data = await response.json();
+      console.log('[Enrich] API response:', data);
+
+      if (!response.ok) {
+        throw new Error(data.error || 'Failed to enrich profile');
+      }
+
+      if (data.success) {
+        const projectCount = data.discoveredProjects?.length || 0;
+        const skillCount = data.additionalSkills?.length || 0;
+        const hasBio = !!data.enrichedBio;
+
+        if (projectCount === 0 && skillCount === 0 && !hasBio) {
+          setAutoFillError('No public information found. Try adding your LinkedIn or portfolio URL above, then click again.');
+          return;
+        }
+
+        setFormData(prev => {
+          const updates: Partial<ProfileFormData> = {};
+
+          if (data.additionalSkills?.length > 0) {
+            updates.skills = [...new Set([...prev.skills, ...data.additionalSkills])].slice(0, 20);
+          }
+
+          if (data.discoveredProjects?.length > 0) {
+            const existingProjects = [...prev.projects];
+
+            for (const dp of data.discoveredProjects.slice(0, 10)) {
+              const newProject: Project = {
+                id: crypto.randomUUID(),
+                title: dp.title || '',
+                description: (dp.description || '').substring(0, 500),
+                imageUrl: '',
+                link: dp.url || '',
+              };
+
+              const emptyIdx = existingProjects.findIndex(p => !p.title.trim());
+              if (emptyIdx >= 0) {
+                existingProjects[emptyIdx] = newProject;
+              } else if (existingProjects.length < 10) {
+                existingProjects.push(newProject);
+              }
+            }
+
+            updates.projects = existingProjects;
+          }
+
+          if (data.enrichedBio) {
+            updates.bio = data.enrichedBio.substring(0, 300);
+          }
+
+          return { ...prev, ...updates };
+        });
+
+        const parts: string[] = [];
+        if (projectCount > 0) parts.push(`${projectCount} project${projectCount > 1 ? 's' : ''}`);
+        if (skillCount > 0) parts.push(`${skillCount} skill${skillCount > 1 ? 's' : ''}`);
+        if (hasBio) parts.push('bio');
+        setAutoFillSummary(`Found ${parts.join(', ')}. Review below and save when ready.`);
+        setAutoFillSuccess(true);
+        setTimeout(() => setAutoFillSuccess(false), 10000);
+      } else if (data.error) {
+        setAutoFillError(data.error);
+      }
+    } catch (err) {
+      console.error('Auto-fill error:', err);
+      setAutoFillError(err instanceof Error ? err.message : 'Auto-fill failed. Please fill in manually.');
+    } finally {
+      setIsAutoFilling(false);
+    }
+  };
+
+  handleAutoFillRef.current = handleAutoFill;
+
+  useEffect(() => {
+    initializeProfileWebMCP({
+      getFormData: () => formDataRef.current,
+      updateField: (field, value) => {
+        setFormData(prev => ({ ...prev, [field]: value }));
+      },
+      addProject: addProjectToForm,
+      triggerEnrich: () => handleAutoFillRef.current(),
+    });
+    return () => cleanupProfileWebMCP();
+  }, [addProjectToForm]);
 
 useEffect(() => {
      track('profile_edit_started');
@@ -133,10 +279,11 @@ useEffect(() => {
             bio: profile.bio,
             focusAreas: profile.focusAreas,
             skills: profile.skills,
-            projects: profile.projects.length > 0 ? profile.projects : [createEmptyProject(), createEmptyProject()],
+            projects: profile.projects.length > 0 ? profile.projects : [],
             availability: profile.availability,
             isCtcMember: profile.isCtcMember,
             profilePictureUrl: profile.profilePictureUrl || '',
+            creativeSpectrum: profile.creativeSpectrum ?? 50,
           });
         } else {
           navigate('/directory/create');
@@ -174,7 +321,7 @@ useEffect(() => {
   };
 
   const addProject = () => {
-    if (formData.projects.length < 5) {
+    if (formData.projects.length < 10) {
       setFormData(prev => ({
         ...prev,
         projects: [...prev.projects, createEmptyProject()],
@@ -183,12 +330,10 @@ useEffect(() => {
   };
 
   const removeProject = (index: number) => {
-    if (formData.projects.length > 2) {
-      setFormData(prev => ({
-        ...prev,
-        projects: prev.projects.filter((_, i) => i !== index),
-      }));
-    }
+    setFormData(prev => ({
+      ...prev,
+      projects: prev.projects.filter((_, i) => i !== index),
+    }));
   };
 
   const isValidEmail = (email: string): boolean => {
@@ -225,9 +370,12 @@ useEffect(() => {
     }
 
     if (step === 3) {
-      // Projects are valid with title and description - image is optional
-      const validProjects = formData.projects.filter(p => p.title.trim() && p.description.trim());
-      if (validProjects.length < 2) newErrors.projects = 'Please complete at least 2 projects with title and description';
+      // No minimum project requirement - users can have 0 projects
+      // But any project that has a title must also have a description
+      const incompleteProjects = formData.projects.filter(p => 
+        (p.title.trim() && !p.description.trim()) || (!p.title.trim() && p.description.trim())
+      );
+      if (incompleteProjects.length > 0) newErrors.projects = 'Projects need both a title and description, or remove them';
     }
 
     if (step === 4) {
@@ -249,9 +397,42 @@ const handleNext = () => {
     setCurrentStep(prev => Math.max(prev - 1, 1));
   };
 
+  const handleSaveFromAnyStep = async () => {
+    track('profile_save_from_step', { step: currentStep });
+    
+    // Only validate essential fields (name, location, email, bio)
+    const newErrors: Record<string, string> = {};
+    if (!formData.fullName.trim()) newErrors.fullName = 'Full name is required';
+    if (!formData.location.trim()) newErrors.location = 'Location is required';
+    if (!formData.email.trim()) newErrors.email = 'Email is required';
+    else if (!isValidEmail(formData.email)) newErrors.email = 'Please enter a valid email address';
+    if (!formData.bio.trim()) newErrors.bio = 'Bio is required';
+    else if (formData.bio.length > 300) newErrors.bio = 'Bio must be 300 characters or less';
+    
+    if (Object.keys(newErrors).length > 0) {
+      setErrors(newErrors);
+      // Jump to step 1 where the errors are
+      setCurrentStep(1);
+      return;
+    }
+
+    // Also check for incomplete projects (have title but no description or vice versa)
+    const incompleteProjects = formData.projects.filter(p => 
+      (p.title.trim() && !p.description.trim()) || (!p.title.trim() && p.description.trim())
+    );
+    if (incompleteProjects.length > 0) {
+      setErrors({ projects: 'Projects need both a title and description, or remove them' });
+      setCurrentStep(3);
+      return;
+    }
+
+    setErrors({});
+    await handleSubmit();
+  };
+
   const handleSubmit = async () => {
     track('profile_submit_attempt');
-    if (!validateStep(currentStep) || !profileId) return;
+    if (!profileId) return;
 
     setIsSubmitting(true);
     setSubmitError('');
@@ -289,7 +470,7 @@ const handleNext = () => {
         if (urlsChanged && session?.access_token) {
           setIsEnriching(true);
           try {
-            const enrichResponse = await fetch('/api/enrich-profile', {
+            const enrichResponse = await fetch('/api/profiles/enrich', {
               method: 'POST',
               headers: {
                 'Content-Type': 'application/json',
@@ -500,13 +681,58 @@ const handleNext = () => {
 
               <div>
                 <label className="block text-sm font-medium text-zinc-300 mb-2">Full Name *</label>
-                <Input
-                  value={formData.fullName}
-                  onChange={(e) => updateField('fullName', e.target.value)}
-                  placeholder="Your full name"
-                  className={cn("h-12", errors.fullName && "border-red-500")}
-                />
+                <div className="flex gap-3">
+                  <Input
+                    value={formData.fullName}
+                    onChange={(e) => updateField('fullName', e.target.value)}
+                    placeholder="Your full name"
+                    className={cn("h-12 flex-1", errors.fullName && "border-red-500")}
+                  />
+                  <button
+                    type="button"
+                    onClick={handleAutoFill}
+                    disabled={isAutoFilling || !formData.fullName.trim()}
+                    className={cn(
+                      "px-4 py-2 flex items-center gap-2 font-secondary text-sm tracking-wide transition-all whitespace-nowrap",
+                      isAutoFilling
+                        ? "bg-purple-500/20 text-purple-400 border border-purple-500/30"
+                        : autoFillSuccess
+                        ? "bg-green-500/20 text-green-400 border border-green-500/30"
+                        : "bg-purple-500/10 text-purple-400 border border-purple-500/20 hover:bg-purple-500/20 hover:border-purple-500/40",
+                      (!formData.fullName.trim() && !isAutoFilling) && "opacity-50 cursor-not-allowed"
+                    )}
+                    title="Search the web for your work, projects, and skills to enrich your profile"
+                  >
+                    {isAutoFilling ? (
+                      <>
+                        <Loader2 className="h-4 w-4 animate-spin" />
+                        Searching the web...
+                      </>
+                    ) : autoFillSuccess ? (
+                      <>
+                        <CheckCircle2 className="h-4 w-4" />
+                        Found!
+                      </>
+                    ) : (
+                      <>
+                        <Wand2 className="h-4 w-4" />
+                        Enrich with AI
+                      </>
+                    )}
+                  </button>
+                </div>
                 {errors.fullName && <p className="text-red-400 text-sm mt-1">{errors.fullName}</p>}
+                {autoFillError && (
+                  <p className="text-amber-400 text-sm mt-1">{autoFillError}</p>
+                )}
+                {autoFillSuccess && autoFillSummary && (
+                  <p className="text-green-400 text-sm mt-1">
+                    {autoFillSummary}
+                  </p>
+                )}
+                <p className="text-zinc-500 text-xs mt-1">
+                  AI searches your portfolio, LinkedIn, and public profiles to discover skills, projects, and work history
+                </p>
               </div>
 
               <div>
@@ -607,6 +833,18 @@ const handleNext = () => {
                 />
                 {errors.skills && <p className="text-red-400 text-sm mt-2">{errors.skills}</p>}
               </div>
+
+              {/* Creative Spectrum */}
+              <div className="pt-4 border-t border-zinc-800">
+                <h2 className="text-xl font-primary text-white mb-2">Where do you fall on the creative tech spectrum?</h2>
+                <p className="text-zinc-400 text-sm font-secondary mb-6">
+                  Whether you lean more toward design or development, you're still a creative technologist. This helps others understand your strengths at a glance.
+                </p>
+                <CreativeSpectrumSlider
+                  value={formData.creativeSpectrum}
+                  onChange={(value) => updateField('creativeSpectrum', value)}
+                />
+              </div>
             </div>
           )}
 
@@ -616,9 +854,9 @@ const handleNext = () => {
               <div className="flex items-center justify-between mb-2">
                 <div>
                   <h2 className="text-xl font-primary text-white">Projects</h2>
-                  <p className="text-zinc-400 text-sm mt-1">2-5 projects required</p>
+                  <p className="text-zinc-400 text-sm mt-1">Add up to 10 projects to showcase your work</p>
                 </div>
-                {formData.projects.length < 5 && (
+                {formData.projects.length < 10 && (
                   <button
                     type="button"
                     onClick={addProject}
@@ -638,15 +876,19 @@ const handleNext = () => {
               )}
 
               <div className="space-y-6">
+                {formData.projects.length === 0 && (
+                  <div className="text-center py-8 border border-dashed border-zinc-800">
+                    <FolderOpen className="h-8 w-8 text-zinc-700 mx-auto mb-3" />
+                    <p className="text-zinc-500 font-secondary text-sm">No projects yet. Click "Add Project" to showcase your work.</p>
+                  </div>
+                )}
                 {formData.projects.map((project, index) => (
                   <div key={project.id} className="p-5 border border-zinc-800 space-y-4">
                     <div className="flex items-center justify-between">
                       <h3 className="text-sm font-secondary tracking-wide text-zinc-400 uppercase">Project {index + 1}</h3>
-                      {formData.projects.length > 2 && (
-                        <button type="button" onClick={() => removeProject(index)} className="p-2 text-zinc-500 hover:text-red-400 transition-colors">
-                          <Trash2 className="h-4 w-4" />
-                        </button>
-                      )}
+                      <button type="button" onClick={() => removeProject(index)} className="p-2 text-zinc-500 hover:text-red-400 transition-colors">
+                        <Trash2 className="h-4 w-4" />
+                      </button>
                     </div>
                     <Input value={project.title} onChange={(e) => updateProject(index, 'title', e.target.value)} placeholder="Project title" className="h-12 bg-transparent border-zinc-800" />
                     
@@ -693,12 +935,14 @@ const handleNext = () => {
                 </div>
               </div>
 
-              {submitError && (
-                <div className="flex items-center gap-2 p-4 bg-red-500/10 border border-red-500/30 rounded-lg">
-                  <AlertCircle className="h-5 w-5 text-red-400 flex-shrink-0" />
-                  <p className="text-red-400 text-sm">{submitError}</p>
-                </div>
-              )}
+            </div>
+          )}
+
+          {/* Submit Error - visible on any step */}
+          {submitError && (
+            <div className="flex items-center gap-2 p-4 mt-6 bg-red-500/10 border border-red-500/30 rounded-lg">
+              <AlertCircle className="h-5 w-5 text-red-400 flex-shrink-0" />
+              <p className="text-red-400 text-sm">{submitError}</p>
             </div>
           )}
 
@@ -717,17 +961,18 @@ const handleNext = () => {
               Back
             </button>
 
-            {currentStep < 4 ? (
+            <div className="flex items-center gap-3">
+              {currentStep < 4 && (
+                <button
+                  onClick={handleNext}
+                  className="flex items-center gap-2 px-6 py-3 border border-zinc-700 text-white font-secondary text-sm tracking-wide hover:border-zinc-500 transition-colors"
+                >
+                  Next
+                  <ChevronRight className="h-4 w-4" />
+                </button>
+              )}
               <button
-                onClick={handleNext}
-                className="flex items-center gap-2 px-8 py-3 bg-white text-black font-secondary text-sm tracking-wide hover:bg-zinc-200 transition-colors"
-              >
-                Continue
-                <ChevronRight className="h-4 w-4" />
-              </button>
-            ) : (
-              <button
-                onClick={handleSubmit}
+                onClick={handleSaveFromAnyStep}
                 disabled={isSubmitting}
                 className="flex items-center gap-2 px-8 py-3 bg-white text-black font-secondary text-sm tracking-wide hover:bg-zinc-200 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
               >
@@ -740,7 +985,7 @@ const handleNext = () => {
                   'Save Changes'
                 )}
               </button>
-            )}
+            </div>
           </div>
         </div>
 

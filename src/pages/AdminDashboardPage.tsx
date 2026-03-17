@@ -27,14 +27,15 @@ import {
   Phone,
   Sparkles,
   Search,
-  CreditCard,
-  DollarSign,
-  BarChart3,
   ArrowUpCircle,
   Trash2,
+  Megaphone,
+  MessageSquare,
+  Send,
 } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import { cn } from '@/lib/utils';
+import { supabase } from '@/lib/supabase';
 import {
   JobStatus,
   JOB_STATUSES,
@@ -43,6 +44,8 @@ import {
 } from '@/types/job-matching';
 import { FOCUS_AREAS } from '@/types/network-profile';
 import { UserManagementSection } from '@/components/admin/UserManagementSection';
+import { BetaBroadcastSection } from '@/components/admin/BetaBroadcastSection';
+import { BetaQuickMessageSection } from '@/components/admin/BetaQuickMessageSection';
 
 // Types for admin API responses
 interface JobSubmissionWithDetails {
@@ -141,19 +144,42 @@ interface AdminCompany {
   updatedAt: string;
 }
 
-// Credit usage type for admin view
-interface CreditUsageCompany {
+// Message credit type for admin view
+interface MessageCreditCompany {
   companyId: string;
   companyName: string;
-  freeUsed: number;
+  verified: boolean;
+  createdAt: string;
+  freeRemaining: number;
   purchasedRemaining: number;
-  totalAnalyses: number;
-  totalRevenue: number; // in cents
+  totalRemaining: number;
+  messagesSent: number;
+  totalGranted: number;
 }
 
-interface CreditUsageTotals {
-  totalAnalyses: number;
-  totalRevenue: number;
+// Company conversation types for admin view
+interface ConversationMessage {
+  id: string;
+  senderType: 'company' | 'member';
+  senderName: string;
+  content: string;
+  createdAt: string;
+  readAt: string | null;
+}
+
+interface CompanyConversation {
+  conversationType: 'job_match' | 'direct' | 'contact_request' | 'agent_chat';
+  matchId?: string;
+  conversationId?: string;
+  contactRequestId?: string;
+  sessionId?: string;
+  status?: string;
+  jobTitle?: string;
+  participantName: string;
+  participantAvatar: string | null;
+  messageCount: number;
+  lastMessageAt: string | null;
+  messages: ConversationMessage[];
 }
 
 // Pending company request type
@@ -274,7 +300,12 @@ const AdminDashboardPage: React.FC = () => {
   const [companies, setCompanies] = useState<AdminCompany[]>([]);
   const [loadingCompanies, setLoadingCompanies] = useState(false);
   const [expandedCompanyId, setExpandedCompanyId] = useState<string | null>(null);
+  const [companyConversations, setCompanyConversations] = useState<Map<string, CompanyConversation[]>>(new Map());
+  const [loadingConversations, setLoadingConversations] = useState<string | null>(null);
+  const [expandedConversationId, setExpandedConversationId] = useState<string | null>(null);
   const [togglingVerifyId, setTogglingVerifyId] = useState<string | null>(null);
+  const [deletingCompanyId, setDeletingCompanyId] = useState<string | null>(null);
+  const [recentlyApprovedCompanyEmail, setRecentlyApprovedCompanyEmail] = useState<string | null>(null);
 
   // Pending company requests state
   const [pendingCompanyRequests, setPendingCompanyRequests] = useState<PendingCompanyRequest[]>([]);
@@ -294,6 +325,8 @@ const AdminDashboardPage: React.FC = () => {
   const [betaMembers, setBetaMembers] = useState<BetaMember[]>([]);
   const [directoryMembers, setDirectoryMembers] = useState<DirectoryMember[]>([]);
   const [upgradingMemberId, setUpgradingMemberId] = useState<string | null>(null);
+  const [resendingEmailId, setResendingEmailId] = useState<string | null>(null);
+  const [broadcastMode, setBroadcastMode] = useState<'quick' | 'full'>('quick');
   const [memberCounts, setMemberCounts] = useState<MemberCounts>({
     betaTotal: 0,
     betaApproved: 0,
@@ -305,16 +338,13 @@ const AdminDashboardPage: React.FC = () => {
   });
   const [loadingMembers, setLoadingMembers] = useState(false);
 
-  // Credit usage state
-  const [creditUsageCompanies, setCreditUsageCompanies] = useState<CreditUsageCompany[]>([]);
-  const [creditUsageTotals, setCreditUsageTotals] = useState<CreditUsageTotals>({ totalAnalyses: 0, totalRevenue: 0 });
-  const [loadingCreditUsage, setLoadingCreditUsage] = useState(false);
-
-  // Grant credits state
-  const [grantCreditsCompany, setGrantCreditsCompany] = useState<CreditUsageCompany | null>(null);
-  const [grantCreditsAmount, setGrantCreditsAmount] = useState('');
-  const [grantCreditsNote, setGrantCreditsNote] = useState('');
-  const [grantingCredits, setGrantingCredits] = useState(false);
+  // Message credits state
+  const [messageCreditCompanies, setMessageCreditCompanies] = useState<MessageCreditCompany[]>([]);
+  const [loadingMessageCredits, setLoadingMessageCredits] = useState(false);
+  const [grantMsgCreditsCompany, setGrantMsgCreditsCompany] = useState<MessageCreditCompany | null>(null);
+  const [grantMsgCreditsAmount, setGrantMsgCreditsAmount] = useState('');
+  const [grantMsgCreditsNote, setGrantMsgCreditsNote] = useState('');
+  const [grantingMsgCredits, setGrantingMsgCredits] = useState(false);
 
   // Web enrichment state
   const [webEnrichingProfileId, setWebEnrichingProfileId] = useState<string | null>(null);
@@ -337,23 +367,70 @@ const AdminDashboardPage: React.FC = () => {
     error?: string;
   } | null>(null);
 
+  // Contact requests state
+  const [contactRequests, setContactRequests] = useState<any[]>([]);
+  const [loadingContactRequests, setLoadingContactRequests] = useState(false);
+  const [updatingContactRequest, setUpdatingContactRequest] = useState<string | null>(null);
+
   // Collapsible sections state
   const [collapsedSections, setCollapsedSections] = useState<Record<string, boolean>>({
     pendingJobs: true,
     pendingProfiles: false,
     pendingCompanyRequests: false,
+    contactRequests: false,
     betaApplications: false,
     betaMembers: true,
     directoryMembers: true,
     companies: true,
-    creditUsage: true,
+    messageCredits: false,
     testEmail: true,
+    betaBroadcast: true,
     userManagement: true,
     jobSubmissions: true,
   });
 
   const toggleSection = (section: string) => {
     setCollapsedSections(prev => ({ ...prev, [section]: !prev[section] }));
+  };
+
+  const fetchContactRequests = useCallback(async () => {
+    if (!session?.access_token) return;
+    setLoadingContactRequests(true);
+    try {
+      const res = await fetch('/api/admin/contact-requests?status=pending', {
+        headers: { Authorization: `Bearer ${session.access_token}` },
+      });
+      const data = await res.json();
+      if (data.success) setContactRequests(data.requests || []);
+    } catch (err) {
+      console.error('Error fetching contact requests:', err);
+    } finally {
+      setLoadingContactRequests(false);
+    }
+  }, [session?.access_token]);
+
+  const handleContactRequestUpdate = async (requestId: string, status: 'approved' | 'rejected', adminNotes?: string) => {
+    if (!session?.access_token) return;
+    setUpdatingContactRequest(requestId);
+    try {
+      const res = await fetch('/api/admin/contact-requests/update', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${session.access_token}`,
+        },
+        body: JSON.stringify({ requestId, status, adminNotes }),
+      });
+      const data = await res.json();
+      if (data.success) {
+        setContactRequests(prev => prev.filter(r => r.id !== requestId));
+        setToast({ message: `Contact request ${status}`, type: 'success' });
+      }
+    } catch (err) {
+      setToast({ message: 'Failed to update contact request', type: 'error' });
+    } finally {
+      setUpdatingContactRequest(null);
+    }
   };
 
   const fetchPendingProfiles = useCallback(async () => {
@@ -461,11 +538,40 @@ const AdminDashboardPage: React.FC = () => {
         throw new Error(data.error || 'Failed to fetch companies');
       }
 
+      console.log('[Admin] Fetched companies:', data.companies.length, 'companies');
       setCompanies(data.companies);
     } catch (err) {
       console.error('Error fetching companies:', err);
     } finally {
       setLoadingCompanies(false);
+    }
+  }, [session?.access_token]);
+
+  const fetchCompanyConversations = useCallback(async (companyId: string) => {
+    if (!session?.access_token) return;
+
+    setLoadingConversations(companyId);
+
+    try {
+      const response = await fetch(`/api/admin/company-conversations?companyId=${companyId}`, {
+        headers: {
+          Authorization: `Bearer ${session.access_token}`,
+        },
+      });
+
+      const data = await response.json();
+
+      if (response.ok && data.success) {
+        setCompanyConversations(prev => {
+          const next = new Map(prev);
+          next.set(companyId, data.conversations);
+          return next;
+        });
+      }
+    } catch (err) {
+      console.error('Error fetching company conversations:', err);
+    } finally {
+      setLoadingConversations(null);
     }
   }, [session?.access_token]);
 
@@ -501,6 +607,9 @@ const AdminDashboardPage: React.FC = () => {
     setApprovingRequestId(requestId);
 
     try {
+      // Get the request details before approving (to track the email)
+      const requestToApprove = pendingCompanyRequests.find(r => r.id === requestId);
+      
       const response = await fetch('/api/admin/company-requests/approve', {
         method: 'POST',
         headers: {
@@ -519,10 +628,20 @@ const AdminDashboardPage: React.FC = () => {
       // Remove from pending list
       setPendingCompanyRequests((prev) => prev.filter((r) => r.id !== requestId));
       
+      // Track the recently approved company email for highlighting
+      if (requestToApprove?.contactEmail) {
+        setRecentlyApprovedCompanyEmail(requestToApprove.contactEmail);
+        // Clear the highlight after 10 seconds
+        setTimeout(() => setRecentlyApprovedCompanyEmail(null), 10000);
+      }
+      
       // Refresh companies list
-      fetchCompanies();
+      await fetchCompanies();
+      
+      // Ensure companies section is expanded so user can see the new company
+      setCollapsedSections((prev) => ({ ...prev, companies: false }));
 
-      setToast({ message: 'Company approved and account created!', type: 'success' });
+      setToast({ message: 'Company approved and account created! Check the Companies section below.', type: 'success' });
     } catch (err: any) {
       console.error('Error approving company request:', err);
       setToast({ message: err.message || 'Failed to approve request', type: 'error' });
@@ -705,6 +824,41 @@ const AdminDashboardPage: React.FC = () => {
     }
   };
 
+  const resendBetaAccessEmail = async (applicationId: string, memberName: string) => {
+    if (!session?.access_token) return;
+
+    setResendingEmailId(applicationId);
+
+    try {
+      const response = await fetch('/api/admin/beta-applications/resend-account-email', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${session.access_token}`,
+        },
+        body: JSON.stringify({ applicationId }),
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data.error || 'Failed to resend email');
+      }
+
+      setToast({
+        message: data.emailSent
+          ? `Sign-in email sent to ${memberName}`
+          : `Failed to send email to ${memberName}`,
+        type: data.emailSent ? 'success' : 'error',
+      });
+    } catch (err: any) {
+      console.error('Error resending beta access email:', err);
+      setToast({ message: err.message || 'Failed to resend email', type: 'error' });
+    } finally {
+      setResendingEmailId(null);
+    }
+  };
+
   // Upgrade a beta member to full directory member
   const upgradeMember = async (profileId: string) => {
     if (!session?.access_token) return;
@@ -788,13 +942,13 @@ const AdminDashboardPage: React.FC = () => {
     }
   }, [session?.access_token]);
 
-  const fetchCreditUsage = useCallback(async () => {
+  const fetchMessageCredits = useCallback(async () => {
     if (!session?.access_token) return;
 
-    setLoadingCreditUsage(true);
+    setLoadingMessageCredits(true);
 
     try {
-      const response = await fetch('/api/admin/credit-usage', {
+      const response = await fetch('/api/admin/message-credits', {
         headers: {
           Authorization: `Bearer ${session.access_token}`,
         },
@@ -803,75 +957,72 @@ const AdminDashboardPage: React.FC = () => {
       const data = await response.json();
 
       if (!response.ok) {
-        throw new Error(data.error || 'Failed to fetch credit usage');
+        throw new Error(data.error || 'Failed to fetch message credits');
       }
 
-      setCreditUsageCompanies(data.companies);
-      setCreditUsageTotals(data.totals);
+      setMessageCreditCompanies(data.companies);
     } catch (err) {
-      console.error('Error fetching credit usage:', err);
+      console.error('Error fetching message credits:', err);
     } finally {
-      setLoadingCreditUsage(false);
+      setLoadingMessageCredits(false);
     }
   }, [session?.access_token]);
 
-  const grantCredits = async () => {
-    if (!session?.access_token || !grantCreditsCompany || grantingCredits) return;
+  const grantMessageCredits = async () => {
+    if (!session?.access_token || !grantMsgCreditsCompany || grantingMsgCredits) return;
 
-    const amount = parseInt(grantCreditsAmount, 10);
+    const amount = parseInt(grantMsgCreditsAmount, 10);
     if (isNaN(amount) || amount <= 0) {
       setToast({ message: 'Please enter a valid credit amount', type: 'error' });
       return;
     }
 
-    setGrantingCredits(true);
+    setGrantingMsgCredits(true);
 
     try {
-      const response = await fetch('/api/admin/grant-credits', {
+      const response = await fetch('/api/admin/grant-message-credits', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
           Authorization: `Bearer ${session.access_token}`,
         },
         body: JSON.stringify({
-          companyId: grantCreditsCompany.companyId,
+          companyId: grantMsgCreditsCompany.companyId,
           creditsAmount: amount,
-          note: grantCreditsNote || undefined,
+          note: grantMsgCreditsNote || undefined,
         }),
       });
 
       const data = await response.json();
 
       if (!response.ok) {
-        throw new Error(data.error || 'Failed to grant credits');
+        throw new Error(data.error || 'Failed to grant message credits');
       }
 
-      // Update local state
-      setCreditUsageCompanies((prev) =>
+      setMessageCreditCompanies((prev) =>
         prev.map((c) =>
-          c.companyId === grantCreditsCompany.companyId
-            ? { ...c, purchasedRemaining: data.newBalance }
+          c.companyId === grantMsgCreditsCompany.companyId
+            ? { ...c, purchasedRemaining: data.newBalance, totalRemaining: c.freeRemaining + data.newBalance }
             : c
         )
       );
 
       setToast({
-        message: `Added ${amount} credits to ${grantCreditsCompany.companyName}`,
+        message: `Added ${amount} message credits to ${grantMsgCreditsCompany.companyName}`,
         type: 'success',
       });
 
-      // Close modal and reset state
-      setGrantCreditsCompany(null);
-      setGrantCreditsAmount('');
-      setGrantCreditsNote('');
+      setGrantMsgCreditsCompany(null);
+      setGrantMsgCreditsAmount('');
+      setGrantMsgCreditsNote('');
     } catch (err) {
-      console.error('Error granting credits:', err);
+      console.error('Error granting message credits:', err);
       setToast({
-        message: err instanceof Error ? err.message : 'Failed to grant credits',
+        message: err instanceof Error ? err.message : 'Failed to grant message credits',
         type: 'error',
       });
     } finally {
-      setGrantingCredits(false);
+      setGrantingMsgCredits(false);
     }
   };
 
@@ -916,6 +1067,55 @@ const AdminDashboardPage: React.FC = () => {
       setTimeout(() => setToast(null), 3000);
     } finally {
       setTogglingVerifyId(null);
+    }
+  };
+
+  const deleteCompany = async (companyId: string) => {
+    if (!session?.access_token || deletingCompanyId) return;
+
+    const company = companies.find((c) => c.id === companyId);
+    if (!company) return;
+
+    if (!confirm(`Are you sure you want to delete ${company.companyName}? This will also delete their user account and all associated data. This action cannot be undone.`)) {
+      return;
+    }
+
+    setDeletingCompanyId(companyId);
+
+    try {
+      const response = await fetch('/api/admin/companies/delete', {
+        method: 'DELETE',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${session.access_token}`,
+        },
+        body: JSON.stringify({ companyId }),
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data.error || 'Failed to delete company');
+      }
+
+      // Remove from local state
+      setCompanies((prev) => prev.filter((c) => c.id !== companyId));
+
+      // Show success toast
+      setToast({
+        message: `Company ${company.companyName} deleted successfully`,
+        type: 'success',
+      });
+      setTimeout(() => setToast(null), 3000);
+    } catch (err) {
+      console.error('Error deleting company:', err);
+      setToast({
+        message: err instanceof Error ? err.message : 'Failed to delete company',
+        type: 'error',
+      });
+      setTimeout(() => setToast(null), 3000);
+    } finally {
+      setDeletingCompanyId(null);
     }
   };
 
@@ -1038,7 +1238,10 @@ const AdminDashboardPage: React.FC = () => {
   };
 
   const fetchJobs = useCallback(async () => {
-    if (!session?.access_token) return;
+    if (!session?.access_token) {
+      setLoading(false);
+      return;
+    }
 
     setLoading(true);
     setError('');
@@ -1065,8 +1268,16 @@ const AdminDashboardPage: React.FC = () => {
         throw new Error(data.error || 'Failed to fetch jobs');
       }
 
-      setJobs(data.jobs);
-      setPagination(data.pagination);
+      setJobs(data.jobs || []);
+      // Safely update pagination with defaults if API response is incomplete
+      if (data.pagination) {
+        setPagination({
+          page: data.pagination.page ?? 1,
+          limit: data.pagination.limit ?? 20,
+          total: data.pagination.total ?? 0,
+          totalPages: data.pagination.totalPages ?? 0,
+        });
+      }
     } catch (err) {
       console.error('Error fetching jobs:', err);
       setError(err instanceof Error ? err.message : 'Failed to load jobs');
@@ -1252,12 +1463,35 @@ const AdminDashboardPage: React.FC = () => {
       fetchJobs();
       fetchPendingProfiles();
       fetchPendingCompanyRequests();
+      fetchContactRequests();
       fetchBetaApplications();
       fetchMembers();
       fetchCompanies();
-      fetchCreditUsage();
+      fetchMessageCredits();
     }
-  }, [user, session, authLoading, navigate, fetchJobs, fetchPendingProfiles, fetchPendingCompanyRequests, fetchBetaApplications, fetchMembers, fetchCompanies, fetchCreditUsage]);
+  }, [user, session, authLoading, navigate, fetchJobs, fetchPendingProfiles, fetchPendingCompanyRequests, fetchContactRequests, fetchBetaApplications, fetchMembers, fetchCompanies, fetchMessageCredits]);
+
+  useEffect(() => {
+    if (!supabase || !session?.access_token) return;
+
+    const channel = supabase
+      .channel('admin-message-credits')
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'message_usage_logs' },
+        () => fetchMessageCredits()
+      )
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'company_message_credits' },
+        () => fetchMessageCredits()
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [session?.access_token, fetchMessageCredits]);
 
   useEffect(() => {
     if (expandedJobId && !matches[expandedJobId]) {
@@ -1300,12 +1534,22 @@ const AdminDashboardPage: React.FC = () => {
     );
   }
 
-  if (error && error.includes('Admin access required')) {
+  // If no user after auth loading completes, don't render anything (useEffect will redirect)
+  if (!user) {
+    return (
+      <div className="min-h-screen bg-black text-white flex items-center justify-center">
+        <Loader2 className="h-8 w-8 animate-spin text-white" />
+      </div>
+    );
+  }
+
+  if (error) {
+    const isAccessDenied = error.includes('Admin access required');
     return (
       <div className="min-h-screen bg-black text-white flex items-center justify-center">
         <div className="text-center max-w-md">
-          <ShieldCheck className="h-16 w-16 text-red-500 mx-auto mb-4" />
-          <h1 className="text-2xl font-primary mb-2">Access Denied</h1>
+          <ShieldCheck className={`h-16 w-16 ${isAccessDenied ? 'text-red-500' : 'text-yellow-500'} mx-auto mb-4`} />
+          <h1 className="text-2xl font-primary mb-2">{isAccessDenied ? 'Access Denied' : 'Error'}</h1>
           <p className="text-zinc-400 font-secondary mb-6">{error}</p>
           <button
             onClick={() => navigate('/')}
@@ -1697,7 +1941,7 @@ const AdminDashboardPage: React.FC = () => {
 
                         {/* Focus Area Tags */}
                         <div className="hidden md:flex flex-wrap gap-1 max-w-xs">
-                          {profile.focusAreas.slice(0, 3).map((area) => {
+                          {(profile.focusAreas || []).slice(0, 3).map((area) => {
                             const areaInfo = FOCUS_AREAS.find((a) => a.value === area);
                             return (
                               <span
@@ -1708,9 +1952,9 @@ const AdminDashboardPage: React.FC = () => {
                               </span>
                             );
                           })}
-                          {profile.focusAreas.length > 3 && (
+                          {(profile.focusAreas || []).length > 3 && (
                             <span className="px-2 py-0.5 bg-zinc-800 text-zinc-500 text-xs font-secondary">
-                              +{profile.focusAreas.length - 3}
+                              +{(profile.focusAreas || []).length - 3}
                             </span>
                           )}
                         </div>
@@ -1738,13 +1982,13 @@ const AdminDashboardPage: React.FC = () => {
                           </div>
 
                           {/* Skills */}
-                          {profile.skills.length > 0 && (
+                          {(profile.skills || []).length > 0 && (
                             <div>
                               <p className="text-xs font-secondary text-zinc-500 uppercase tracking-wide mb-2">
                                 Skills
                               </p>
                               <div className="flex flex-wrap gap-1">
-                                {profile.skills.map((skill) => (
+                                {(profile.skills || []).map((skill) => (
                                   <span
                                     key={skill}
                                     className="px-2 py-0.5 bg-zinc-800 text-zinc-300 text-xs font-secondary"
@@ -1757,13 +2001,13 @@ const AdminDashboardPage: React.FC = () => {
                           )}
 
                           {/* Focus Areas (full list) */}
-                          {profile.focusAreas.length > 0 && (
+                          {(profile.focusAreas || []).length > 0 && (
                             <div>
                               <p className="text-xs font-secondary text-zinc-500 uppercase tracking-wide mb-2">
                                 Focus Areas
                               </p>
                               <div className="flex flex-wrap gap-1">
-                                {profile.focusAreas.map((area) => {
+                                {(profile.focusAreas || []).map((area) => {
                                   const areaInfo = FOCUS_AREAS.find((a) => a.value === area);
                                   return (
                                     <span
@@ -1807,13 +2051,13 @@ const AdminDashboardPage: React.FC = () => {
                           </div>
 
                           {/* Projects */}
-                          {profile.projects.length > 0 && (
+                          {(profile.projects || []).length > 0 && (
                             <div>
                               <p className="text-xs font-secondary text-zinc-500 uppercase tracking-wide mb-2">
-                                Projects ({profile.projects.length})
+                                Projects ({(profile.projects || []).length})
                               </p>
                               <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                                {profile.projects.map((project, idx) => (
+                                {(profile.projects || []).map((project, idx) => (
                                   <div
                                     key={idx}
                                     className="p-3 bg-zinc-900/50 border border-zinc-800"
@@ -2179,6 +2423,125 @@ const AdminDashboardPage: React.FC = () => {
           ))}
         </div>
 
+        {/* Contact Requests Section */}
+        <div className="bg-zinc-900/30 border border-zinc-800/50 rounded-2xl overflow-hidden">
+          <button
+            onClick={() => toggleSection('contactRequests')}
+            className="w-full flex items-center justify-between p-6 text-left hover:bg-zinc-800/20 transition-colors"
+          >
+            <div className="flex items-center gap-3">
+              <UserCircle className="h-5 w-5 text-pink-400" />
+              <h2 className="text-lg font-semibold text-white">Contact Requests</h2>
+              {contactRequests.length > 0 && (
+                <span className="px-2 py-0.5 text-xs font-medium bg-pink-500/20 text-pink-400 rounded-full">
+                  {contactRequests.length}
+                </span>
+              )}
+            </div>
+            <ChevronDown className={`h-5 w-5 text-zinc-500 transition-transform ${
+              collapsedSections.contactRequests ? "" : "rotate-180"
+            }`} />
+          </button>
+          {!collapsedSections.contactRequests && (loadingContactRequests ? (
+            <div className="p-6 pt-0 flex justify-center">
+              <Loader2 className="h-6 w-6 animate-spin text-zinc-600" />
+            </div>
+          ) : contactRequests.length === 0 ? (
+            <div className="p-6 pt-0 text-center text-zinc-500 text-sm">
+              No pending contact requests.
+            </div>
+          ) : (
+            <div className="p-6 pt-0 space-y-4">
+              {contactRequests.map((req) => (
+                <div key={req.id} className="bg-zinc-900/50 border border-zinc-800/50 rounded-xl p-5">
+                  <div className="flex items-start justify-between gap-4 mb-3">
+                    <div className="flex-1">
+                      <div className="flex items-center gap-2 mb-1">
+                        <Building2 className="h-4 w-4 text-pink-400" />
+                        <span className="font-medium text-white">{req.companyName}</span>
+                        <span className="text-zinc-600">wants to connect with</span>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        {req.memberPicture ? (
+                          <img src={req.memberPicture} alt="" className="w-6 h-6 rounded-full object-cover" />
+                        ) : (
+                          <div className="w-6 h-6 rounded-full bg-violet-500/20 flex items-center justify-center text-xs text-violet-400">
+                            {req.memberName?.charAt(0)}
+                          </div>
+                        )}
+                        <a
+                          href={`/directory/profile/${req.memberSlug}`}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="font-medium text-violet-400 hover:text-violet-300 transition-colors flex items-center gap-1"
+                        >
+                          {req.memberName}
+                          <ExternalLink className="h-3 w-3" />
+                        </a>
+                        {req.memberLocation && (
+                          <span className="text-xs text-zinc-500 flex items-center gap-1">
+                            <MapPin className="h-3 w-3" />
+                            {req.memberLocation}
+                          </span>
+                        )}
+                      </div>
+                    </div>
+                    <span className="text-xs text-zinc-500">{new Date(req.createdAt).toLocaleDateString()}</span>
+                  </div>
+
+                  {/* Company contact info */}
+                  <div className="text-xs text-zinc-400 mb-2 flex items-center gap-3">
+                    <span>{req.contactName}</span>
+                    <a href={`mailto:${req.contactEmail}`} className="text-pink-400 hover:text-pink-300 flex items-center gap-1">
+                      <Mail className="h-3 w-3" />
+                      {req.contactEmail}
+                    </a>
+                  </div>
+
+                  {/* Member email (for admin to reach out) */}
+                  <div className="text-xs text-zinc-400 mb-3 flex items-center gap-2">
+                    <span className="text-zinc-600">Member email:</span>
+                    <a href={`mailto:${req.memberEmail}`} className="text-violet-400 hover:text-violet-300 flex items-center gap-1">
+                      <Mail className="h-3 w-3" />
+                      {req.memberEmail}
+                    </a>
+                  </div>
+
+                  {req.message && (
+                    <div className="bg-zinc-800/50 rounded-lg p-3 mb-3 text-sm text-zinc-300">
+                      <span className="text-xs text-zinc-500 block mb-1">Message:</span>
+                      {req.message}
+                    </div>
+                  )}
+
+                  <div className="flex gap-2">
+                    <button
+                      onClick={() => handleContactRequestUpdate(req.id, 'approved')}
+                      disabled={updatingContactRequest === req.id}
+                      className="inline-flex items-center gap-1.5 px-4 py-2 bg-emerald-500/20 text-emerald-400 text-sm font-medium rounded-lg hover:bg-emerald-500/30 transition-colors disabled:opacity-50"
+                    >
+                      {updatingContactRequest === req.id ? (
+                        <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                      ) : (
+                        <CheckCircle2 className="h-3.5 w-3.5" />
+                      )}
+                      Approve
+                    </button>
+                    <button
+                      onClick={() => handleContactRequestUpdate(req.id, 'rejected')}
+                      disabled={updatingContactRequest === req.id}
+                      className="inline-flex items-center gap-1.5 px-4 py-2 bg-red-500/20 text-red-400 text-sm font-medium rounded-lg hover:bg-red-500/30 transition-colors disabled:opacity-50"
+                    >
+                      <XCircle className="h-3.5 w-3.5" />
+                      Reject
+                    </button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          ))}
+        </div>
+
         {/* Beta Applications Section */}
         <div className="mb-10">
           <div className="flex items-center justify-between mb-4">
@@ -2242,10 +2605,10 @@ const AdminDashboardPage: React.FC = () => {
                           {new Date(application.created_at).toLocaleDateString()}
                         </span>
                       </div>
-                      {application.interests.length > 0 && (
+                      {(application.interests || []).length > 0 && (
                         <div className="flex flex-wrap gap-2">
                           <span className="text-xs text-zinc-500 font-secondary">Interests:</span>
-                          {application.interests.map((interest) => (
+                          {(application.interests || []).map((interest) => (
                             <span
                               key={interest}
                               className="px-2 py-1 text-xs font-secondary bg-zinc-800 text-zinc-300 border border-zinc-700"
@@ -2368,13 +2731,13 @@ const AdminDashboardPage: React.FC = () => {
                       <td className="px-4 py-3 text-zinc-400 font-secondary text-sm">{member.email}</td>
                       <td className="px-4 py-3">
                         <div className="flex flex-wrap gap-1">
-                          {member.interests.slice(0, 3).map((interest) => (
+                          {(member.interests || []).slice(0, 3).map((interest) => (
                             <span key={interest} className="px-2 py-0.5 text-xs font-secondary bg-zinc-800 text-zinc-300 rounded">
                               {interest.replace(/-/g, ' ')}
                             </span>
                           ))}
-                          {member.interests.length > 3 && (
-                            <span className="text-xs text-zinc-500">+{member.interests.length - 3}</span>
+                          {(member.interests || []).length > 3 && (
+                            <span className="text-xs text-zinc-500">+{(member.interests || []).length - 3}</span>
                           )}
                         </div>
                       </td>
@@ -2382,18 +2745,32 @@ const AdminDashboardPage: React.FC = () => {
                         {new Date(member.createdAt).toLocaleDateString()}
                       </td>
                       <td className="px-4 py-3 text-right">
-                        <button
-                          onClick={() => deleteBetaApplication(member.id, member.name)}
-                          disabled={deletingBetaId === member.id}
-                          className="p-2 text-zinc-500 hover:text-red-400 hover:bg-red-400/10 rounded transition-colors disabled:opacity-50"
-                          title="Delete beta member"
-                        >
-                          {deletingBetaId === member.id ? (
-                            <Loader2 className="h-4 w-4 animate-spin" />
-                          ) : (
-                            <Trash2 className="h-4 w-4" />
-                          )}
-                        </button>
+                        <div className="flex items-center justify-end gap-1">
+                          <button
+                            onClick={() => resendBetaAccessEmail(member.id, member.name)}
+                            disabled={resendingEmailId === member.id}
+                            className="p-2 text-zinc-500 hover:text-purple-400 hover:bg-purple-400/10 rounded transition-colors disabled:opacity-50"
+                            title="Resend sign-in email"
+                          >
+                            {resendingEmailId === member.id ? (
+                              <Loader2 className="h-4 w-4 animate-spin" />
+                            ) : (
+                              <Mail className="h-4 w-4" />
+                            )}
+                          </button>
+                          <button
+                            onClick={() => deleteBetaApplication(member.id, member.name)}
+                            disabled={deletingBetaId === member.id}
+                            className="p-2 text-zinc-500 hover:text-red-400 hover:bg-red-400/10 rounded transition-colors disabled:opacity-50"
+                            title="Delete beta member"
+                          >
+                            {deletingBetaId === member.id ? (
+                              <Loader2 className="h-4 w-4 animate-spin" />
+                            ) : (
+                              <Trash2 className="h-4 w-4" />
+                            )}
+                          </button>
+                        </div>
                       </td>
                     </tr>
                   ))}
@@ -2481,6 +2858,11 @@ const AdminDashboardPage: React.FC = () => {
                                   BETA
                                 </span>
                               )}
+                              {member.membershipType === 'company' && (
+                                <span className="px-1.5 py-0.5 text-[10px] font-secondary bg-green-500/20 text-green-400 border border-green-500/30 rounded">
+                                  COMPANY
+                                </span>
+                              )}
                             </div>
                             <span className="text-zinc-500 font-secondary text-xs">{member.email}</span>
                           </div>
@@ -2494,13 +2876,13 @@ const AdminDashboardPage: React.FC = () => {
                       </td>
                       <td className="px-4 py-3">
                         <div className="flex flex-wrap gap-1">
-                          {member.focusAreas.slice(0, 2).map((area) => (
+                          {(member.focusAreas || []).slice(0, 2).map((area) => (
                             <span key={area} className="px-2 py-0.5 text-xs font-secondary bg-blue-500/10 text-blue-400 rounded">
                               {area.replace(/-/g, ' ')}
                             </span>
                           ))}
-                          {member.focusAreas.length > 2 && (
-                            <span className="text-xs text-zinc-500">+{member.focusAreas.length - 2}</span>
+                          {(member.focusAreas || []).length > 2 && (
+                            <span className="text-xs text-zinc-500">+{(member.focusAreas || []).length - 2}</span>
                           )}
                         </div>
                       </td>
@@ -2623,11 +3005,27 @@ const AdminDashboardPage: React.FC = () => {
             <div className="space-y-3">
               {companies.map((company) => {
                 const isExpanded = expandedCompanyId === company.id;
+                const isRecentlyApproved = recentlyApprovedCompanyEmail === company.contactEmail;
                 return (
-                  <div key={company.id} className="border border-zinc-800">
+                  <div 
+                    key={company.id} 
+                    className={cn(
+                      "border transition-all duration-500",
+                      isRecentlyApproved 
+                        ? "border-green-500 bg-green-500/5 shadow-lg shadow-green-500/20" 
+                        : "border-zinc-800"
+                    )}
+                  >
                     {/* Company Header */}
                     <button
-                      onClick={() => setExpandedCompanyId(isExpanded ? null : company.id)}
+                      onClick={() => {
+                        const newId = isExpanded ? null : company.id;
+                        setExpandedCompanyId(newId);
+                        setExpandedConversationId(null);
+                        if (newId && !companyConversations.has(newId)) {
+                          fetchCompanyConversations(newId);
+                        }
+                      }}
                       className="w-full p-4 flex items-center justify-between text-left hover:bg-zinc-900/50 transition-colors"
                     >
                       <div className="flex items-center gap-4 flex-1">
@@ -2638,6 +3036,12 @@ const AdminDashboardPage: React.FC = () => {
                         <div className="flex-1 min-w-0">
                           <div className="flex items-center gap-3 mb-1">
                             <h3 className="font-primary text-white">{company.companyName}</h3>
+                            {isRecentlyApproved && (
+                              <span className="inline-flex items-center gap-1 px-2 py-0.5 bg-green-500/20 text-green-400 text-xs font-secondary border border-green-500/30 animate-pulse">
+                                <Sparkles className="h-3 w-3" />
+                                Just Approved
+                              </span>
+                            )}
                             {company.verified ? (
                               <span className="inline-flex items-center gap-1 px-2 py-0.5 bg-blue-500/20 text-blue-400 text-xs font-secondary border border-blue-500/30">
                                 <BadgeCheck className="h-3 w-3" />
@@ -2746,7 +3150,157 @@ const AdminDashboardPage: React.FC = () => {
                             )}
                           </div>
 
-                          {/* Verification Toggle */}
+                          {/* Conversation History */}
+                          <div className="pt-4 border-t border-zinc-800">
+                            <div className="flex items-center justify-between mb-3">
+                              <h4 className="text-sm font-primary text-zinc-300 flex items-center gap-2">
+                                <MessageSquare className="h-4 w-4 text-zinc-500" />
+                                Conversation History
+                              </h4>
+                              <button
+                                onClick={() => fetchCompanyConversations(company.id)}
+                                disabled={loadingConversations === company.id}
+                                className="text-xs text-zinc-500 hover:text-zinc-300 font-secondary flex items-center gap-1 transition-colors disabled:opacity-50"
+                              >
+                                <RefreshCw className={cn("h-3 w-3", loadingConversations === company.id && "animate-spin")} />
+                                Refresh
+                              </button>
+                            </div>
+
+                            {loadingConversations === company.id ? (
+                              <div className="flex items-center justify-center py-6">
+                                <Loader2 className="h-5 w-5 animate-spin text-zinc-500" />
+                              </div>
+                            ) : (() => {
+                              const convos = companyConversations.get(company.id) || [];
+                              if (convos.length === 0) {
+                                return (
+                                  <div className="text-center py-4 border border-zinc-800 rounded">
+                                    <MessageSquare className="h-8 w-8 text-zinc-700 mx-auto mb-2" />
+                                    <p className="text-xs text-zinc-500 font-secondary">No conversations yet</p>
+                                  </div>
+                                );
+                              }
+                              return (
+                                <div className="space-y-2">
+                                  {convos.map((convo) => {
+                                    const convoKey = convo.matchId || convo.conversationId || convo.contactRequestId || convo.sessionId || '';
+                                    const isConvoExpanded = expandedConversationId === convoKey;
+                                    return (
+                                      <div key={convoKey} className="border border-zinc-800 rounded overflow-hidden">
+                                        <button
+                                          onClick={() => setExpandedConversationId(isConvoExpanded ? null : convoKey)}
+                                          className="w-full px-3 py-2 flex items-center justify-between text-left hover:bg-zinc-900/50 transition-colors"
+                                        >
+                                          <div className="flex items-center gap-3 min-w-0">
+                                            <div className="w-7 h-7 rounded-full bg-zinc-800 flex items-center justify-center border border-zinc-700 flex-shrink-0 overflow-hidden">
+                                              {convo.participantAvatar ? (
+                                                <img src={convo.participantAvatar} alt="" className="w-full h-full object-cover" />
+                                              ) : (
+                                                <UserCircle className="h-4 w-4 text-zinc-500" />
+                                              )}
+                                            </div>
+                                            <div className="min-w-0">
+                                              <div className="flex items-center gap-2">
+                                                <p className="text-sm text-zinc-200 font-secondary truncate">
+                                                  {convo.participantName}
+                                                </p>
+                                                <span className={cn(
+                                                  "px-1.5 py-0.5 text-[10px] font-secondary rounded flex-shrink-0",
+                                                  convo.conversationType === 'job_match'
+                                                    ? "bg-violet-500/20 text-violet-400"
+                                                    : convo.conversationType === 'contact_request'
+                                                    ? "bg-amber-500/20 text-amber-400"
+                                                    : convo.conversationType === 'agent_chat'
+                                                    ? "bg-emerald-500/20 text-emerald-400"
+                                                    : "bg-blue-500/20 text-blue-400"
+                                                )}>
+                                                  {convo.conversationType === 'job_match' ? 'Job Match' : convo.conversationType === 'contact_request' ? 'Contact Request' : convo.conversationType === 'agent_chat' ? 'CT Finder' : 'Direct'}
+                                                </span>
+                                                {convo.conversationType === 'contact_request' && convo.status && (
+                                                  <span className={cn(
+                                                    "px-1.5 py-0.5 text-[10px] font-secondary rounded flex-shrink-0",
+                                                    convo.status === 'pending' ? "bg-yellow-500/20 text-yellow-400"
+                                                      : convo.status === 'approved' ? "bg-green-500/20 text-green-400"
+                                                      : "bg-red-500/20 text-red-400"
+                                                  )}>
+                                                    {convo.status}
+                                                  </span>
+                                                )}
+                                              </div>
+                                              {convo.jobTitle && (
+                                                <p className="text-xs text-zinc-500 font-secondary truncate">
+                                                  {convo.jobTitle}
+                                                </p>
+                                              )}
+                                            </div>
+                                          </div>
+                                          <div className="flex items-center gap-3 flex-shrink-0">
+                                            <span className="text-xs text-zinc-500 font-secondary">
+                                              {convo.messageCount} msg{convo.messageCount !== 1 ? 's' : ''}
+                                            </span>
+                                            {convo.lastMessageAt && (
+                                              <span className="text-xs text-zinc-600 font-secondary">
+                                                {new Date(convo.lastMessageAt).toLocaleDateString()}
+                                              </span>
+                                            )}
+                                            <ChevronDown className={cn(
+                                              "h-4 w-4 text-zinc-600 transition-transform duration-200",
+                                              isConvoExpanded && "rotate-180"
+                                            )} />
+                                          </div>
+                                        </button>
+
+                                        {isConvoExpanded && (
+                                          <div className="border-t border-zinc-800 bg-zinc-950/50 max-h-80 overflow-y-auto">
+                                            <div className="p-3 space-y-2">
+                                              {convo.messages.map((msg) => (
+                                                <div
+                                                  key={msg.id}
+                                                  className={cn(
+                                                    "flex",
+                                                    msg.senderType === 'company' ? "justify-end" : "justify-start"
+                                                  )}
+                                                >
+                                                  <div className={cn(
+                                                    "max-w-[80%] px-3 py-2 rounded-lg",
+                                                    msg.senderType === 'company'
+                                                      ? "bg-pink-500/10 border border-pink-500/20"
+                                                      : msg.senderType === 'admin'
+                                                      ? "bg-amber-500/10 border border-amber-500/20"
+                                                      : msg.senderType === 'agent'
+                                                      ? "bg-emerald-500/10 border border-emerald-500/20"
+                                                      : "bg-zinc-800 border border-zinc-700"
+                                                  )}>
+                                                    <p className="text-xs text-zinc-400 font-secondary mb-1">
+                                                      {msg.senderName}
+                                                      <span className="text-zinc-600 ml-2">
+                                                        {new Date(msg.createdAt).toLocaleString()}
+                                                      </span>
+                                                    </p>
+                                                    <p className="text-sm text-zinc-200 font-secondary whitespace-pre-wrap break-words">
+                                                      {msg.content}
+                                                    </p>
+                                                    {msg.readAt && (
+                                                      <p className="text-[10px] text-zinc-600 font-secondary mt-1">
+                                                        Read {new Date(msg.readAt).toLocaleString()}
+                                                      </p>
+                                                    )}
+                                                  </div>
+                                                </div>
+                                              ))}
+                                            </div>
+                                          </div>
+                                        )}
+                                      </div>
+                                    );
+                                  })}
+                                </div>
+                              );
+                            })()}
+                          </div>
+
+                          {/* Verification Toggle and Delete */}
                           <div className="flex gap-3 pt-4 border-t border-zinc-800">
                             {company.verified ? (
                               <button
@@ -2785,6 +3339,23 @@ const AdminDashboardPage: React.FC = () => {
                                 )}
                               </button>
                             )}
+                            <button
+                              onClick={() => deleteCompany(company.id)}
+                              disabled={deletingCompanyId === company.id}
+                              className="flex items-center gap-2 px-4 py-2 bg-red-500/10 hover:bg-red-500/20 text-red-400 border border-red-500/30 hover:border-red-500/50 font-secondary text-sm transition-colors disabled:opacity-50"
+                            >
+                              {deletingCompanyId === company.id ? (
+                                <>
+                                  <Loader2 className="h-4 w-4 animate-spin" />
+                                  Deleting...
+                                </>
+                              ) : (
+                                <>
+                                  <Trash2 className="h-4 w-4" />
+                                  Delete Company
+                                </>
+                              )}
+                            </button>
                           </div>
                         </div>
                       </div>
@@ -2796,29 +3367,29 @@ const AdminDashboardPage: React.FC = () => {
           ))}
         </div>
 
-        {/* Credit Usage Section */}
+        {/* Message Credits Section */}
         <div className="mb-10">
           <div className="flex items-center justify-between mb-4">
             <button
-              onClick={() => toggleSection('creditUsage')}
+              onClick={() => toggleSection('messageCredits')}
               className="flex items-center gap-2 group"
             >
-              <CreditCard className="h-5 w-5 text-zinc-500" />
+              <MessageSquare className="h-5 w-5 text-zinc-500" />
               <h2 className="text-xl font-primary">Credit Usage</h2>
               <span className="px-2 py-0.5 bg-zinc-500/20 text-zinc-400 text-xs font-secondary rounded-full">
-                {creditUsageCompanies.length}
+                {messageCreditCompanies.length}
               </span>
               <ChevronDown className={cn(
                 "h-5 w-5 text-zinc-500 transition-transform duration-200",
-                collapsedSections.creditUsage ? "" : "rotate-180"
+                collapsedSections.messageCredits ? "" : "rotate-180"
               )} />
             </button>
             <button
-              onClick={() => fetchCreditUsage()}
-              disabled={loadingCreditUsage}
+              onClick={() => fetchMessageCredits()}
+              disabled={loadingMessageCredits}
               className="flex items-center gap-2 px-3 py-2 border border-zinc-800 text-zinc-400 hover:text-white hover:border-zinc-600 font-secondary text-sm transition-colors disabled:opacity-50"
             >
-              {loadingCreditUsage ? (
+              {loadingMessageCredits ? (
                 <Loader2 className="h-4 w-4 animate-spin" />
               ) : (
                 <RefreshCw className="h-4 w-4" />
@@ -2827,112 +3398,195 @@ const AdminDashboardPage: React.FC = () => {
             </button>
           </div>
 
-          {!collapsedSections.creditUsage && (
+          {!collapsedSections.messageCredits && (
           <>
-          {/* Platform Totals */}
-          <div className="grid grid-cols-2 gap-4 mb-6">
-            <div className="border border-zinc-800 p-4">
-              <p className="text-xs font-secondary text-zinc-500 uppercase tracking-wide mb-1 flex items-center gap-2">
-                <BarChart3 className="h-3 w-3" />
-                Total Analyses
-              </p>
-              <p className="text-2xl font-primary text-pink-400">{creditUsageTotals.totalAnalyses}</p>
-            </div>
-            <div className="border border-zinc-800 p-4">
-              <p className="text-xs font-secondary text-zinc-500 uppercase tracking-wide mb-1 flex items-center gap-2">
-                <DollarSign className="h-3 w-3" />
-                Total Revenue
-              </p>
-              <p className="text-2xl font-primary text-green-400">
-                ${(creditUsageTotals.totalRevenue / 100).toFixed(2)}
-              </p>
-            </div>
-          </div>
-
-          {loadingCreditUsage ? (
-            <div className="border border-zinc-800 p-8 flex items-center justify-center">
-              <Loader2 className="h-6 w-6 animate-spin text-zinc-500" />
-            </div>
-          ) : creditUsageCompanies.length === 0 ? (
-            <div className="border border-zinc-800 p-8 text-center">
-              <CreditCard className="h-12 w-12 text-zinc-700 mx-auto mb-4" />
-              <p className="text-zinc-400 font-secondary">No credit usage data yet.</p>
-            </div>
-          ) : (
-            <div className="border border-zinc-800 overflow-hidden">
-              {/* Table Header */}
-              <div className="grid grid-cols-7 gap-4 px-4 py-3 bg-zinc-900/50 border-b border-zinc-800">
-                <div className="text-xs font-secondary text-zinc-500 uppercase tracking-wide col-span-2">
-                  Company
-                </div>
-                <div className="text-xs font-secondary text-zinc-500 uppercase tracking-wide text-center">
-                  Free Used
-                </div>
-                <div className="text-xs font-secondary text-zinc-500 uppercase tracking-wide text-center">
-                  Purchased
-                </div>
-                <div className="text-xs font-secondary text-zinc-500 uppercase tracking-wide text-center">
-                  Total Analyses
-                </div>
-                <div className="text-xs font-secondary text-zinc-500 uppercase tracking-wide text-center">
-                  Revenue
-                </div>
-                <div className="text-xs font-secondary text-zinc-500 uppercase tracking-wide text-right">
-                  Actions
-                </div>
+            {/* Totals */}
+            <div className="grid grid-cols-2 gap-4 mb-6">
+              <div className="border border-zinc-800 p-4">
+                <p className="text-xs font-secondary text-zinc-500 uppercase tracking-wide mb-1 flex items-center gap-2">
+                  <Send className="h-3 w-3" />
+                  Total Messages Sent
+                </p>
+                <p className="text-2xl font-primary text-pink-400">
+                  {messageCreditCompanies.reduce((sum, c) => sum + c.messagesSent, 0)}
+                </p>
               </div>
+              <div className="border border-zinc-800 p-4">
+                <p className="text-xs font-secondary text-zinc-500 uppercase tracking-wide mb-1 flex items-center gap-2">
+                  <ArrowUpCircle className="h-3 w-3" />
+                  Total Credits Granted
+                </p>
+                <p className="text-2xl font-primary text-violet-400">
+                  {messageCreditCompanies.reduce((sum, c) => sum + c.totalGranted, 0)}
+                </p>
+              </div>
+            </div>
 
-              {/* Table Rows */}
-              <div className="divide-y divide-zinc-800">
-                {creditUsageCompanies.map((company) => (
-                  <div
-                    key={company.companyId}
-                    className="grid grid-cols-7 gap-4 px-4 py-3 hover:bg-zinc-900/30 transition-colors items-center"
-                  >
-                    <div className="col-span-2 flex items-center gap-2">
-                      <Building2 className="h-4 w-4 text-zinc-500 flex-shrink-0" />
-                      <span className="font-secondary text-sm text-zinc-300 truncate">
-                        {company.companyName}
-                      </span>
-                    </div>
-                    <div className="text-center">
-                      <span className="font-secondary text-sm text-zinc-400">
-                        {company.freeUsed}/5
-                      </span>
-                    </div>
-                    <div className="text-center">
-                      <span className="font-secondary text-sm text-zinc-400">
-                        {company.purchasedRemaining}
-                      </span>
-                    </div>
-                    <div className="text-center">
-                      <span className="font-secondary text-sm text-pink-400 font-medium">
-                        {company.totalAnalyses}
-                      </span>
-                    </div>
-                    <div className="text-center">
-                      <span className={cn(
-                        'font-secondary text-sm font-medium',
-                        company.totalRevenue > 0 ? 'text-green-400' : 'text-zinc-500'
-                      )}>
-                        ${(company.totalRevenue / 100).toFixed(2)}
-                      </span>
-                    </div>
-                    <div className="text-right">
-                      <button
-                        onClick={() => setGrantCreditsCompany(company)}
-                        className="inline-flex items-center gap-1 px-2 py-1 text-xs font-secondary text-violet-400 hover:text-violet-300 hover:bg-violet-500/10 border border-violet-500/30 hover:border-violet-500/50 transition-colors"
-                      >
-                        <Sparkles className="h-3 w-3" />
-                        Grant
-                      </button>
-                    </div>
+            {loadingMessageCredits ? (
+              <div className="border border-zinc-800 p-8 flex items-center justify-center">
+                <Loader2 className="h-6 w-6 animate-spin text-zinc-500" />
+              </div>
+            ) : messageCreditCompanies.length === 0 ? (
+              <div className="border border-zinc-800 p-8 text-center">
+                <MessageSquare className="h-12 w-12 text-zinc-700 mx-auto mb-4" />
+                <p className="text-zinc-400 font-secondary">No message credit data yet.</p>
+              </div>
+            ) : (
+              <div className="border border-zinc-800 overflow-hidden">
+                <div className="grid grid-cols-7 gap-4 px-4 py-3 bg-zinc-900/50 border-b border-zinc-800">
+                  <div className="text-xs font-secondary text-zinc-500 uppercase tracking-wide col-span-2">
+                    Company
                   </div>
-                ))}
+                  <div className="text-xs font-secondary text-zinc-500 uppercase tracking-wide text-center">
+                    Free Left
+                  </div>
+                  <div className="text-xs font-secondary text-zinc-500 uppercase tracking-wide text-center">
+                    Purchased Left
+                  </div>
+                  <div className="text-xs font-secondary text-zinc-500 uppercase tracking-wide text-center">
+                    Sent
+                  </div>
+                  <div className="text-xs font-secondary text-zinc-500 uppercase tracking-wide text-center">
+                    Total Remaining
+                  </div>
+                  <div className="text-xs font-secondary text-zinc-500 uppercase tracking-wide text-right">
+                    Actions
+                  </div>
+                </div>
+
+                <div className="divide-y divide-zinc-800">
+                  {messageCreditCompanies.map((company) => (
+                    <div
+                      key={company.companyId}
+                      className="grid grid-cols-7 gap-4 px-4 py-3 hover:bg-zinc-900/30 transition-colors items-center"
+                    >
+                      <div className="col-span-2 flex items-center gap-2">
+                        <Building2 className="h-4 w-4 text-zinc-500 flex-shrink-0" />
+                        <div className="min-w-0">
+                          <span className="font-secondary text-sm text-zinc-300 truncate block">
+                            {company.companyName}
+                          </span>
+                          {!company.verified && (
+                            <span className="text-xs text-zinc-600 font-secondary">Unverified</span>
+                          )}
+                        </div>
+                      </div>
+                      <div className="text-center">
+                        <span className={cn(
+                          "font-secondary text-sm",
+                          company.freeRemaining === 0 ? "text-zinc-600" : "text-zinc-400"
+                        )}>
+                          {company.freeRemaining}/25
+                        </span>
+                      </div>
+                      <div className="text-center">
+                        <span className={cn(
+                          "font-secondary text-sm",
+                          company.purchasedRemaining === 0 ? "text-zinc-600" : "text-violet-400"
+                        )}>
+                          {company.purchasedRemaining}
+                        </span>
+                      </div>
+                      <div className="text-center">
+                        <span className="font-secondary text-sm text-pink-400 font-medium">
+                          {company.messagesSent}
+                        </span>
+                      </div>
+                      <div className="text-center">
+                        <span className={cn(
+                          "font-secondary text-sm font-medium",
+                          company.totalRemaining === 0
+                            ? "text-red-400"
+                            : company.totalRemaining <= 5
+                            ? "text-amber-400"
+                            : "text-green-400"
+                        )}>
+                          {company.totalRemaining}
+                        </span>
+                      </div>
+                      <div className="text-right">
+                        <button
+                          onClick={() => setGrantMsgCreditsCompany(company)}
+                          className="inline-flex items-center gap-1 px-2 py-1 text-xs font-secondary text-violet-400 hover:text-violet-300 hover:bg-violet-500/10 border border-violet-500/30 hover:border-violet-500/50 transition-colors"
+                        >
+                          <ArrowUpCircle className="h-3 w-3" />
+                          Top Up
+                        </button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
               </div>
-            </div>
-          )}
+            )}
           </>
+          )}
+        </div>
+
+        {/* Beta Broadcast Section */}
+        <div className="mb-10">
+          <button
+            onClick={() => toggleSection('betaBroadcast')}
+            className="w-full flex items-center justify-between mb-4 group"
+          >
+            <div className="flex items-center gap-2">
+              <Megaphone className="h-5 w-5 text-amber-400" />
+              <h2 className="text-xl font-primary">Beta User Broadcast</h2>
+            </div>
+            <ChevronDown className={cn(
+              "h-5 w-5 text-zinc-500 transition-transform duration-200",
+              collapsedSections.betaBroadcast ? "" : "rotate-180"
+            )} />
+          </button>
+
+          {!collapsedSections.betaBroadcast && session?.access_token && (
+            <>
+              {/* Mode toggle */}
+              <div className="flex gap-2 mb-4">
+                <button
+                  onClick={() => setBroadcastMode('quick')}
+                  className={cn(
+                    'flex items-center gap-2 px-4 py-2 text-sm font-secondary transition-colors border',
+                    broadcastMode === 'quick'
+                      ? 'bg-amber-500/15 border-amber-500/40 text-amber-300'
+                      : 'bg-zinc-800 border-zinc-700 text-zinc-400 hover:border-zinc-600'
+                  )}
+                >
+                  <MessageSquare className="h-4 w-4" />
+                  Quick Message
+                </button>
+                <button
+                  onClick={() => setBroadcastMode('full')}
+                  className={cn(
+                    'flex items-center gap-2 px-4 py-2 text-sm font-secondary transition-colors border',
+                    broadcastMode === 'full'
+                      ? 'bg-amber-500/15 border-amber-500/40 text-amber-300'
+                      : 'bg-zinc-800 border-zinc-700 text-zinc-400 hover:border-zinc-600'
+                  )}
+                >
+                  <Megaphone className="h-4 w-4" />
+                  Full Broadcast
+                </button>
+              </div>
+
+              {broadcastMode === 'quick' ? (
+                <BetaQuickMessageSection
+                  accessToken={session.access_token}
+                  betaUserCount={memberCounts.betaApproved}
+                  onToast={(message, type) => {
+                    setToast({ message, type });
+                    setTimeout(() => setToast(null), 3000);
+                  }}
+                />
+              ) : (
+                <BetaBroadcastSection
+                  accessToken={session.access_token}
+                  onToast={(message, type) => {
+                    setToast({ message, type });
+                    setTimeout(() => setToast(null), 3000);
+                  }}
+                />
+              )}
+            </>
           )}
         </div>
 
@@ -3592,48 +4246,47 @@ const AdminDashboardPage: React.FC = () => {
       )}
 
       {/* Grant Credits Modal */}
-      {grantCreditsCompany && (
+      {/* Grant Message Credits Modal */}
+      {grantMsgCreditsCompany && (
         <div className="fixed inset-0 z-50 flex items-center justify-center">
-          {/* Backdrop */}
           <div
             className="absolute inset-0 bg-black/80 backdrop-blur-sm"
             onClick={() => {
-              setGrantCreditsCompany(null);
-              setGrantCreditsAmount('');
-              setGrantCreditsNote('');
+              setGrantMsgCreditsCompany(null);
+              setGrantMsgCreditsAmount('');
+              setGrantMsgCreditsNote('');
             }}
           />
 
-          {/* Dialog */}
           <div className="relative bg-zinc-900 border border-zinc-700 w-full max-w-md mx-4 p-6">
-            {/* Close button */}
             <button
               onClick={() => {
-                setGrantCreditsCompany(null);
-                setGrantCreditsAmount('');
-                setGrantCreditsNote('');
+                setGrantMsgCreditsCompany(null);
+                setGrantMsgCreditsAmount('');
+                setGrantMsgCreditsNote('');
               }}
               className="absolute top-4 right-4 text-zinc-500 hover:text-white transition-colors"
             >
               <X className="h-5 w-5" />
             </button>
 
-            <h3 className="font-primary text-xl text-white mb-2">Grant Credits</h3>
+            <h3 className="font-primary text-xl text-white mb-2">Top Up Message Credits</h3>
             <p className="text-sm text-zinc-400 font-secondary mb-4">
-              Add bonus credits to <span className="text-white">{grantCreditsCompany.companyName}</span>'s account.
+              Add message credits to <span className="text-white">{grantMsgCreditsCompany.companyName}</span>'s account.
             </p>
 
-            {/* Current balance display */}
             <div className="mb-4 p-3 bg-zinc-800/50 border border-zinc-700">
               <p className="text-xs font-secondary text-zinc-500 uppercase tracking-wide mb-1">
                 Current Balance
               </p>
               <p className="font-secondary text-sm text-zinc-300">
-                {grantCreditsCompany.freeUsed < 5 ? 5 - grantCreditsCompany.freeUsed : 0} free + {grantCreditsCompany.purchasedRemaining} purchased credits
+                {grantMsgCreditsCompany.freeRemaining} free + {grantMsgCreditsCompany.purchasedRemaining} purchased = <span className="text-white font-medium">{grantMsgCreditsCompany.totalRemaining} total</span>
+              </p>
+              <p className="font-secondary text-xs text-zinc-500 mt-1">
+                {grantMsgCreditsCompany.messagesSent} messages sent so far
               </p>
             </div>
 
-            {/* Credit amount input */}
             <div className="mb-4">
               <label className="block text-xs font-secondary text-zinc-500 uppercase tracking-wide mb-2">
                 Credits to Add *
@@ -3641,53 +4294,51 @@ const AdminDashboardPage: React.FC = () => {
               <input
                 type="number"
                 min="1"
-                value={grantCreditsAmount}
-                onChange={(e) => setGrantCreditsAmount(e.target.value)}
+                value={grantMsgCreditsAmount}
+                onChange={(e) => setGrantMsgCreditsAmount(e.target.value)}
                 placeholder="Enter credit amount"
                 className="w-full px-4 py-3 bg-zinc-800 border border-zinc-700 text-white placeholder:text-zinc-500 font-secondary text-sm focus:outline-none focus:border-zinc-500"
               />
             </div>
 
-            {/* Note textarea */}
             <div className="mb-6">
               <label className="block text-xs font-secondary text-zinc-500 uppercase tracking-wide mb-2">
                 Note (Optional)
               </label>
               <textarea
-                value={grantCreditsNote}
-                onChange={(e) => setGrantCreditsNote(e.target.value)}
-                placeholder="e.g., Promotional bonus, support compensation..."
+                value={grantMsgCreditsNote}
+                onChange={(e) => setGrantMsgCreditsNote(e.target.value)}
+                placeholder="e.g., Trial extension, premium upgrade..."
                 className="w-full px-4 py-3 bg-zinc-800 border border-zinc-700 text-white placeholder:text-zinc-500 font-secondary text-sm focus:outline-none focus:border-zinc-500 resize-none"
                 rows={2}
               />
             </div>
 
-            {/* Action buttons */}
             <div className="flex gap-3">
               <button
                 onClick={() => {
-                  setGrantCreditsCompany(null);
-                  setGrantCreditsAmount('');
-                  setGrantCreditsNote('');
+                  setGrantMsgCreditsCompany(null);
+                  setGrantMsgCreditsAmount('');
+                  setGrantMsgCreditsNote('');
                 }}
                 className="flex-1 px-4 py-2 border border-zinc-700 text-zinc-300 hover:border-zinc-500 font-secondary text-sm transition-colors"
               >
                 Cancel
               </button>
               <button
-                onClick={grantCredits}
-                disabled={grantingCredits || !grantCreditsAmount}
+                onClick={grantMessageCredits}
+                disabled={grantingMsgCredits || !grantMsgCreditsAmount}
                 className="flex-1 flex items-center justify-center gap-2 px-4 py-2 bg-violet-500 hover:bg-violet-600 text-white font-secondary text-sm transition-colors disabled:opacity-50"
               >
-                {grantingCredits ? (
+                {grantingMsgCredits ? (
                   <>
                     <Loader2 className="h-4 w-4 animate-spin" />
                     Granting...
                   </>
                 ) : (
                   <>
-                    <Sparkles className="h-4 w-4" />
-                    Grant Credits
+                    <ArrowUpCircle className="h-4 w-4" />
+                    Top Up
                   </>
                 )}
               </button>

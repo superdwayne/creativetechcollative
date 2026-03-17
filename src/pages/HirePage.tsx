@@ -898,9 +898,9 @@ const HirePage: React.FC = () => {
                                 <CheckCircle2 className="w-4 h-4 text-emerald-400" />
                               </div>
                               <div>
-                                <h5 className="text-sm font-semibold text-white mb-1">
+                                <h4 className="text-sm font-semibold text-white mb-1">
                                   Why {match.fullName.split(' ')[0]} is a Great Match
-                                </h5>
+                                </h4>
                                 <p className="text-zinc-300 text-sm leading-relaxed">{match.matchReasoning}</p>
                               </div>
                             </div>
@@ -908,9 +908,9 @@ const HirePage: React.FC = () => {
                             {/* Skill Matches */}
                             {match.skillMatches && match.skillMatches.length > 0 && (
                               <div className="mt-4 pt-4 border-t border-emerald-500/10">
-                                <h6 className="text-xs font-medium text-zinc-500 uppercase tracking-wide mb-3">
+                                <h5 className="text-xs font-medium text-zinc-500 uppercase tracking-wide mb-3">
                                   Key Matching Skills
-                                </h6>
+                                </h5>
                                 <div className="grid gap-2">
                                   {match.skillMatches.slice(0, 6).map((sm, idx) => (
                                     <div key={idx} className="flex items-start gap-2 text-sm">
@@ -936,10 +936,10 @@ const HirePage: React.FC = () => {
                           {/* Bio */}
                           {match.bio && (
                             <div className="bg-zinc-800/30 rounded-xl p-5">
-                              <h5 className="text-xs font-medium text-zinc-500 uppercase tracking-wide mb-3 flex items-center gap-2">
+                              <h4 className="text-xs font-medium text-zinc-500 uppercase tracking-wide mb-3 flex items-center gap-2">
                                 <Briefcase className="w-4 h-4" />
                                 Background & Experience
-                              </h5>
+                              </h4>
                               <p className="text-zinc-300 text-sm leading-relaxed">{match.bio}</p>
                             </div>
                           )}
@@ -947,10 +947,10 @@ const HirePage: React.FC = () => {
                           {/* All Skills */}
                           {match.skills && match.skills.length > 0 && (
                             <div className="bg-zinc-800/30 rounded-xl p-5">
-                              <h5 className="text-xs font-medium text-zinc-500 uppercase tracking-wide mb-3 flex items-center gap-2">
+                              <h4 className="text-xs font-medium text-zinc-500 uppercase tracking-wide mb-3 flex items-center gap-2">
                                 <Sparkles className="w-4 h-4" />
                                 Full Skillset
-                              </h5>
+                              </h4>
                               <div className="flex flex-wrap gap-2">
                                 {match.skills.map((skill, idx) => (
                                   <span

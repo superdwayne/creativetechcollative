@@ -5,6 +5,7 @@ import ImageCube from '../components/ImageCube';
 import EmailSignup from '../components/EmailSignup';
 import Footer from '../components/ui/footer';
 import { getWebhookUrl } from '@/utils/webhookUtils';
+import { useHaptics } from '@/hooks/useHaptics';
 
 interface Member {
   name: string;
@@ -28,18 +29,20 @@ interface CaseStudy {
 // Image Carousel Component for Case Studies
 const ImageCarousel: React.FC<{ images: string[]; title: string }> = ({ images, title }) => {
   const [currentImageIndex, setCurrentImageIndex] = useState(0);
+  const { tap } = useHaptics();
 
-  const nextImage = () => setCurrentImageIndex((prev) => (prev + 1) % images.length);
-  const prevImage = () => setCurrentImageIndex((prev) => (prev - 1 + images.length) % images.length);
+  const nextImage = () => { tap(); setCurrentImageIndex((prev) => (prev + 1) % images.length); };
+  const prevImage = () => { tap(); setCurrentImageIndex((prev) => (prev - 1 + images.length) % images.length); };
 
   if (images.length === 0) return null;
 
   return (
     <div className="relative group overflow-hidden bg-zinc-900 aspect-[4/3]">
-      <img 
-        src={images[currentImageIndex]} 
+      <img
+        src={images[currentImageIndex]}
         alt={`${title} - Image ${currentImageIndex + 1}`}
         className="w-full h-full object-cover transition-all duration-500 group-hover:scale-105"
+        loading="lazy"
         onError={(e) => {
           const target = e.target as HTMLImageElement;
           target.src = `https://via.placeholder.com/800x600/1f2937/9ca3af?text=${encodeURIComponent(title)}`;
@@ -59,7 +62,7 @@ const ImageCarousel: React.FC<{ images: string[]; title: string }> = ({ images, 
             {images.map((_, index) => (
               <button
                 key={index}
-                onClick={() => setCurrentImageIndex(index)}
+                onClick={() => { tap(); setCurrentImageIndex(index); }}
                 className={`w-1.5 h-1.5 rounded-full transition-all duration-300 ${index === currentImageIndex ? 'bg-white scale-125' : 'bg-white/50 hover:bg-white/75'}`}
               />
             ))}
@@ -80,7 +83,7 @@ const staticCollaborations: CaseStudy[] = [
     category: 'Presentation',
     tags: ['AI', 'MCP', '8th Wall', 'TouchDesigner', 'AI Agents'],
     date: '2025-12-20',
-    images: ['https://scontent.cdninstagram.com/v/t51.82787-15/561611891_17922032478156370_3459566483777620000_n.jpg?stp=dst-jpg_e35_tt6&_nc_cat=101&ig_cache_key=Mzc0MDI0MjA5NjY0NjA5MTU3Mw%3D%3D.3-ccb7-5&ccb=7-5&_nc_sid=58cdad&efg=eyJ2ZW5jb2RlX3RhZyI6InhwaWRzLjE0Mzl4MTQ0Mi5zZHIuQzMifQ%3D%3D&_nc_ohc=WSZTQQcu-dwQ7kNvwGIEs4u&_nc_oc=AdmKK44ZaH_u4Fb8buw07omAwi7f8b9NSf5sVxoN2UxOR-EqRdFxjteCcuLYQ55lpBk&_nc_ad=z-m&_nc_cid=1207&_nc_zt=23&_nc_ht=scontent.cdninstagram.com&_nc_gid=lxnhR-Y9m83rUyxciYgOXQ&oh=00_AflelGpgZMnt4AY6le95tldm_d7RzFRs7Fc61LkWVSr-Pw&oe=69445860'],
+    images: ['https://ik.imagekit.io/agenciesofanywhere/articles/recommended-event-adnight-2023/cover.png?tr=w-1920,q-100'],
     url: 'https://www.linkedin.com/feed/update/urn:li:activity:7381662568286679040'
   },
   {
@@ -130,6 +133,7 @@ const staticCollaborations: CaseStudy[] = [
 
 const HeroPage: React.FC = () => {
   const navigate = useNavigate();
+  const { tap } = useHaptics();
   const [selectedMember, setSelectedMember] = useState<Member | null>(null);
   const [caseStudies, setCaseStudies] = useState<CaseStudy[]>(staticCollaborations);
   const [casesLoading, setCasesLoading] = useState(false);
@@ -187,7 +191,7 @@ const HeroPage: React.FC = () => {
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [selectedMember]);
 
-  // Fetch case studies from webhook
+  // Fetch case studies from webhook (deferred — below the fold)
   useEffect(() => {
     const fetchCases = async () => {
       try {
@@ -303,7 +307,9 @@ const HeroPage: React.FC = () => {
       }
     };
 
-    fetchCases();
+    // Defer fetch to after initial render — case studies are below the fold
+    const id = requestIdleCallback ? requestIdleCallback(fetchCases) : setTimeout(fetchCases, 200) as unknown as number;
+    return () => { requestIdleCallback ? cancelIdleCallback(id) : clearTimeout(id); };
   }, []);
 
   const members: Member[] = [
@@ -344,7 +350,7 @@ As a creative technologist and educator, Edwin focuses on making complex technol
         <div className="flex-1 flex flex-col justify-center px-8 md:px-16 lg:px-24 py-20 lg:py-0">
           {/* Small Label */}
           <div className="mb-8">
-            <span className="text-xs font-secondary tracking-[0.3em] text-zinc-500 uppercase">
+            <span className="text-xs font-secondary tracking-[0.3em] text-zinc-400 uppercase">
               Creative Technology Collective
             </span>
           </div>
@@ -435,7 +441,7 @@ As a creative technologist and educator, Edwin focuses on making complex technol
       {/* Mission Section */}
       <section id="mission" className="min-h-screen bg-black flex items-center justify-center px-8 md:px-16 lg:px-24">
         <div className="max-w-6xl text-center">
-          <span className="text-xs font-secondary tracking-[0.3em] text-zinc-500 uppercase mb-8 block">
+          <span className="text-xs font-secondary tracking-[0.3em] text-zinc-400 uppercase mb-8 block">
             Our Mission
           </span>
           <h2 className="text-3xl md:text-5xl lg:text-7xl font-primary font-medium leading-tight text-white mb-8">
@@ -446,12 +452,12 @@ As a creative technologist and educator, Edwin focuses on making complex technol
       </section>
 
       {/* Members Section */}
-      <section id="members" className={`py-32 bg-black px-8 md:px-16 lg:px-24 relative transition-all duration-500 ${selectedMember ? 'z-50' : 'z-10'}`}>
+      <section id="members" className={`py-20 md:py-24 bg-black px-8 md:px-16 lg:px-24 relative transition-all duration-500 ${selectedMember ? 'z-50' : 'z-10'}`}>
         <div className="max-w-7xl mx-auto">
           {/* Section Header */}
           <div className="flex flex-col md:flex-row md:items-end md:justify-between mb-16">
             <div>
-              <span className="text-xs font-secondary tracking-[0.3em] text-zinc-500 uppercase mb-4 block">
+              <span className="text-xs font-secondary tracking-[0.3em] text-zinc-400 uppercase mb-4 block">
                 Our Members
               </span>
               <h2 className="text-4xl md:text-5xl lg:text-6xl font-primary font-medium text-white">
@@ -467,10 +473,11 @@ As a creative technologist and educator, Edwin focuses on making complex technol
               <div className="grid grid-cols-1 md:grid-cols-2">
                 {/* Image - Left side */}
                 <div className="aspect-square">
-                  <img 
-                    src={selectedMember.image} 
+                  <img
+                    src={selectedMember.image}
                     alt={selectedMember.name}
                     className="w-full h-full object-cover"
+                    loading="lazy"
                   />
                 </div>
 
@@ -478,13 +485,13 @@ As a creative technologist and educator, Edwin focuses on making complex technol
                 <div className="flex flex-col justify-center p-8 md:p-12 relative">
                   {/* Close Button */}
                   <button
-                    onClick={() => setSelectedMember(null)}
+                    onClick={() => { tap(); setSelectedMember(null); }}
                     className="absolute top-6 right-6 p-2 text-zinc-400 hover:text-white transition-colors"
                   >
                     <X className="w-8 h-8" />
                   </button>
 
-                  <span className="text-xs font-secondary tracking-[0.3em] text-zinc-500 uppercase mb-4">
+                  <span className="text-xs font-secondary tracking-[0.3em] text-zinc-400 uppercase mb-4">
                     {selectedMember.role}
                   </span>
                   <h3 className="text-4xl md:text-5xl font-primary font-medium text-white mb-6">
@@ -505,6 +512,7 @@ As a creative technologist and educator, Edwin focuses on making complex technol
                 key={member.name}
                 className="group relative aspect-square overflow-hidden bg-zinc-900 cursor-pointer"
                 onClick={() => {
+                  tap();
                   setSelectedMember(member);
                   const element = document.getElementById('members');
                   if (element) {
@@ -512,10 +520,11 @@ As a creative technologist and educator, Edwin focuses on making complex technol
                   }
                 }}
               >
-                <img 
-                  src={member.image} 
+                <img
+                  src={member.image}
                   alt={member.name}
                   className="w-full h-full object-cover grayscale group-hover:grayscale-0 transition-all duration-500 group-hover:scale-105"
+                  loading="lazy"
                 />
                 <div className="absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 transition-opacity duration-300 flex items-end p-4">
                   <span className="text-white font-secondary text-sm">{member.name}</span>
@@ -531,12 +540,12 @@ As a creative technologist and educator, Edwin focuses on making complex technol
     
 
       {/* Partners Section */}
-      <section id="partners" className="py-32 bg-black px-8 md:px-16 lg:px-24 relative z-20">
+      <section id="partners" className="py-20 md:py-24 bg-black px-8 md:px-16 lg:px-24 relative z-20">
         <div className="max-w-7xl mx-auto">
           {/* Section Header */}
           <div className="flex flex-col md:flex-row md:items-end md:justify-between mb-16">
             <div>
-              <span className="text-xs font-secondary tracking-[0.3em] text-zinc-500 uppercase mb-4 block">
+              <span className="text-xs font-secondary tracking-[0.3em] text-zinc-400 uppercase mb-4 block">
                 Our Partners
               </span>
               <h2 className="text-4xl md:text-5xl lg:text-6xl font-primary font-medium text-white">
@@ -563,10 +572,11 @@ As a creative technologist and educator, Edwin focuses on making complex technol
                 className="group flex flex-col items-center justify-center p-6 bg-zinc-900/50 hover:bg-zinc-800/50 transition-all duration-300 cursor-pointer"
               >
                 <div className="flex items-center justify-center h-20 mb-4">
-                  <img 
-                    src={partner.image} 
+                  <img
+                    src={partner.image}
                     alt={partner.name}
                     className="max-h-12 w-auto object-contain opacity-60 group-hover:opacity-100 transition-opacity duration-300 filter grayscale group-hover:grayscale-0"
+                    loading="lazy"
                   />
                 </div>
                 <span className="text-zinc-400 group-hover:text-white font-secondary text-sm text-center transition-colors duration-300">
@@ -582,7 +592,7 @@ As a creative technologist and educator, Edwin focuses on making complex technol
               Interested in partnering with us?
             </p>
             <button
-              onClick={() => navigate('/contact')}
+              onClick={() => { tap(); navigate('/contact'); }}
               className="px-8 py-4 border border-zinc-700 text-white font-secondary text-sm tracking-wide hover:border-zinc-500 hover:bg-white/5 transition-all"
             >
               Get in Touch
@@ -592,12 +602,12 @@ As a creative technologist and educator, Edwin focuses on making complex technol
       </section>
 
       {/* Collaborations Section */}
-      <section id="collaborations" className={`py-32 bg-black px-8 md:px-16 lg:px-24 relative transition-all duration-500 ${selectedCase ? 'z-50' : 'z-20'}`}>
+      <section id="collaborations" className={`py-20 md:py-24 bg-black px-8 md:px-16 lg:px-24 relative transition-all duration-500 ${selectedCase ? 'z-50' : 'z-20'}`}>
         <div className="max-w-7xl mx-auto">
           {/* Section Header */}
           <div className="flex flex-col md:flex-row md:items-end md:justify-between mb-16">
             <div>
-              <span className="text-xs font-secondary tracking-[0.3em] text-zinc-500 uppercase mb-4 block">
+              <span className="text-xs font-secondary tracking-[0.3em] text-zinc-400 uppercase mb-4 block">
                 Our Work
               </span>
               <h2 className="text-4xl md:text-5xl lg:text-6xl font-primary font-medium text-white">
@@ -632,13 +642,13 @@ As a creative technologist and educator, Edwin focuses on making complex technol
                 {/* Right side - Content */}
                 <div className="flex flex-col justify-center p-8 md:p-12 relative">
                   <button
-                    onClick={() => setSelectedCase(null)}
+                    onClick={() => { tap(); setSelectedCase(null); }}
                     className="absolute top-6 right-6 p-2 text-zinc-400 hover:text-white transition-colors text-2xl"
                   >
                     ✕
                   </button>
 
-                  <span className="text-xs font-secondary tracking-[0.3em] text-zinc-500 uppercase mb-4">
+                  <span className="text-xs font-secondary tracking-[0.3em] text-zinc-400 uppercase mb-4">
                     {selectedCase.client || 'Case Study'}
                   </span>
                   <h3 className="text-4xl md:text-5xl font-primary font-medium text-white mb-6">
@@ -671,18 +681,19 @@ As a creative technologist and educator, Edwin focuses on making complex technol
                 <div 
                   key={caseStudy.id}
                   className="group relative aspect-video overflow-hidden bg-zinc-900 cursor-pointer"
-                  onClick={() => setSelectedCase(caseStudy)}
+                  onClick={() => { tap(); setSelectedCase(caseStudy); }}
                 >
                   {caseStudy.images.length > 0 && (
-                    <img 
-                      src={caseStudy.images[0]} 
+                    <img
+                      src={caseStudy.images[0]}
                       alt={caseStudy.title}
                       className="w-full h-full object-cover opacity-60 group-hover:opacity-100 group-hover:scale-105 transition-all duration-500"
+                      loading="lazy"
                     />
                   )}
                   <div className="absolute inset-0 bg-gradient-to-t from-black via-black/50 to-transparent" />
                   <div className="absolute bottom-0 left-0 right-0 p-6">
-                    <span className="text-xs font-secondary tracking-[0.2em] text-zinc-500 uppercase mb-2 block">
+                    <span className="text-xs font-secondary tracking-[0.2em] text-zinc-400 uppercase mb-2 block">
                       {caseStudy.client || 'Case Study'}
                     </span>
                     <h3 className="text-2xl md:text-3xl font-primary font-medium text-white mb-2">
@@ -708,7 +719,7 @@ As a creative technologist and educator, Edwin focuses on making complex technol
           {caseStudies.length > 4 && (
             <div className="mt-16 text-center">
               <button
-                onClick={() => navigate('/collaborations')}
+                onClick={() => { tap(); navigate('/collaborations'); }}
                 className="px-8 py-4 border border-zinc-700 text-white font-secondary text-sm tracking-wide hover:border-zinc-500 hover:bg-white/5 transition-all"
               >
                 View All {caseStudies.length} Projects
@@ -719,9 +730,9 @@ As a creative technologist and educator, Edwin focuses on making complex technol
       </section>
 
       {/* Join Us CTA Section */}
-      <section id="newsletter" className="py-32 bg-black px-8 md:px-16 lg:px-24 relative">
+      <section id="newsletter" className="py-20 md:py-24 bg-black px-8 md:px-16 lg:px-24 relative">
         <div className="max-w-4xl mx-auto text-center">
-          <span className="text-xs font-secondary tracking-[0.3em] text-zinc-500 uppercase mb-6 block">
+          <span className="text-xs font-secondary tracking-[0.3em] text-zinc-400 uppercase mb-6 block">
             Sign up to our newsletter
           </span>
           <h2 className="text-4xl md:text-5xl lg:text-6xl font-primary font-medium text-white mb-8 leading-tight">

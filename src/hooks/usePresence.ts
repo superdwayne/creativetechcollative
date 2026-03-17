@@ -18,7 +18,11 @@ export function usePresence() {
       try {
         await fetch('/api/messages/presence', {
           method: 'POST',
-          headers: { Authorization: `Bearer ${session.access_token}` },
+          headers: {
+            'Content-Type': 'application/json',
+            Authorization: `Bearer ${session.access_token}`,
+          },
+          body: JSON.stringify({ status: 'online' }),
         });
       } catch (error) {
         // Silently fail - presence is not critical

@@ -227,7 +227,7 @@ async function fetchUrlContent(url: string, timeoutMs: number = 10000): Promise<
       if (response.ok) {
         const text = await response.text();
         console.log(`[ENRICH-SEARCH] Jina got ${text.length} chars from ${url}`);
-        return text.substring(0, 10000);
+        return text.substring(0, 15000);
       }
       console.log(`[ENRICH-SEARCH] Jina returned ${response.status} for ${url}`);
     } catch (error) {
@@ -285,6 +285,61 @@ async function fetchUrlSimple(url: string, timeoutMs: number = 8000): Promise<st
   }
 }
 
+/**
+ * Extract internal links from a portfolio page HTML that likely point to project pages
+ */
+function extractProjectLinks(html: string, baseUrl: string): string[] {
+  const links: string[] = [];
+  let origin: string;
+  try {
+    origin = new URL(baseUrl.startsWith('http') ? baseUrl : `https://${baseUrl}`).origin;
+  } catch {
+    return [];
+  }
+
+  // Match all <a href="..."> links
+  const linkRegex = /<a\s[^>]*href=["']([^"']+)["'][^>]*>([\s\S]*?)<\/a>/gi;
+  let match;
+
+  while ((match = linkRegex.exec(html)) !== null) {
+    let href = match[1];
+    const linkText = match[2].replace(/<[^>]+>/g, '').trim().toLowerCase();
+
+    // Skip anchors, external links, assets, and common non-project paths
+    if (!href || href.startsWith('#') || href.startsWith('mailto:') || href.startsWith('tel:')) continue;
+    if (/\.(jpg|jpeg|png|gif|svg|pdf|css|js|ico|webp|mp4|mp3)$/i.test(href)) continue;
+
+    // Make absolute
+    if (href.startsWith('/')) {
+      href = origin + href;
+    } else if (!href.startsWith('http')) {
+      href = origin + '/' + href;
+    }
+
+    // Only include internal links
+    if (!href.startsWith(origin)) continue;
+
+    // Skip common non-project paths
+    const path = href.replace(origin, '').toLowerCase();
+    if (['/about', '/contact', '/blog', '/privacy', '/terms', '/login', '/signup', '/'].includes(path)) continue;
+    if (path === '' || path === '/') continue;
+
+    // Likely a project page if it has a meaningful path segment
+    const segments = path.split('/').filter(Boolean);
+    if (segments.length >= 1 && segments[0].length > 1) {
+      // Prioritize paths that look like project pages
+      const projectPatterns = /project|work|case|portfolio|campaign|installation/i;
+      const isLikelyProject = projectPatterns.test(path) || segments.length <= 3;
+      
+      if (isLikelyProject && !links.includes(href)) {
+        links.push(href);
+      }
+    }
+  }
+
+  return links.slice(0, 8); // Max 8 project links
+}
+
 interface AIAnalysisResult {
   projects: DiscoveredProject[];
   additionalSkills: string[];
@@ -303,40 +358,57 @@ function buildEnrichmentPrompt(
   searchResults: WebSearchResult[],
   pageContents: string[]
 ): string {
-  const truncatedContents = pageContents.map(c => c.substring(0, 2500));
+  const truncatedContents = pageContents.map(c => c.substring(0, 4000));
   
-  return `You are analyzing web search results to help enrich a creative technologist's profile for job matching. Extract comprehensive, accurate information.
+  return `You are an expert researcher building a comprehensive professional profile for a creative technologist. Your job is to extract EVERY piece of relevant information from the provided web data.
 
-Profile Name: ${profileName}
+PERSON: ${profileName}
 Current Bio: ${currentBio || 'Not provided'}
 Current Skills: ${currentSkills.join(', ') || 'None listed'}
 
-Search Results:
-${searchResults.slice(0, 6).map((r, i) => `${i + 1}. ${r.title}\n   URL: ${r.url}\n   ${r.snippet}`).join('\n\n')}
+=== SEARCH RESULTS ===
+${searchResults.slice(0, 8).map((r, i) => `${i + 1}. ${r.title}\n   URL: ${r.url}\n   ${r.snippet}`).join('\n\n')}
 
-Page Contents:
-${truncatedContents.slice(0, 3).map((c, i) => `--- Page ${i + 1} ---\n${c}`).join('\n\n')}
+=== PAGE CONTENTS ===
+${truncatedContents.slice(0, 5).map((c, i) => `--- Page ${i + 1} ---\n${c}`).join('\n\n')}
 
-Extract ALL relevant information about ${profileName}:
+=== EXTRACTION INSTRUCTIONS ===
 
-1. PROJECTS: Notable work, campaigns, installations, case studies. Include:
-   - title, description (2-3 sentences), url, client, technologies
+Be EXHAUSTIVE. Extract everything you can find about ${profileName}:
 
-2. WORK HISTORY: Companies/agencies they've worked at:
-   - company, role, duration, description
+1. PROJECTS (extract ALL you can find):
+   - Every project, campaign, installation, case study, client work, personal project, open-source contribution
+   - Include: title, detailed description (2-3 sentences about what it was), url if available, client/brand name, technologies used
+   - Look for awards, exhibitions, festival appearances
+   - Include freelance work, agency work, and personal experiments
 
-3. ADDITIONAL SKILLS: Technical skills not in their current list:
-   - Programming, creative tools, AI/ML, hardware, frameworks
+2. WORK HISTORY (every role you can identify):
+   - All companies, agencies, studios, freelance roles
+   - Include: company name, role/title, approximate duration, description of what they did there
+   - Look for current and past positions
 
-4. ENRICHED BIO: Professional bio (3-4 sentences) highlighting specialty, clients, tech
+3. ADDITIONAL SKILLS (be comprehensive):
+   - Programming languages (JavaScript, Python, C++, GLSL, etc.)
+   - Frameworks & libraries (React, Three.js, Unity, TouchDesigner, etc.)
+   - Creative tools (After Effects, Blender, Cinema 4D, Figma, etc.)
+   - Hardware (Arduino, Raspberry Pi, LED controllers, sensors, etc.)
+   - AI/ML tools (Stable Diffusion, ComfyUI, RunwayML, etc.)
+   - Methodologies (creative coding, physical computing, real-time graphics, etc.)
+   - Do NOT include skills they already have: ${currentSkills.join(', ')}
 
-5. SUMMARY: Brief overview for matching
+4. ENRICHED BIO:
+   - Write a compelling 3-4 sentence professional bio
+   - Mention their specialty, notable clients/brands, and key technologies
+   - Make it sound natural and professional, suitable for a directory listing
 
-CRITICAL:
-- Only include information clearly about THIS person (${profileName})
-- Be thorough - include brand/client names
+5. SUMMARY: One paragraph overview of their background and expertise
+
+RULES:
+- Only include information clearly about THIS specific person (${profileName})
+- Be thorough - more is better, the user will choose what to keep
 - Technologies should be specific (e.g., "Three.js" not "JavaScript library")
-- If unsure, don't include it
+- Include project URLs when found
+- If you find GitHub repos, Behance projects, or awards - include them as projects
 
 Respond in valid JSON:
 {
@@ -363,7 +435,7 @@ async function analyzeWithClaude(prompt: string, apiKey: string): Promise<AIAnal
     },
     body: JSON.stringify({
       model: process.env.USE_CLAUDE_SONNET === 'true' ? 'claude-sonnet-4-20250514' : 'claude-3-5-haiku-20241022',
-      max_tokens: 2500,
+      max_tokens: 4000,
       messages: [{ role: 'user', content: prompt }],
     }),
   });
@@ -399,8 +471,8 @@ async function analyzeWithGPT(prompt: string, apiKey: string): Promise<AIAnalysi
       'Authorization': `Bearer ${apiKey}`,
     },
     body: JSON.stringify({
-      model: 'gpt-4o', // Latest GPT model
-      max_tokens: 2500,
+      model: 'gpt-4o',
+      max_tokens: 4000,
       temperature: 0.7,
       response_format: { type: 'json_object' },
       messages: [
@@ -513,30 +585,39 @@ export default async function handler(req: Request) {
     // PHASE 1: PARALLEL URL FETCHING + SEARCH
     // ========================================
     
-    // Build search queries
+    // Build search queries - cast a wide net
     const queries: string[] = [
-      `"${name}" portfolio`,
-      `"${name}" creative technologist`,
+      `"${name}" portfolio projects work`,
+      `"${name}" creative technologist developer designer`,
     ];
     
-    if (location?.trim()) {
-      queries.push(`"${name}" ${location} developer`);
+    // Add focused queries based on provided info
+    if (focusAreas?.length > 0) {
+      queries.push(`"${name}" ${focusAreas.slice(0, 2).join(' ')}`);
     }
+    if (location?.trim()) {
+      queries.push(`"${name}" ${location}`);
+    }
+    // Try to find GitHub, Behance, Dribbble, etc.
+    queries.push(`"${name}" site:github.com OR site:behance.net OR site:dribbble.com OR site:medium.com`);
 
     // Prepare all parallel operations
     const parallelOps: Promise<any>[] = [];
     const opLabels: string[] = [];
 
-    // Add portfolio fetch
+    // Add portfolio fetch + key subpages
     if (portfolioUrl?.trim()) {
       parallelOps.push(withTimeout(fetchUrlContent(portfolioUrl, 10000), 12000, ''));
       opLabels.push('portfolio');
       
-      // Add one subpage fetch (most important one)
+      // Fetch key subpages in parallel
       try {
-        const baseUrl = new URL(portfolioUrl);
-        parallelOps.push(withTimeout(fetchUrlContent(`${baseUrl.origin}/about`, 8000), 10000, ''));
-        opLabels.push('portfolio-about');
+        const baseUrl = new URL(portfolioUrl.startsWith('http') ? portfolioUrl : `https://${portfolioUrl}`);
+        const subpages = ['/about', '/work', '/projects', '/portfolio'];
+        for (const subpage of subpages) {
+          parallelOps.push(withTimeout(fetchUrlContent(`${baseUrl.origin}${subpage}`, 8000), 10000, ''));
+          opLabels.push(`portfolio-subpage`);
+        }
       } catch {}
     }
 
@@ -546,10 +627,10 @@ export default async function handler(req: Request) {
       opLabels.push('linkedin');
     }
 
-    // Add parallel web searches (all queries at once)
-    for (const query of queries.slice(0, 2)) {
-      parallelOps.push(withTimeout(searchWithJina(query), 10000, []));
-      opLabels.push(`search-${queries.indexOf(query)}`);
+    // Add parallel web searches (run more queries in parallel)
+    for (let i = 0; i < Math.min(queries.length, 4); i++) {
+      parallelOps.push(withTimeout(searchWithJina(queries[i]), 10000, []));
+      opLabels.push(`search-${i}`);
     }
 
     console.log(`[ENRICH-SEARCH] Starting ${parallelOps.length} parallel operations...`);
@@ -574,9 +655,10 @@ export default async function handler(req: Request) {
       } else {
         // It's content from URL
         if (typeof result === 'string' && result.length > 100) {
+          // For portfolio subpages, use a generic label
           const url = label === 'portfolio' ? portfolioUrl :
                       label === 'linkedin' ? linkedinUrl :
-                      label === 'portfolio-about' ? `${new URL(portfolioUrl).origin}/about` : '';
+                      label === 'portfolio-subpage' ? `${portfolioUrl} (subpage)` : '';
           if (url) {
             directContents.push({ url, content: result });
           }
@@ -592,16 +674,68 @@ export default async function handler(req: Request) {
     console.log(`[ENRICH-SEARCH] Direct content: ${directContents.length}, Search results: ${uniqueResults.length}`);
 
     // ========================================
-    // PHASE 2: FETCH TOP SEARCH RESULT URLs (PARALLEL)
+    // PHASE 2: CRAWL PORTFOLIO FOR PROJECT PAGES
     // ========================================
     
-    // Only fetch 2 search result URLs to save time
+    if (portfolioUrl?.trim() && (Date.now() - startTime) < 25000) {
+      // Fetch the raw HTML of the portfolio to find project links
+      try {
+        console.log(`[ENRICH-SEARCH] Crawling portfolio for project links...`);
+        const portfolioHtmlResponse = await fetch(
+          portfolioUrl.startsWith('http') ? portfolioUrl : `https://${portfolioUrl}`,
+          {
+            headers: {
+              'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
+              'Accept': 'text/html',
+            },
+            signal: AbortSignal.timeout(8000),
+          }
+        );
+
+        if (portfolioHtmlResponse.ok) {
+          const portfolioHtml = await portfolioHtmlResponse.text();
+          const projectLinks = extractProjectLinks(portfolioHtml, portfolioUrl);
+          
+          console.log(`[ENRICH-SEARCH] Found ${projectLinks.length} project links on portfolio`);
+
+          if (projectLinks.length > 0) {
+            // Fetch up to 5 project pages in parallel
+            const projectFetches = projectLinks.slice(0, 5).map(
+              url => withTimeout(fetchUrlContent(url, 8000), 10000, '')
+            );
+            
+            const projectContents = await Promise.all(projectFetches);
+            
+            projectContents.forEach((content, i) => {
+              if (typeof content === 'string' && content.length > 200) {
+                directContents.push({ 
+                  url: projectLinks[i], 
+                  content: content 
+                });
+              }
+            });
+            
+            console.log(`[ENRICH-SEARCH] Fetched ${projectContents.filter(c => typeof c === 'string' && c.length > 200).length} project pages`);
+          }
+        }
+      } catch (crawlError) {
+        console.log(`[ENRICH-SEARCH] Portfolio crawl failed:`, crawlError);
+      }
+    }
+
+    console.log(`[ENRICH-SEARCH] Phase 2 complete in ${Date.now() - startTime}ms`);
+
+    // ========================================
+    // PHASE 3: FETCH TOP SEARCH RESULT URLs (PARALLEL)
+    // ========================================
+    
+    // Fetch top search result URLs for more content
     const urlsToFetch = uniqueResults
-      .slice(0, 2)
+      .slice(0, 4)
       .filter(r => !directContents.find(d => d.url === r.url))
       .map(r => r.url);
 
-    if (urlsToFetch.length > 0 && (Date.now() - startTime) < 30000) {
+    if (urlsToFetch.length > 0 && (Date.now() - startTime) < 35000) {
       console.log(`[ENRICH-SEARCH] Fetching ${urlsToFetch.length} search result URLs...`);
       
       const contentResults = await Promise.all(
@@ -615,13 +749,13 @@ export default async function handler(req: Request) {
       });
     }
 
-    console.log(`[ENRICH-SEARCH] Phase 2 complete in ${Date.now() - startTime}ms`);
+    console.log(`[ENRICH-SEARCH] Phase 3 complete in ${Date.now() - startTime}ms`);
 
     // ========================================
-    // PHASE 3: FALLBACK SEARCH IF NEEDED
+    // PHASE 4: FALLBACK SEARCH IF NEEDED
     // ========================================
     
-    if (uniqueResults.length < 2 && directContents.length < 2 && (Date.now() - startTime) < 35000) {
+    if (uniqueResults.length < 2 && directContents.length < 2 && (Date.now() - startTime) < 40000) {
       console.log(`[ENRICH-SEARCH] Trying fallback search...`);
       const fallbackResults = await withTimeout(
         searchWebFallback(`${name} portfolio`, googleApiKey, googleCx),
@@ -639,7 +773,7 @@ export default async function handler(req: Request) {
     console.log(`[ENRICH-SEARCH] Total: ${directContents.length} pages, ${finalResults.length} search results`);
 
     // ========================================
-    // PHASE 4: AI ANALYSIS
+    // PHASE 5: AI ANALYSIS
     // ========================================
 
     // Build context for AI

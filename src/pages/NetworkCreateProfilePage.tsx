@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { Input } from '../components/ui/input';
 import { Textarea } from '../components/ui/textarea';
@@ -35,9 +35,11 @@ import {
   AVAILABILITY_OPTIONS, 
   SUGGESTED_SKILLS 
 } from '@/types/network-profile';
+import { CreativeSpectrumSlider } from '@/components/ui/creative-spectrum-slider';
 import { createProfile, getProfileByUserId } from '@/lib/supabase';
 import { useAuth } from '@/contexts/AuthContext';
 import { cn } from '@/lib/utils';
+import { initializeProfileWebMCP, cleanupProfileWebMCP } from '@/lib/webmcp-profile';
 
 const STEPS = [
   { id: 1, title: 'Basic Info', icon: User },
@@ -57,7 +59,7 @@ const createEmptyProject = (): Project => ({
 const NetworkCreateProfilePage: React.FC = () => {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
-  const { user, session, loading: authLoading } = useAuth();
+  const { user, session, loading: authLoading, isCompanyUser } = useAuth();
   const [currentStep, setCurrentStep] = useState(1);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState('');
@@ -69,6 +71,7 @@ const NetworkCreateProfilePage: React.FC = () => {
   const [isAutoFilling, setIsAutoFilling] = useState(false);
   const [autoFillError, setAutoFillError] = useState('');
   const [autoFillSuccess, setAutoFillSuccess] = useState(false);
+  const [autoFillSummary, setAutoFillSummary] = useState('');
   
   // Generate mode state
   const isGenerateMode = searchParams.get('mode') === 'generate';
@@ -82,6 +85,11 @@ const NetworkCreateProfilePage: React.FC = () => {
   useEffect(() => {
     if (!authLoading && !user) {
       navigate('/directory/auth?mode=signup');
+      return;
+    }
+
+    if (!authLoading && isCompanyUser) {
+      navigate('/company/dashboard');
       return;
     }
 
@@ -104,36 +112,49 @@ const NetworkCreateProfilePage: React.FC = () => {
           if (enrichmentParam) {
             try {
               const data = JSON.parse(decodeURIComponent(enrichmentParam));
-              setFormData(prev => {
-                const updates: Partial<ProfileFormData> = {};
-                
-                if (data.additionalSkills?.length > 0) {
-                  updates.skills = data.additionalSkills.slice(0, 15);
-                }
-                
-                if (data.enrichedBio) {
-                  updates.bio = data.enrichedBio.substring(0, 300);
-                }
-                
-                if (data.discoveredProjects?.length > 0) {
-                  const projects = data.discoveredProjects.slice(0, 5).map((p: any) => ({
-                    id: crypto.randomUUID(),
-                    title: p.title || 'Untitled Project',
-                    description: p.description || '',
-                    link: p.url || '',
-                    imageUrl: '',
-                  }));
-                  while (projects.length < 2) {
-                    projects.push(createEmptyProject());
+              console.log('[Create] Enrichment data from URL:', data);
+
+              const hasProjects = data.discoveredProjects?.length > 0;
+              const hasSkills = data.additionalSkills?.length > 0;
+              const hasBio = !!data.enrichedBio;
+
+              if (hasProjects || hasSkills || hasBio) {
+                setFormData(prev => {
+                  const updates: Partial<ProfileFormData> = {};
+
+                  if (hasSkills) {
+                    updates.skills = data.additionalSkills.slice(0, 15);
                   }
-                  updates.projects = projects;
-                }
-                
-                return { ...prev, ...updates };
-              });
-              
-              setAutoFillSuccess(true);
-              setTimeout(() => setAutoFillSuccess(false), 5000);
+
+                  if (hasBio) {
+                    updates.bio = data.enrichedBio.substring(0, 300);
+                  }
+
+                  if (hasProjects) {
+                    const projects = data.discoveredProjects.slice(0, 10).map((p: any) => ({
+                      id: crypto.randomUUID(),
+                      title: p.title || 'Untitled Project',
+                      description: (p.description || '').substring(0, 500),
+                      link: p.url || '',
+                      imageUrl: '',
+                    }));
+                    while (projects.length < 2) {
+                      projects.push(createEmptyProject());
+                    }
+                    updates.projects = projects;
+                  }
+
+                  return { ...prev, ...updates };
+                });
+
+                const parts: string[] = [];
+                if (hasProjects) parts.push(`${data.discoveredProjects.length} project${data.discoveredProjects.length > 1 ? 's' : ''}`);
+                if (hasSkills) parts.push(`${data.additionalSkills.length} skill${data.additionalSkills.length > 1 ? 's' : ''}`);
+                if (hasBio) parts.push('bio');
+                setAutoFillSummary(`Found ${parts.join(', ')}. Review below and on the next steps.`);
+                setAutoFillSuccess(true);
+                setTimeout(() => setAutoFillSuccess(false), 10000);
+              }
             } catch (e) {
               console.error('Failed to parse enrichment data:', e);
             }
@@ -161,9 +182,45 @@ const NetworkCreateProfilePage: React.FC = () => {
     availability: 'open-to-collaborations',
     isCtcMember: false,
     profilePictureUrl: '',
+    creativeSpectrum: 50,
   });
 
   const [errors, setErrors] = useState<Record<string, string>>({});
+
+  // Keep a ref so WebMCP callbacks always read the latest form state
+  const formDataRef = useRef(formData);
+  useEffect(() => { formDataRef.current = formData; }, [formData]);
+
+  const addProjectToForm = useCallback((project: Omit<Project, 'id'>) => {
+    setFormData(prev => {
+      const emptyIdx = prev.projects.findIndex(p => !p.title.trim());
+      const newProject: Project = { ...project, id: crypto.randomUUID() };
+      if (emptyIdx >= 0) {
+        const updated = [...prev.projects];
+        updated[emptyIdx] = newProject;
+        return { ...prev, projects: updated };
+      }
+      if (prev.projects.length < 10) {
+        return { ...prev, projects: [...prev.projects, newProject] };
+      }
+      return prev;
+    });
+  }, []);
+
+  useEffect(() => {
+    initializeProfileWebMCP({
+      getFormData: () => formDataRef.current,
+      updateField: (field, value) => {
+        setFormData(prev => ({ ...prev, [field]: value }));
+      },
+      addProject: addProjectToForm,
+      triggerEnrich: () => handleAutoFillRef.current(),
+    });
+    return () => cleanupProfileWebMCP();
+  }, [addProjectToForm]);
+
+  // Ref to the auto-fill handler so WebMCP can call it without stale closures
+  const handleAutoFillRef = useRef<() => Promise<void>>(() => Promise.resolve());
 
   const updateField = <K extends keyof ProfileFormData>(
     field: K, 
@@ -189,7 +246,7 @@ const NetworkCreateProfilePage: React.FC = () => {
   };
 
   const addProject = () => {
-    if (formData.projects.length < 5) {
+    if (formData.projects.length < 10) {
       setFormData(prev => ({
         ...prev,
         projects: [...prev.projects, createEmptyProject()],
@@ -217,86 +274,89 @@ const NetworkCreateProfilePage: React.FC = () => {
     setIsAutoFilling(true);
     setAutoFillError('');
     setAutoFillSuccess(false);
+    setAutoFillSummary('');
 
     try {
-      // Use the enrich-profile-search API which does comprehensive web search + URL fetching
       const response = await fetch('/api/enrich-profile-search', {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
+        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           fullName: formData.fullName.trim(),
           currentSkills: formData.skills,
           currentBio: formData.bio,
-          // Include URLs if already filled in - these provide much better enrichment
           linkedinUrl: formData.linkedinUrl?.trim() || '',
           portfolioUrl: formData.portfolioUrl?.trim() || '',
-          // Include additional context for smarter search
           location: formData.location?.trim() || '',
           focusAreas: formData.focusAreas || [],
           existingProjects: formData.projects.filter(p => p.title.trim()),
         }),
       });
 
+      if (response.status === 504) {
+        throw new Error('The search took too long. Try adding your LinkedIn or portfolio URL for faster results.');
+      }
+
       const data = await response.json();
+      console.log('[Enrich] API response:', data);
 
       if (!response.ok) {
         throw new Error(data.error || 'Failed to auto-fill profile');
       }
 
       if (data.success) {
-        // Update form data with discovered information
+        const projectCount = data.discoveredProjects?.length || 0;
+        const skillCount = data.additionalSkills?.length || 0;
+        const hasBio = !!data.enrichedBio;
+
+        if (projectCount === 0 && skillCount === 0 && !hasBio) {
+          setAutoFillError('No public information found. Try adding your LinkedIn or portfolio URL above, then click again.');
+          return;
+        }
+
         setFormData(prev => {
           const updates: Partial<ProfileFormData> = {};
 
-          // Add discovered skills
-          if (data.additionalSkills && data.additionalSkills.length > 0) {
-            const mergedSkills = [...new Set([...prev.skills, ...data.additionalSkills])];
-            updates.skills = mergedSkills.slice(0, 20);
+          if (data.additionalSkills?.length > 0) {
+            updates.skills = [...new Set([...prev.skills, ...data.additionalSkills])].slice(0, 20);
           }
 
-          // Add discovered projects
-          if (data.discoveredProjects && data.discoveredProjects.length > 0) {
-            const newProjects = data.discoveredProjects.slice(0, 5).map((p: any) => ({
-              id: crypto.randomUUID(),
-              title: p.title || '',
-              description: p.description || '',
-              imageUrl: '',
-              link: p.url || '',
-            }));
-
-            // Fill empty project slots first
+          if (data.discoveredProjects?.length > 0) {
             const existingProjects = [...prev.projects];
-            let projectIndex = 0;
 
-            for (const newProject of newProjects) {
-              // Find an empty slot or add new
-              while (projectIndex < existingProjects.length && existingProjects[projectIndex].title) {
-                projectIndex++;
-              }
+            for (const dp of data.discoveredProjects.slice(0, 10)) {
+              const newProject: Project = {
+                id: crypto.randomUUID(),
+                title: dp.title || '',
+                description: (dp.description || '').substring(0, 500),
+                imageUrl: '',
+                link: dp.url || '',
+              };
 
-              if (projectIndex < existingProjects.length) {
-                existingProjects[projectIndex] = newProject;
-              } else if (existingProjects.length < 5) {
+              const emptyIdx = existingProjects.findIndex(p => !p.title.trim());
+              if (emptyIdx >= 0) {
+                existingProjects[emptyIdx] = newProject;
+              } else if (existingProjects.length < 10) {
                 existingProjects.push(newProject);
               }
-              projectIndex++;
             }
 
             updates.projects = existingProjects;
           }
 
-          // Update bio if empty or short
-          if (data.enrichedBio && (!prev.bio || prev.bio.length < 50)) {
+          if (data.enrichedBio) {
             updates.bio = data.enrichedBio.substring(0, 300);
           }
 
           return { ...prev, ...updates };
         });
 
+        const parts: string[] = [];
+        if (projectCount > 0) parts.push(`${projectCount} project${projectCount > 1 ? 's' : ''}`);
+        if (skillCount > 0) parts.push(`${skillCount} skill${skillCount > 1 ? 's' : ''}`);
+        if (hasBio) parts.push('bio');
+        setAutoFillSummary(`Found ${parts.join(', ')}. Review below and on the next steps.`);
         setAutoFillSuccess(true);
-        setTimeout(() => setAutoFillSuccess(false), 5000);
+        setTimeout(() => setAutoFillSuccess(false), 10000);
       } else if (data.error) {
         setAutoFillError(data.error);
       }
@@ -307,6 +367,9 @@ const NetworkCreateProfilePage: React.FC = () => {
       setIsAutoFilling(false);
     }
   };
+
+  // Keep the ref in sync so WebMCP can call the latest version
+  handleAutoFillRef.current = handleAutoFill;
 
   // Generate profile from LinkedIn/Portfolio URL
   const handleGenerateProfile = async () => {
@@ -394,7 +457,7 @@ const NetworkCreateProfilePage: React.FC = () => {
 
         // Add discovered projects
         if (data.discoveredProjects && data.discoveredProjects.length > 0) {
-          const projects = data.discoveredProjects.slice(0, 5).map((p: any) => ({
+          const projects = data.discoveredProjects.slice(0, 10).map((p: any) => ({
             id: crypto.randomUUID(),
             title: p.title || 'Untitled Project',
             description: p.description || '',
@@ -563,7 +626,7 @@ const NetworkCreateProfilePage: React.FC = () => {
         if (session?.access_token) {
           setIsEnriching(true);
           try {
-            const enrichResponse = await fetch('/api/enrich-profile', {
+            const enrichResponse = await fetch('/api/profiles/enrich', {
               method: 'POST',
               headers: {
                 'Content-Type': 'application/json',
@@ -616,7 +679,9 @@ const NetworkCreateProfilePage: React.FC = () => {
               <span className="block text-zinc-500">created</span>
             </h1>
             <p className="text-zinc-400 font-secondary mb-6 text-lg">
-              Your profile has been submitted and is pending approval. You'll receive an email once it's approved and live in the directory.
+              {user?.user_metadata?.beta_member
+                ? 'Your profile is live in the directory! As a beta member, your profile has been automatically approved.'
+                : "Your profile has been submitted and is pending approval. You'll receive an email once it's approved and live in the directory."}
             </p>
 
             {/* AI Enrichment Status */}
@@ -939,9 +1004,9 @@ const NetworkCreateProfilePage: React.FC = () => {
                 {autoFillError && (
                   <p className="text-amber-400 text-sm mt-1">{autoFillError}</p>
                 )}
-                {autoFillSuccess && (
+                {autoFillSuccess && autoFillSummary && (
                   <p className="text-green-400 text-sm mt-1">
-                    Profile auto-filled! Review the information below and make any adjustments.
+                    {autoFillSummary}
                   </p>
                 )}
                 <p className="text-zinc-500 text-xs mt-1">
@@ -1078,6 +1143,18 @@ const NetworkCreateProfilePage: React.FC = () => {
                   <p className="text-red-400 text-sm mt-2">{errors.skills}</p>
                 )}
               </div>
+
+              {/* Creative Spectrum */}
+              <div className="pt-4 border-t border-zinc-800">
+                <h2 className="text-xl font-primary text-white mb-2">Where do you fall on the creative tech spectrum?</h2>
+                <p className="text-zinc-400 text-sm font-secondary mb-6">
+                  Whether you lean more toward design or development, you're still a creative technologist. This helps others understand your strengths at a glance.
+                </p>
+                <CreativeSpectrumSlider
+                  value={formData.creativeSpectrum}
+                  onChange={(value) => updateField('creativeSpectrum', value)}
+                />
+              </div>
             </div>
           )}
 
@@ -1088,10 +1165,10 @@ const NetworkCreateProfilePage: React.FC = () => {
                 <div>
                   <h2 className="text-xl font-primary text-white">Projects / Case Studies</h2>
                   <p className="text-zinc-400 text-sm font-secondary mt-1">
-                    Add 2-5 projects to showcase your work
+                    Add up to 10 projects to showcase your work
                   </p>
                 </div>
-                {formData.projects.length < 5 && (
+                {formData.projects.length < 10 && (
                   <button
                     type="button"
                     onClick={addProject}

@@ -14,6 +14,9 @@
     "api/jobs/[[...path]].ts": {
       "maxDuration": 60
     },
+    "api/company/talent-agent.ts": {
+      "maxDuration": 120
+    },
     "api/company/[[...path]].ts": {
       "maxDuration": 30
     },
@@ -36,14 +39,22 @@
       "maxDuration": 30
     }
   },
-  "rewrites": [
-    {
-      "source": "/api/(.*)",
-      "destination": "/api/$1"
-    },
-    {
-      "source": "/(.*)",
-      "destination": "/index.html"
-    }
+  "routes": [
+    { "src": "/api/admin/(.*)", "dest": "/api/admin/[[...path]]" },
+    { "src": "/api/admin", "dest": "/api/admin/[[...path]]" },
+    { "src": "/api/beta/(.*)", "dest": "/api/beta/[[...path]]" },
+    { "src": "/api/beta", "dest": "/api/beta/[[...path]]" },
+    { "src": "/api/messages/(.*)", "dest": "/api/messages/[[...path]]" },
+    { "src": "/api/messages", "dest": "/api/messages/[[...path]]" },
+    { "src": "/api/jobs/(.*)", "dest": "/api/jobs/[[...path]]" },
+    { "src": "/api/jobs", "dest": "/api/jobs/[[...path]]" },
+    { "src": "/api/company/ct-finder", "dest": "/api/company/talent-agent" },
+    { "src": "/api/company/talent-agent", "dest": "/api/company/talent-agent" },
+    { "src": "/api/company/(.*)", "dest": "/api/company/[[...path]]" },
+    { "src": "/api/company", "dest": "/api/company/[[...path]]" },
+    { "src": "/api/profiles/(.*)", "dest": "/api/profiles/[[...path]]" },
+    { "src": "/api/profiles", "dest": "/api/profiles/[[...path]]" },
+    { "handle": "filesystem" },
+    { "src": "/((?!api/).*)", "dest": "/index.html" }
   ]
 }

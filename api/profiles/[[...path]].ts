@@ -1,34 +1,32 @@
+import type { VercelRequest, VercelResponse } from '@vercel/node';
 import { createClient, SupabaseClient } from '@supabase/supabase-js';
 import { z } from 'zod';
-import { newProfilePendingAdminEmail, EMAIL_FROM_DOMAIN, PUBLIC_URL } from '../lib/email-templates';
-
-export const config = {
-  runtime: 'nodejs',
-  maxDuration: 60, // Allow time for AI processing and browser automation
-};
+import { newProfilePendingAdminEmail, EMAIL_FROM_DOMAIN, PUBLIC_URL } from '../_lib/email-templates.js';
 
 // ============================================================================
 // HELPERS
 // ============================================================================
 
-function getPathSegments(req: Request): string[] {
-  const url = new URL(req.url);
-  const path = url.pathname.replace('/api/profiles/', '').replace(/^\/+|\/+$/g, '');
-  return path ? path.split('/') : [];
-}
+function getRoute(req: VercelRequest): string {
+  // Try query.path first (Vercel catch-all), fallback to URL parsing
+  let pathSegments = (req.query.path as string[]) || [];
 
-function jsonResponse(data: any, status: number = 200): Response {
-  return new Response(JSON.stringify(data), {
-    status,
-    headers: { 'Content-Type': 'application/json' },
-  });
+  if (pathSegments.length === 0 && req.url) {
+    const urlPath = req.url.split('?')[0];
+    const match = urlPath.match(/\/api\/profiles\/(.+)/);
+    if (match && match[1]) {
+      pathSegments = match[1].split('/');
+    }
+  }
+
+  return pathSegments.join('/');
 }
 
 async function authenticateUser(
-  req: Request,
+  req: VercelRequest,
   supabase: SupabaseClient
 ): Promise<{ user: any; error?: string }> {
-  const authHeader = req.headers.get('Authorization');
+  const authHeader = req.headers.authorization;
   if (!authHeader || !authHeader.startsWith('Bearer ')) {
     return { user: null, error: 'Authentication required' };
   }
@@ -44,29 +42,29 @@ async function authenticateUser(
 }
 
 // ============================================================================
-// ENRICH PROFILE HANDLER
+// ENRICH PROFILE HANDLER (generate embedding)
 // ============================================================================
 
 async function handleEnrichProfile(
-  req: Request,
+  req: VercelRequest,
+  res: VercelResponse,
   supabase: SupabaseClient,
   user: any
 ) {
   if (req.method !== 'POST') {
-    return jsonResponse({ error: 'Method not allowed' }, 405);
+    return res.status(405).json({ error: 'Method not allowed' });
   }
 
   const openaiApiKey = process.env.OPENAI_API_KEY;
   if (!openaiApiKey) {
-    return jsonResponse({ error: 'OpenAI API key not configured' }, 500);
+    return res.status(500).json({ error: 'OpenAI API key not configured' });
   }
 
   try {
-    const body = await req.json().catch(() => ({}));
-    const { profileId } = body;
+    const { profileId } = req.body || {};
 
     if (!profileId) {
-      return jsonResponse({ error: 'profileId is required' }, 400);
+      return res.status(400).json({ error: 'profileId is required' });
     }
 
     const { data: profile, error: fetchError } = await supabase
@@ -76,14 +74,13 @@ async function handleEnrichProfile(
       .single();
 
     if (fetchError || !profile) {
-      return jsonResponse({ error: 'Profile not found' }, 404);
+      return res.status(404).json({ error: 'Profile not found' });
     }
 
     if (profile.user_id !== user.id) {
-      return jsonResponse({ error: 'Not authorized to enrich this profile' }, 403);
+      return res.status(403).json({ error: 'Not authorized to enrich this profile' });
     }
 
-    // Build embedding text from profile data
     const embeddingParts: string[] = [];
     if (profile.full_name) embeddingParts.push(`Name: ${profile.full_name}`);
     if (profile.bio) embeddingParts.push(`Bio: ${profile.bio}`);
@@ -101,10 +98,9 @@ async function handleEnrichProfile(
     const embeddingText = embeddingParts.join('\n\n');
 
     if (!embeddingText.trim()) {
-      return jsonResponse({ error: 'No content to embed' }, 400);
+      return res.status(400).json({ error: 'No content to embed' });
     }
 
-    // Generate embedding using OpenAI API
     const embeddingResponse = await fetch('https://api.openai.com/v1/embeddings', {
       method: 'POST',
       headers: {
@@ -119,20 +115,19 @@ async function handleEnrichProfile(
 
     if (!embeddingResponse.ok) {
       const errorData = await embeddingResponse.json().catch(() => ({}));
-      return jsonResponse({
+      return res.status(500).json({
         error: 'Failed to generate AI embedding',
-        details: errorData.error?.message || embeddingResponse.statusText
-      }, 500);
+        details: errorData.error?.message || embeddingResponse.statusText,
+      });
     }
 
     const embeddingData = await embeddingResponse.json();
     const embedding = embeddingData.data?.[0]?.embedding;
 
     if (!embedding || !Array.isArray(embedding)) {
-      return jsonResponse({ error: 'Invalid embedding response from OpenAI' }, 500);
+      return res.status(500).json({ error: 'Invalid embedding response from OpenAI' });
     }
 
-    // Save embedding to database
     const embeddingString = `[${embedding.join(',')}]`;
     const { error: updateError } = await supabase
       .from('network_profiles')
@@ -143,41 +138,39 @@ async function handleEnrichProfile(
       .eq('id', profileId);
 
     if (updateError) {
-      return jsonResponse({ error: 'Failed to save embedding', details: updateError.message }, 500);
+      return res.status(500).json({ error: 'Failed to save embedding', details: updateError.message });
     }
 
-    return jsonResponse({
+    return res.status(200).json({
       success: true,
       profileId,
-      message: 'Profile enriched successfully'
+      message: 'Profile enriched successfully',
     });
   } catch (error) {
-    if (error instanceof z.ZodError) {
-      return jsonResponse({ error: 'Invalid request data', details: error.issues }, 400);
-    }
-    return jsonResponse({ error: 'Profile enrichment failed' }, 500);
+    console.error('[ENRICH] Error:', error);
+    return res.status(500).json({ error: 'Profile enrichment failed' });
   }
 }
 
 // ============================================================================
-// UPDATE PROFILE ENRICHMENT HANDLER
+// UPDATE PROFILE ENRICHMENT HANDLER (apply AI suggestions)
 // ============================================================================
 
 async function handleUpdateEnrichment(
-  req: Request,
+  req: VercelRequest,
+  res: VercelResponse,
   supabase: SupabaseClient,
   user: any
 ) {
   if (req.method !== 'POST') {
-    return jsonResponse({ error: 'Method not allowed' }, 405);
+    return res.status(405).json({ error: 'Method not allowed' });
   }
 
   try {
-    const body = await req.json();
-    const { profileId, updates } = body;
+    const { profileId, updates } = req.body || {};
 
     if (!profileId) {
-      return jsonResponse({ error: 'profileId is required' }, 400);
+      return res.status(400).json({ error: 'profileId is required' });
     }
 
     const { data: profile, error: fetchError } = await supabase
@@ -187,24 +180,24 @@ async function handleUpdateEnrichment(
       .single();
 
     if (fetchError || !profile) {
-      return jsonResponse({ error: 'Profile not found' }, 404);
+      return res.status(404).json({ error: 'Profile not found' });
     }
 
     if (profile.user_id !== user.id) {
-      return jsonResponse({ error: 'Not authorized to update this profile' }, 403);
+      return res.status(403).json({ error: 'Not authorized to update this profile' });
     }
 
     const allowedFields = ['skills', 'projects', 'bio', 'enriched_content'];
     const sanitizedUpdates: Record<string, any> = {};
 
     for (const field of allowedFields) {
-      if (updates[field] !== undefined) {
+      if (updates?.[field] !== undefined) {
         sanitizedUpdates[field] = updates[field];
       }
     }
 
     if (Object.keys(sanitizedUpdates).length === 0) {
-      return jsonResponse({ error: 'No valid updates provided' }, 400);
+      return res.status(400).json({ error: 'No valid updates provided' });
     }
 
     const { error: updateError } = await supabase
@@ -213,81 +206,17 @@ async function handleUpdateEnrichment(
       .eq('id', profileId);
 
     if (updateError) {
-      return jsonResponse({ error: 'Failed to update profile' }, 500);
+      return res.status(500).json({ error: 'Failed to update profile' });
     }
 
-    // Regenerate embedding with updated profile data
-    const openaiApiKey = process.env.OPENAI_API_KEY;
-    if (openaiApiKey) {
-      try {
-        const { data: updatedProfile } = await supabase
-          .from('network_profiles')
-          .select('id, full_name, location, bio, focus_areas, skills, projects, enriched_content')
-          .eq('id', profileId)
-          .single();
-
-        if (updatedProfile) {
-          const parts: string[] = [];
-          parts.push(`Name: ${updatedProfile.full_name}`);
-          if (updatedProfile.location) parts.push(`Location: ${updatedProfile.location}`);
-          if (updatedProfile.bio) parts.push(`Bio: ${updatedProfile.bio}`);
-          if (updatedProfile.focus_areas?.length) parts.push(`Focus Areas: ${updatedProfile.focus_areas.join(', ')}`);
-          if (updatedProfile.skills?.length) parts.push(`Skills: ${updatedProfile.skills.join(', ')}`);
-
-          if (updatedProfile.projects?.length) {
-            const projectText = updatedProfile.projects
-              .map((p: any) => {
-                const projectParts = [p.title];
-                if (p.description) projectParts.push(p.description);
-                if (p.tools?.length) projectParts.push(`Tools: ${p.tools.join(', ')}`);
-                return projectParts.join(' - ');
-              })
-              .filter(Boolean)
-              .join(' | ');
-            if (projectText) parts.push(`Projects: ${projectText}`);
-          }
-
-          const text = parts.join('\n\n');
-
-          if (text.trim().length >= 10) {
-            const embeddingResponse = await fetch('https://api.openai.com/v1/embeddings', {
-              method: 'POST',
-              headers: {
-                'Content-Type': 'application/json',
-                'Authorization': `Bearer ${openaiApiKey}`,
-              },
-              body: JSON.stringify({
-                model: 'text-embedding-3-small',
-                input: text,
-              }),
-            });
-
-            if (embeddingResponse.ok) {
-              const embeddingData = await embeddingResponse.json();
-              const embedding = embeddingData.data?.[0]?.embedding;
-
-              if (embedding) {
-                await supabase
-                  .from('network_profiles')
-                  .update({
-                    embedding: `[${embedding.join(',')}]`,
-                    embedding_updated_at: new Date().toISOString()
-                  })
-                  .eq('id', profileId);
-              }
-            }
-          }
-        }
-      } catch (embeddingError) {
-        console.error('[UPDATE-ENRICHMENT] Embedding generation error:', embeddingError);
-      }
-    }
-
-    return jsonResponse({ success: true });
+    // Embedding regeneration is handled separately by the client
+    // calling /api/generate-embeddings after this returns
+    return res.status(200).json({ success: true });
   } catch (error) {
-    return jsonResponse({
+    console.error('[UPDATE-ENRICHMENT] Error:', error);
+    return res.status(500).json({
       error: error instanceof Error ? error.message : 'Update failed',
-    }, 500);
+    });
   }
 }
 
@@ -298,20 +227,20 @@ async function handleUpdateEnrichment(
 const ADMIN_NOTIFICATION_EMAIL = process.env.ADMIN_NOTIFICATION_EMAIL || `admin@${EMAIL_FROM_DOMAIN}`;
 
 async function handleNotifyProfileCreated(
-  req: Request,
+  req: VercelRequest,
+  res: VercelResponse,
   supabase: SupabaseClient,
   user: any
 ) {
   if (req.method !== 'POST') {
-    return jsonResponse({ error: 'Method not allowed' }, 405);
+    return res.status(405).json({ error: 'Method not allowed' });
   }
 
   try {
-    const body = await req.json();
-    const { profileId, profileName, profileEmail, profileSlug, profileLocation, profileBio, focusAreas } = body;
+    const { profileId, profileName, profileEmail, profileSlug, profileLocation, profileBio, focusAreas } = req.body || {};
 
     if (!profileId || !profileName || !profileEmail || !profileSlug) {
-      return jsonResponse({ error: 'Missing required fields' }, 400);
+      return res.status(400).json({ error: 'Missing required fields' });
     }
 
     const { data: profile, error: profileError } = await supabase
@@ -321,19 +250,37 @@ async function handleNotifyProfileCreated(
       .single();
 
     if (profileError || !profile) {
-      return jsonResponse({ error: 'Profile not found' }, 404);
+      return res.status(404).json({ error: 'Profile not found' });
     }
 
     if (profile.user_id !== user.id) {
-      return jsonResponse({ error: 'You can only notify for your own profile' }, 403);
+      return res.status(403).json({ error: 'You can only notify for your own profile' });
     }
 
-    // Send admin notification
     const resendApiKey = process.env.RESEND_API_KEY;
     let sent = false;
 
-    if (resendApiKey) {
+    console.log(`[NOTIFY-PROFILE-CREATED] Config check:`, {
+      hasResendKey: !!resendApiKey,
+      resendKeyPrefix: resendApiKey ? resendApiKey.substring(0, 8) + '...' : 'MISSING',
+      adminEmail: ADMIN_NOTIFICATION_EMAIL,
+      fromDomain: EMAIL_FROM_DOMAIN,
+      publicUrl: PUBLIC_URL,
+    });
+
+    if (!resendApiKey) {
+      console.error('[NOTIFY-PROFILE-CREATED] RESEND_API_KEY is not set — cannot send email');
+    } else {
       try {
+        const fromAddress = `Creative Technology Collective <noreply@${EMAIL_FROM_DOMAIN}>`;
+        const subject = `New Profile Pending Approval: ${profileName}`;
+
+        console.log(`[NOTIFY-PROFILE-CREATED] Sending email:`, {
+          from: fromAddress,
+          to: ADMIN_NOTIFICATION_EMAIL,
+          subject,
+        });
+
         const htmlContent = newProfilePendingAdminEmail({
           profileName,
           profileEmail,
@@ -351,20 +298,27 @@ async function handleNotifyProfileCreated(
             Authorization: `Bearer ${resendApiKey}`,
           },
           body: JSON.stringify({
-            from: `Creative Technology Collective <noreply@${EMAIL_FROM_DOMAIN}>`,
+            from: fromAddress,
             to: [ADMIN_NOTIFICATION_EMAIL],
-            subject: `New Profile Pending Approval: ${profileName}`,
+            subject,
             html: htmlContent,
           }),
         });
 
-        sent = response.ok;
+        const responseBody = await response.json().catch(() => ({}));
+
+        if (response.ok) {
+          sent = true;
+          console.log(`[NOTIFY-PROFILE-CREATED] Email sent successfully:`, responseBody);
+        } else {
+          console.error(`[NOTIFY-PROFILE-CREATED] Resend API error ${response.status}:`, responseBody);
+        }
       } catch (error) {
-        console.error('[NOTIFY-PROFILE-CREATED] Email error:', error);
+        console.error('[NOTIFY-PROFILE-CREATED] Email send exception:', error);
       }
     }
 
-    return jsonResponse({
+    return res.status(200).json({
       success: true,
       notificationSent: sent,
       message: sent
@@ -372,7 +326,8 @@ async function handleNotifyProfileCreated(
         : 'Profile created but admin notification could not be sent',
     });
   } catch (error) {
-    return jsonResponse({ error: 'Failed to send notification' }, 500);
+    console.error('[NOTIFY-CREATED] Error:', error);
+    return res.status(500).json({ error: 'Failed to send notification' });
   }
 }
 
@@ -387,17 +342,27 @@ interface WebSearchResult {
 }
 
 async function searchWithJina(query: string): Promise<WebSearchResult[]> {
+  const jinaApiKey = process.env.JINA_API_KEY;
+
   try {
     const jinaSearchUrl = `https://s.jina.ai/${encodeURIComponent(query)}`;
+    const headers: Record<string, string> = {
+      Accept: 'application/json',
+      'User-Agent': 'Mozilla/5.0 (compatible; ProfileEnricher/1.0)',
+    };
+    if (jinaApiKey) {
+      headers['Authorization'] = `Bearer ${jinaApiKey}`;
+    }
+
     const response = await fetch(jinaSearchUrl, {
-      headers: {
-        'Accept': 'application/json',
-        'User-Agent': 'Mozilla/5.0 (compatible; ProfileEnricher/1.0)',
-      },
+      headers,
       signal: AbortSignal.timeout(15000),
     });
 
-    if (!response.ok) return [];
+    if (!response.ok) {
+      console.log(`[profiles/search] Jina returned ${response.status}, trying DuckDuckGo`);
+      return searchWithDuckDuckGoFallback(query);
+    }
 
     const text = await response.text();
     const results: WebSearchResult[] = [];
@@ -417,6 +382,55 @@ async function searchWithJina(query: string): Promise<WebSearchResult[]> {
       }
     }
 
+    if (results.length === 0) {
+      return searchWithDuckDuckGoFallback(query);
+    }
+
+    return results;
+  } catch {
+    return searchWithDuckDuckGoFallback(query);
+  }
+}
+
+async function searchWithDuckDuckGoFallback(query: string): Promise<WebSearchResult[]> {
+  try {
+    const response = await fetch(
+      `https://html.duckduckgo.com/html/?q=${encodeURIComponent(query)}`,
+      {
+        headers: {
+          'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/121.0.0.0 Safari/537.36',
+          Accept: 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
+          'Accept-Language': 'en-US,en;q=0.9',
+        },
+        signal: AbortSignal.timeout(8000),
+      }
+    );
+
+    if (!response.ok) return [];
+
+    const html = await response.text();
+    const results: WebSearchResult[] = [];
+
+    const hrefPattern = /class="result__a"[^>]*href="([^"]*)"[^>]*>([^<]*)</g;
+    const snippetPattern = /class="result__snippet"[^>]*>([^<]*)</g;
+
+    const snippets: string[] = [];
+    let match;
+    while ((match = snippetPattern.exec(html)) !== null) {
+      snippets.push(match[1].trim());
+    }
+
+    let snippetIndex = 0;
+    while ((match = hrefPattern.exec(html)) !== null && results.length < 8) {
+      let url = match[1];
+      const title = match[2].trim();
+      if (!url || url.includes('duckduckgo.com') || !title) continue;
+      if (url.startsWith('//')) url = 'https:' + url;
+
+      results.push({ url, title, snippet: snippets[snippetIndex] || '' });
+      snippetIndex++;
+    }
+
     return results;
   } catch {
     return [];
@@ -424,13 +438,20 @@ async function searchWithJina(query: string): Promise<WebSearchResult[]> {
 }
 
 async function fetchUrlWithJina(url: string): Promise<string> {
+  const jinaApiKey = process.env.JINA_API_KEY;
+
   try {
     const jinaUrl = `https://r.jina.ai/${url}`;
+    const headers: Record<string, string> = {
+      Accept: 'text/plain',
+      'User-Agent': 'Mozilla/5.0 (compatible; ProfileEnricher/1.0)',
+    };
+    if (jinaApiKey) {
+      headers['Authorization'] = `Bearer ${jinaApiKey}`;
+    }
+
     const response = await fetch(jinaUrl, {
-      headers: {
-        'Accept': 'text/plain',
-        'User-Agent': 'Mozilla/5.0 (compatible; ProfileEnricher/1.0)',
-      },
+      headers,
       signal: AbortSignal.timeout(15000),
     });
 
@@ -442,29 +463,27 @@ async function fetchUrlWithJina(url: string): Promise<string> {
   }
 }
 
-async function handleEnrichByName(req: Request) {
+async function handleEnrichByName(req: VercelRequest, res: VercelResponse) {
   if (req.method !== 'POST') {
-    return jsonResponse({ error: 'Method not allowed' }, 405);
+    return res.status(405).json({ error: 'Method not allowed' });
   }
 
   const anthropicApiKey = process.env.ANTHROPIC_API_KEY;
   if (!anthropicApiKey) {
-    return jsonResponse({ error: 'AI service not configured' }, 500);
+    return res.status(500).json({ error: 'AI service not configured' });
   }
 
   try {
-    const body = await req.json();
-    const { fullName, currentSkills = [], currentBio = '', linkedinUrl = '', portfolioUrl = '' } = body;
+    const { fullName, currentSkills = [], currentBio = '', linkedinUrl = '', portfolioUrl = '' } = req.body || {};
 
     if (!fullName || typeof fullName !== 'string' || fullName.trim().length < 2) {
-      return jsonResponse({ error: 'Full name is required' }, 400);
+      return res.status(400).json({ error: 'Full name is required' });
     }
 
     const name = fullName.trim();
     const directContents: { url: string; content: string }[] = [];
     const allResults: WebSearchResult[] = [];
 
-    // Fetch from provided URLs
     if (portfolioUrl?.trim()) {
       const content = await fetchUrlWithJina(portfolioUrl);
       if (content.length > 100) {
@@ -481,7 +500,6 @@ async function handleEnrichByName(req: Request) {
       }
     }
 
-    // Web search
     const queries = [`"${name}" portfolio`, `"${name}" creative technologist`];
     for (const query of queries) {
       const results = await searchWithJina(query);
@@ -491,28 +509,26 @@ async function handleEnrichByName(req: Request) {
       }
     }
 
-    const uniqueResults = allResults.filter(
-      (r, i, arr) => r.url && arr.findIndex(x => x.url === r.url) === i
-    ).slice(0, 10);
+    const uniqueResults = allResults
+      .filter((r, i, arr) => r.url && arr.findIndex((x) => x.url === r.url) === i)
+      .slice(0, 10);
 
     if (directContents.length === 0 && uniqueResults.length === 0) {
-      return jsonResponse({
+      return res.status(200).json({
         success: true,
         discoveredProjects: [],
         additionalSkills: [],
         workHistory: [],
         enrichedBio: '',
-        summary: '',
-        note: 'No web results found for this name.',
+        summary: 'No public information found. Try adding a LinkedIn or portfolio URL for better results.',
       });
     }
 
-    // Fetch more content if needed
     if (directContents.length < 3) {
       const resultsToFetch = uniqueResults
-        .filter(r => !directContents.find(d => d.url === r.url))
+        .filter((r) => !directContents.find((d) => d.url === r.url))
         .slice(0, 5 - directContents.length);
-      
+
       for (const result of resultsToFetch) {
         const content = await fetchUrlWithJina(result.url);
         if (content.length > 200) {
@@ -521,7 +537,6 @@ async function handleEnrichByName(req: Request) {
       }
     }
 
-    // Analyze with AI
     const prompt = `You are analyzing web search results to help auto-fill a creative technologist's profile.
 
 Profile Name: ${name}
@@ -571,14 +586,14 @@ Respond in JSON:
     const data = await response.json();
     const text = data.content?.[0]?.text || '{}';
     const jsonMatch = text.match(/\{[\s\S]*\}/);
-    
+
     if (!jsonMatch) {
       throw new Error('Could not parse AI response');
     }
 
     const analysis = JSON.parse(jsonMatch[0]);
 
-    return jsonResponse({
+    return res.status(200).json({
       success: true,
       discoveredProjects: analysis.projects || [],
       additionalSkills: analysis.additionalSkills || [],
@@ -587,10 +602,11 @@ Respond in JSON:
       summary: analysis.summary || '',
     });
   } catch (error) {
-    return jsonResponse({
+    console.error('[ENRICH-BY-NAME] Error:', error);
+    return res.status(500).json({
       success: false,
       error: error instanceof Error ? error.message : 'Enrichment failed',
-    }, 500);
+    });
   }
 }
 
@@ -605,23 +621,22 @@ const ExtractContentRequest = z.object({
   currentSkills: z.array(z.string()).optional(),
 });
 
-async function handleSearchPerson(req: Request) {
+async function handleSearchPerson(req: VercelRequest, res: VercelResponse) {
   if (req.method !== 'POST') {
-    return jsonResponse({ error: 'Method not allowed' }, 405);
+    return res.status(405).json({ error: 'Method not allowed' });
   }
 
   if (process.env.USE_AGENT_BROWSER !== 'true') {
-    return jsonResponse({
+    return res.status(400).json({
       error: 'Agent-browser is not enabled',
       hint: 'Set USE_AGENT_BROWSER=true in your environment',
-    }, 400);
+    });
   }
 
   try {
-    const body = await req.json();
-    const input = ExtractContentRequest.parse(body);
+    const input = ExtractContentRequest.parse(req.body);
 
-    const { extractFromMultipleUrls } = await import('../lib/agent-browser-search.js');
+    const { extractFromMultipleUrls } = await import('../_lib/agent-browser-search.js');
     const extractedContent = await extractFromMultipleUrls(input.urls, { timeout: 25000 });
 
     let analysis = null;
@@ -665,7 +680,7 @@ Extract projects, skills, work history, bio, and summary. Respond in valid JSON.
       }
     }
 
-    return jsonResponse({
+    return res.status(200).json({
       success: true,
       extracted: extractedContent.map((c: any) => ({
         url: c.url,
@@ -683,12 +698,13 @@ Extract projects, skills, work history, bio, and summary. Respond in valid JSON.
     });
   } catch (error) {
     if (error instanceof z.ZodError) {
-      return jsonResponse({ success: false, error: 'Invalid request', details: error.issues }, 400);
+      return res.status(400).json({ success: false, error: 'Invalid request', details: error.issues });
     }
-    return jsonResponse({
+    console.error('[SEARCH-PERSON] Error:', error);
+    return res.status(500).json({
       success: false,
       error: error instanceof Error ? error.message : 'Extraction failed',
-    }, 500);
+    });
   }
 }
 
@@ -696,50 +712,59 @@ Extract projects, skills, work history, bio, and summary. Respond in valid JSON.
 // MAIN ROUTER
 // ============================================================================
 
-export default async function handler(req: Request) {
+export default async function handler(req: VercelRequest, res: VercelResponse) {
+  // Handle CORS preflight
+  if (req.method === 'OPTIONS') {
+    res.setHeader('Access-Control-Allow-Origin', '*');
+    res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
+    res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
+    res.setHeader('Access-Control-Max-Age', '86400');
+    return res.status(204).end();
+  }
+
   const supabaseUrl = process.env.SUPABASE_URL;
   const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
 
   if (!supabaseUrl || !supabaseServiceKey) {
-    return jsonResponse({ error: 'Supabase not configured' }, 500);
+    console.error('[PROFILES] Supabase not configured');
+    return res.status(500).json({ error: 'Supabase not configured' });
   }
 
   const supabase = createClient(supabaseUrl, supabaseServiceKey);
 
-  const pathSegments = getPathSegments(req);
-  const route = pathSegments.join('/');
-
-  console.log(`[PROFILES] Route: ${route}, Method: ${req.method}`);
-
-  // Routes that don't require auth
-  if (route === 'enrich-by-name') {
-    return handleEnrichByName(req);
-  }
-
-  if (route === 'search-person') {
-    return handleSearchPerson(req);
-  }
-
-  // All other routes require authentication
-  const { user, error: authError } = await authenticateUser(req, supabase);
-  if (authError) {
-    return jsonResponse({ error: authError }, 401);
-  }
-
   try {
+    const route = getRoute(req);
+
+    console.log(`[PROFILES] Route: "${route}", Method: ${req.method}`);
+
+    // Routes that don't require auth
+    if (route === 'enrich-by-name') {
+      return handleEnrichByName(req, res);
+    }
+
+    if (route === 'search-person') {
+      return handleSearchPerson(req, res);
+    }
+
+    // All other routes require authentication
+    const { user, error: authError } = await authenticateUser(req, supabase);
+    if (authError) {
+      return res.status(401).json({ error: authError });
+    }
+
     switch (route) {
       case 'enrich':
-        return handleEnrichProfile(req, supabase, user);
+        return handleEnrichProfile(req, res, supabase, user);
       case 'update-enrichment':
-        return handleUpdateEnrichment(req, supabase, user);
+        return handleUpdateEnrichment(req, res, supabase, user);
       case 'notify-created':
-        return handleNotifyProfileCreated(req, supabase, user);
+        return handleNotifyProfileCreated(req, res, supabase, user);
       default:
-        console.warn(`[PROFILES] Unknown route: ${route}`);
-        return jsonResponse({ error: `Route not found: /api/profiles/${route}` }, 404);
+        console.warn(`[PROFILES] Unknown route: "${route}"`);
+        return res.status(404).json({ error: `Route not found: /api/profiles/${route}` });
     }
   } catch (error) {
-    console.error('[PROFILES] Error:', error);
-    return jsonResponse({ error: 'Internal server error' }, 500);
+    console.error('[PROFILES] Unhandled error:', error);
+    return res.status(500).json({ error: 'Internal server error' });
   }
 }

@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { Alert, AlertContent, AlertTitle, AlertDescription } from "@/components/ui/alert";
 import { ButtonColorful } from "@/components/ui/button-colorful";
 import { X, Cookie } from "lucide-react";
+import { useHaptics } from "@/hooks/useHaptics";
 
 interface CookieNoticeProps {
   onAccept?: () => void;
@@ -10,6 +11,7 @@ interface CookieNoticeProps {
 
 export function CookieNotice({ onAccept, onDecline }: CookieNoticeProps) {
   const [isVisible, setIsVisible] = useState(false);
+  const { tap } = useHaptics();
 
   useEffect(() => {
     // Check if user has already made a choice
@@ -24,18 +26,21 @@ export function CookieNotice({ onAccept, onDecline }: CookieNoticeProps) {
   }, []);
 
   const handleAccept = () => {
+    tap();
     localStorage.setItem('cookie-consent', 'accepted');
     setIsVisible(false);
     onAccept?.();
   };
 
   const handleDecline = () => {
+    tap();
     localStorage.setItem('cookie-consent', 'declined');
     setIsVisible(false);
     onDecline?.();
   };
 
   const handleClose = () => {
+    tap();
     setIsVisible(false);
   };
 

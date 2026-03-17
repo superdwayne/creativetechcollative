@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
 import { useBetaAccess } from '@/hooks/useBetaAccess';
@@ -37,11 +37,24 @@ const BetaHubPage: React.FC = () => {
     isApproved,
     isPending,
     isRejected,
+    isAdmin,
     betaApplication,
     hasProfile,
     profileStatus,
     error,
   } = useBetaAccess();
+
+  // Redirect approved beta users directly to the directory
+  // BetaHub is now just a redirect point - the directory is the main destination
+  useEffect(() => {
+    if (!loading && isApproved) {
+      if (hasProfile) {
+        navigate('/directory');
+      } else {
+        navigate('/directory/create');
+      }
+    }
+  }, [loading, isApproved, hasProfile, navigate]);
 
   const handleSignOut = async () => {
     await signOut();
@@ -123,8 +136,9 @@ const BetaHubPage: React.FC = () => {
     );
   }
 
-  // No beta application found AND no approved profile (existing members get access via profile)
-  if (!betaApplication && profileStatus !== 'approved') {
+  // No beta application found AND no approved profile AND not an admin
+  // Admins bypass beta application requirement
+  if (!betaApplication && profileStatus !== 'approved' && !isAdmin) {
     return (
       <div className="min-h-screen bg-black text-white flex items-center justify-center p-8">
         <div className="max-w-md text-center">

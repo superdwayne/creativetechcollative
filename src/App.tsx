@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Routes, Route, useLocation, Navigate } from 'react-router-dom';
+import { Routes, Route, useLocation, useNavigate, Navigate } from 'react-router-dom';
 import RotatingCube from './components/RotatingCube';
 import Navigation from './components/Navigation';
 import HomePage from './pages/HomePage';
@@ -51,12 +51,16 @@ import CompanyAuthPage from './pages/CompanyAuthPage';
 import CompanyRegisterPage from './pages/CompanyRegisterPage';
 import CompanyRequestAccessPage from './pages/CompanyRequestAccessPage';
 import CompanyDashboardPage from './pages/CompanyDashboardPage';
+import CompanyCTFinderPage from './pages/CompanyTalentAgentPage';
 import ChatPage from './pages/ChatPage';
 import BetaPage from './pages/BetaPage';
 import BetaHubPage from './pages/BetaHubPage';
 import BetaAuthPage from './pages/BetaAuthPage';
 import BetaAccountSetupPage from './pages/BetaAccountSetupPage';
+import ResetPasswordPage from './pages/ResetPasswordPage';
 import { usePageTracking } from './hooks/usePageTracking';
+import MessageNotification from './components/MessageNotification';
+import BetaFeedbackWidget from './components/BetaFeedbackWidget';
 
 // Helper function to get appropriate icon for category/tag
 const getCategoryIcon = (name: string): string => {
@@ -98,9 +102,27 @@ function App() {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [showCubeIcon, setShowCubeIcon] = useState(true);
   const location = useLocation();
+  const navigate = useNavigate();
 
   // Track page views on route changes for Google Analytics
   usePageTracking();
+
+  // Intercept Supabase auth hash params on the root page and redirect
+  // to the auth callback. Confirmation/magic link emails redirect to site_url
+  // which is `/`, but only /auth/callback knows how to process those tokens.
+  useEffect(() => {
+    const hash = window.location.hash;
+    if (!hash || hash.length <= 1 || location.pathname !== '/') return;
+
+    const hashParams = new URLSearchParams(hash.substring(1));
+
+    if (hashParams.has('access_token') && hashParams.has('refresh_token')) {
+      window.location.replace(`${window.location.origin}/auth/callback${hash}`);
+    } else if (hashParams.has('error')) {
+      const errorDesc = hashParams.get('error_description') || 'Authentication failed';
+      navigate(`/beta/auth?error=${encodeURIComponent(errorDesc)}`, { replace: true });
+    }
+  }, [location.pathname, navigate]);
 
 
   // Handle scroll effects
@@ -194,9 +216,15 @@ function App() {
         setMobileMenuOpen={setMobileMenuOpen}
       />
 
+      {/* Real-time Message Notifications */}
+      <MessageNotification />
+
+      {/* Beta Feedback Widget - bottom right on all pages for logged-in users */}
+      <BetaFeedbackWidget />
+
       {/* Main Content */}
-      <div className={`flex-1 ${location.pathname !== '/cases' ? 'p-4 md:p-8 pt-24' : 'pt-24'}`}>
-        <div className={location.pathname === '/cases' ? 'w-full' : 'max-w-7xl mx-auto'}>
+      <main className={`flex-1 pt-[72px]`}>
+        <div>
           <Routes>
             <Route 
               path="/" 
@@ -541,6 +569,15 @@ function App() {
                 </div>
               }
             />
+            {/* Company CT Finder route */}
+            <Route
+              path="/company/ct-finder"
+              element={
+                <div className="w-full">
+                  <CompanyCTFinderPage />
+                </div>
+              }
+            />
             {/* Messages / Chat route */}
             <Route
               path="/messages"
@@ -586,6 +623,15 @@ function App() {
                 </div>
               }
             />
+            {/* Password Reset - set new password after reset link */}
+            <Route
+              path="/reset-password"
+              element={
+                <div className="w-full">
+                  <ResetPasswordPage />
+                </div>
+              }
+            />
           </Routes>
         </div>
         
@@ -595,7 +641,7 @@ function App() {
             <Footer />
           </div>
         )}
-      </div>
+      </main>
       
       {/* Global Cookie Notice */}
       <CookieNotice 

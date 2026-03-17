@@ -17,6 +17,7 @@ const BetaPage: React.FC = () => {
   });
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [submitMessage, setSubmitMessage] = useState('');
+  const [applicationSubmitted, setApplicationSubmitted] = useState(false);
 
   // Form handlers
   const capitalizeName = (name: string): string => {
@@ -72,7 +73,7 @@ const BetaPage: React.FC = () => {
     setSubmitMessage('');
 
     try {
-      const response = await fetch('/api/beta-signup', {
+      const response = await fetch('/api/beta/signup', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -86,12 +87,8 @@ const BetaPage: React.FC = () => {
       });
 
       if (response.ok) {
-        setSubmitMessage('Application submitted! We\'ll review it and get back to you soon.');
-        setFormData({
-          name: '',
-          email: '',
-          interests: []
-        });
+        setApplicationSubmitted(true);
+        return;
       } else {
         const errorData = await response.json().catch(() => ({}));
         throw new Error(errorData.error || 'Something went wrong');
@@ -181,6 +178,39 @@ const BetaPage: React.FC = () => {
               })}
             </p>
           </div>
+        </div>
+      </div>
+    );
+  }
+
+  // Show success state after application submission
+  if (applicationSubmitted) {
+    return (
+      <div className="min-h-screen bg-black text-white flex items-center justify-center p-8">
+        <div className="max-w-md text-center">
+          <div className="w-16 h-16 rounded-full bg-emerald-500/20 flex items-center justify-center mx-auto mb-6">
+            <CheckCircle2 className="h-8 w-8 text-emerald-400" />
+          </div>
+          <div className="flex items-center justify-center gap-2 mb-4">
+            <Sparkles className="h-5 w-5 text-purple-400" />
+            <span className="text-xs font-secondary tracking-[0.3em] text-purple-400 uppercase">
+              Beta Program
+            </span>
+          </div>
+          <h1 className="text-3xl font-primary font-medium mb-4">Application Received!</h1>
+          <p className="text-zinc-400 font-secondary mb-4 leading-relaxed">
+            Thanks, {formData.name.split(' ')[0]}! We've received your beta application and our team will review it shortly.
+          </p>
+          <p className="text-zinc-500 font-secondary text-sm mb-8">
+            Once approved, you'll receive an email with a link to sign in and create your profile. We typically review applications within 24-48 hours.
+          </p>
+          <Link
+            to="/"
+            className="inline-flex items-center gap-2 px-8 py-4 border border-zinc-700 text-white font-secondary text-sm tracking-wide hover:border-zinc-500 hover:bg-zinc-800/50 transition-all"
+          >
+            Back to Home
+            <ArrowRight className="h-4 w-4" />
+          </Link>
         </div>
       </div>
     );
@@ -339,19 +369,6 @@ const BetaPage: React.FC = () => {
         </div>
       </div>
 
-      {/* Vertical Text on Left Edge */}
-      <div className="hidden lg:block fixed left-8 top-1/2 -translate-y-1/2 -rotate-90 origin-center z-10">
-        <span className="text-xs font-secondary tracking-[0.3em] text-zinc-600 uppercase whitespace-nowrap">
-          Beta Program • Early Access • Shape the Future
-        </span>
-      </div>
-
-      {/* Vertical Text on Right Edge */}
-      <div className="hidden lg:block fixed right-8 top-1/2 -translate-y-1/2 rotate-90 origin-center z-10">
-        <span className="text-xs font-secondary tracking-[0.3em] text-zinc-600 uppercase whitespace-nowrap">
-          Creative • Technology • Collective
-        </span>
-      </div>
     </div>
   );
 };

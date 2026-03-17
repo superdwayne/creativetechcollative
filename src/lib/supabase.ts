@@ -20,8 +20,19 @@ if (!supabaseUrl || !supabaseAnonKey) {
   console.warn('Supabase credentials not configured. Profile storage will not work.');
 }
 
-export const supabase = supabaseUrl && supabaseAnonKey 
-  ? createClient(supabaseUrl, supabaseAnonKey)
+export const supabase = supabaseUrl && supabaseAnonKey
+  ? createClient(supabaseUrl, supabaseAnonKey, {
+      global: {
+        headers: {
+          'Accept': 'application/json',
+        },
+      },
+      realtime: {
+        params: {
+          eventsPerSecond: 10,
+        },
+      },
+    })
   : null;
 
 export async function getCurrentUserId(): Promise<string | null> {
@@ -39,7 +50,7 @@ async function sendProfileApprovalNotification(profile: NetworkProfile, accessTo
       return;
     }
 
-    const response = await fetch('/api/notify-profile-created', {
+    const response = await fetch('/api/profiles/notify-created', {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -59,13 +70,17 @@ async function sendProfileApprovalNotification(profile: NetworkProfile, accessTo
 
     if (!response.ok) {
       const error = await response.json().catch(() => ({}));
-      console.warn('Admin notification API error:', error.error || response.statusText);
+      console.error('[Profile notification] API call failed:', response.status, error.error || response.statusText);
     } else {
       const result = await response.json();
-      console.log('Admin notification result:', result.message);
+      if (result.notificationSent) {
+        console.log('[Profile notification] Admin notified successfully:', result.message);
+      } else {
+        console.warn('[Profile notification] API responded OK but email was NOT sent:', result.message);
+      }
     }
   } catch (error) {
-    console.error('Failed to send approval notification:', error);
+    console.error('[Profile notification] Exception calling notify-created:', error);
     // Don't throw - profile creation should succeed even if notification fails
   }
 }
@@ -121,7 +136,8 @@ export async function uploadImage(
     .from('profile-images')
     .upload(fileName, file, {
       cacheControl: '3600',
-      upsert: false
+      upsert: false,
+      contentType: file.type
     });
 
   if (uploadError) {
@@ -229,6 +245,8 @@ export async function createProfile(
       }
     }
 
+    const isBetaMember = membershipType === 'beta';
+
     const profileData = {
       user_id: userId,
       full_name: formData.fullName,
@@ -244,8 +262,10 @@ export async function createProfile(
       availability: formData.availability,
       is_ctc_member: formData.isCtcMember,
       profile_picture_url: formData.profilePictureUrl || null,
+      creative_spectrum: formData.creativeSpectrum ?? 50,
       slug,
       membership_type: membershipType,
+      ...(isBetaMember ? { approved: true, approved_at: new Date().toISOString() } : {}),
     };
 
     const { data, error } = await supabase
@@ -272,6 +292,7 @@ export async function createProfile(
       availability: data.availability,
       isCtcMember: data.is_ctc_member,
       profilePictureUrl: data.profile_picture_url,
+      creativeSpectrum: data.creative_spectrum ?? 50,
       approved: data.approved || false,
       approvedAt: data.approved_at,
       approvedBy: data.approved_by,
@@ -316,6 +337,7 @@ export async function updateProfile(profileId: string, formData: ProfileFormData
       availability: formData.availability,
       is_ctc_member: formData.isCtcMember,
       profile_picture_url: formData.profilePictureUrl || null,
+      creative_spectrum: formData.creativeSpectrum ?? 50,
       // Clear embedding so it gets regenerated with updated data
       embedding: null,
       embedding_updated_at: null,
@@ -346,6 +368,7 @@ export async function updateProfile(profileId: string, formData: ProfileFormData
       availability: data.availability,
       isCtcMember: data.is_ctc_member,
       profilePictureUrl: data.profile_picture_url,
+      creativeSpectrum: data.creative_spectrum ?? 50,
       approved: data.approved || false,
       approvedAt: data.approved_at,
       approvedBy: data.approved_by,
@@ -409,6 +432,7 @@ export async function getProfileByUserId(userId: string): Promise<NetworkProfile
       availability: data.availability,
       isCtcMember: data.is_ctc_member,
       profilePictureUrl: data.profile_picture_url,
+      creativeSpectrum: data.creative_spectrum ?? 50,
       approved: data.approved || false,
       approvedAt: data.approved_at,
       approvedBy: data.approved_by,
@@ -455,6 +479,7 @@ export async function getProfileByEmail(email: string): Promise<NetworkProfile |
       availability: data.availability,
       isCtcMember: data.is_ctc_member,
       profilePictureUrl: data.profile_picture_url,
+      creativeSpectrum: data.creative_spectrum ?? 50,
       approved: data.approved || false,
       approvedAt: data.approved_at,
       approvedBy: data.approved_by,
@@ -536,6 +561,7 @@ export async function getProfileBySlug(slugOrId: string): Promise<NetworkProfile
       availability: data.availability,
       isCtcMember: data.is_ctc_member,
       profilePictureUrl: data.profile_picture_url,
+      creativeSpectrum: data.creative_spectrum ?? 50,
       approved: data.approved || false,
       approvedAt: data.approved_at,
       approvedBy: data.approved_by,
@@ -555,10 +581,12 @@ export async function getAllProfiles(): Promise<NetworkProfile[]> {
 
   try {
     // Only fetch approved profiles for the public directory
+    // Exclude company profiles (membership_type = 'company')
     const { data, error } = await supabase
       .from('network_profiles')
       .select('*')
       .eq('approved', true)
+      .neq('membership_type', 'company')
       .order('created_at', { ascending: false });
 
     if (error || !data) return [];
@@ -579,6 +607,7 @@ export async function getAllProfiles(): Promise<NetworkProfile[]> {
       availability: item.availability,
       isCtcMember: item.is_ctc_member,
       profilePictureUrl: item.profile_picture_url,
+      creativeSpectrum: item.creative_spectrum ?? 50,
       approved: item.approved || false,
       approvedAt: item.approved_at,
       approvedBy: item.approved_by,
@@ -1220,6 +1249,40 @@ export async function getMatchesForMember(
 }
 
 // =============================================================================
+// BETA FEEDBACK FUNCTIONS
+// =============================================================================
+
+export async function submitBetaFeedback(feedback: {
+  userId: string;
+  userEmail?: string;
+  pageUrl: string;
+  category: string;
+  rating?: number;
+  message: string;
+}): Promise<{ success: boolean; error?: string }> {
+  if (!supabase) {
+    return { success: false, error: 'Database not configured' };
+  }
+
+  try {
+    const { error } = await supabase.from('beta_feedback').insert({
+      user_id: feedback.userId,
+      user_email: feedback.userEmail || null,
+      page_url: feedback.pageUrl,
+      category: feedback.category,
+      rating: feedback.rating || null,
+      message: feedback.message,
+    });
+
+    if (error) throw error;
+    return { success: true };
+  } catch (error: any) {
+    console.error('Error submitting feedback:', error);
+    return { success: false, error: error.message || 'Failed to submit feedback' };
+  }
+}
+
+// =============================================================================
 // VECTOR SIMILARITY SEARCH FUNCTIONS
 // =============================================================================
 
@@ -1278,12 +1341,14 @@ export async function findSimilarProfiles(
       availability: row.availability,
       isCtcMember: row.is_ctc_member,
       profilePictureUrl: row.profile_picture_url,
+      creativeSpectrum: row.creative_spectrum ?? 50,
       approved: row.approved,
       approvedAt: row.approved_at,
       approvedBy: row.approved_by,
       createdAt: row.created_at,
       updatedAt: row.updated_at,
       slug: row.slug,
+      membershipType: row.membership_type || 'full',
       embedding: row.embedding,
       embeddingUpdatedAt: row.embedding_updated_at,
       enrichedContent: row.enriched_content,

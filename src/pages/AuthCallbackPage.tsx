@@ -37,6 +37,25 @@ const AuthCallbackPage: React.FC = () => {
         const refreshToken = hashParams.get('refresh_token');
         const type = hashParams.get('type');
 
+        // If this is a password recovery flow, redirect to reset-password page
+        // The AuthContext will also detect PASSWORD_RECOVERY and redirect,
+        // but we catch it here first to avoid unnecessary profile lookups
+        if (type === 'recovery') {
+          if (accessToken && refreshToken) {
+            await supabase.auth.setSession({
+              access_token: accessToken,
+              refresh_token: refreshToken,
+            });
+          }
+          // AuthContext's onAuthStateChange will fire PASSWORD_RECOVERY and navigate
+          // But as a fallback, navigate directly
+          setStatus('success');
+          setTimeout(() => {
+            navigate('/reset-password', { replace: true });
+          }, 500);
+          return;
+        }
+
         // Also check query params (some flows use query params)
         const queryParams = new URLSearchParams(window.location.search);
         const code = queryParams.get('code');
@@ -54,6 +73,8 @@ const AuthCallbackPage: React.FC = () => {
 
           if (data.session) {
             setStatus('success');
+            // Note: if this was a recovery code, the AuthContext's onAuthStateChange
+            // will detect PASSWORD_RECOVERY and redirect to /reset-password automatically
             await redirectToDestination(data.session.user.id, data.session.user.email);
           }
         } else if (accessToken && refreshToken) {
@@ -115,9 +136,7 @@ const AuthCallbackPage: React.FC = () => {
           // Verify email matches if we have an expected email
           if (expectedEmail && expectedEmail.toLowerCase() !== userEmail.toLowerCase()) {
             console.warn('[AuthCallback] Email mismatch - expected:', expectedEmail, 'got:', userEmail);
-            // Still allow login but don't link the token
           } else {
-            // Link the beta application to this user
             const response = await fetch('/api/beta/link-google-account', {
               method: 'POST',
               headers: { 'Content-Type': 'application/json' },
@@ -132,13 +151,27 @@ const AuthCallbackPage: React.FC = () => {
           }
         } catch (err) {
           console.error('[AuthCallback] Error linking beta account:', err);
-          // Continue with redirect even if linking fails
         }
       }
       
-      // Short delay to show success message
+      // Check if the beta user already has a profile
+      let profile = await getProfileByUserId(userId);
+      if (!profile && userEmail) {
+        const profileByEmail = await getProfileByEmail(userEmail);
+        if (profileByEmail) {
+          const linked = await linkProfileToUser(profileByEmail.id, userId);
+          if (linked) {
+            profile = profileByEmail;
+          }
+        }
+      }
+
       setTimeout(() => {
-        navigate('/beta/hub', { replace: true });
+        if (profile) {
+          navigate('/directory/dashboard', { replace: true });
+        } else {
+          navigate('/directory/create', { replace: true });
+        }
       }, 1000);
       return;
     }
@@ -191,6 +224,15 @@ const AuthCallbackPage: React.FC = () => {
       return;
     }
 
+    // Check if user is a company user even without explicit company flow
+    const company = await getCompanyByUserId(userId);
+    if (company) {
+      setTimeout(() => {
+        navigate('/company/dashboard', { replace: true });
+      }, 1000);
+      return;
+    }
+
     // Directory flow - check if user has a network profile
     let profile = await getProfileByUserId(userId);
 
@@ -198,7 +240,6 @@ const AuthCallbackPage: React.FC = () => {
     if (!profile && userEmail) {
       const profileByEmail = await getProfileByEmail(userEmail);
       if (profileByEmail) {
-        // Found a profile with matching email - link it to this user
         const linked = await linkProfileToUser(profileByEmail.id, userId);
         if (linked) {
           profile = profileByEmail;

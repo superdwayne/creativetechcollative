@@ -26,7 +26,14 @@ export default defineConfig({
         changeOrigin: true,
         rewrite: (path) => path.replace(/^\/api\/webhook-test/, ''),
         secure: true,
-      }
+      },
+      // Proxy all other /api routes to production Vercel deployment
+      '/api': {
+        target: 'https://www.creativetechnologists.nl',
+        changeOrigin: true,
+        secure: true,
+        followRedirects: true,
+      },
     }
   }
 });

@@ -1,0 +1,241 @@
+{
+  "name": "CTC Content Generation",
+  "nodes": [
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "weeks",
+              "triggerAtDay": [1],
+              "triggerAtHour": 9
+            }
+          ]
+        }
+      },
+      "id": "schedule-trigger",
+      "name": "Weekly Schedule",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [0, 0]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.anthropic.com/v1/messages",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "anthropic-version",
+              "value": "2023-06-01"
+            },
+            {
+              "name": "content-type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"model\": \"claude-sonnet-4-20250514\",\n  \"max_tokens\": 2048,\n  \"messages\": [\n    {\n      \"role\": \"user\",\n      \"content\": \"You are a content strategist for the Creative Technology Collective (CTC), a professional network connecting creative technologists, designers, and innovators.\\n\\nGenerate content for this week:\\n\\n1. **LinkedIn Post** (professional tone, 150-200 words)\\n   - Topic: Highlight the value of the creative technology community\\n   - Include a call-to-action to join or engage\\n   - Use 3-5 relevant hashtags\\n\\n2. **Twitter/X Post** (concise, 280 chars max)\\n   - Engaging hook about creative technology trends\\n   - Include 2-3 hashtags\\n\\n3. **Newsletter Section** (300-400 words)\\n   - Opening paragraph welcoming readers\\n   - Industry insight or trend analysis\\n   - Member spotlight placeholder [MEMBER NAME]\\n   - Upcoming events/opportunities section\\n   - Closing with community call-to-action\\n\\nFormat your response as JSON with keys: linkedin_post, twitter_post, newsletter_content\"\n    }\n  ]\n}"
+      },
+      "id": "generate-social-content",
+      "name": "Generate Social Media Content",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [220, -100],
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "anthropic-api",
+          "name": "Anthropic API Key"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.anthropic.com/v1/messages",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "anthropic-version",
+              "value": "2023-06-01"
+            },
+            {
+              "name": "content-type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"model\": \"claude-sonnet-4-20250514\",\n  \"max_tokens\": 2048,\n  \"messages\": [\n    {\n      \"role\": \"user\",\n      \"content\": \"You are a content strategist for the Creative Technology Collective (CTC).\\n\\nGenerate a full newsletter draft for this week:\\n\\n**Newsletter Structure:**\\n1. Subject Line (compelling, under 60 chars)\\n2. Preview Text (40-90 chars)\\n3. Header Section - warm greeting\\n4. Featured Story (200-300 words) - pick a trending topic in creative technology (AI art, immersive experiences, creative coding, design systems, etc.)\\n5. Community Highlights - placeholder for 2-3 member achievements\\n6. Resources & Tools - recommend 2-3 useful tools/resources\\n7. Events Section - placeholder for upcoming community events\\n8. Footer - sign off with community values\\n\\nTone: Warm, inclusive, forward-thinking, professional but approachable.\\n\\nFormat as JSON with keys: subject_line, preview_text, header, featured_story, community_highlights, resources, events, footer\"\n    }\n  ]\n}"
+      },
+      "id": "generate-newsletter",
+      "name": "Generate Newsletter Content",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [220, 100],
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "anthropic-api",
+          "name": "Anthropic API Key"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "// Parse the social media content from Claude API response\nconst socialResponse = $('Generate Social Media Content').first().json;\nconst newsletterResponse = $('Generate Newsletter Content').first().json;\n\n// Extract the text content from Claude's response\nlet socialContent = {};\nlet newsletterContent = {};\n\ntry {\n  const socialText = socialResponse.content[0].text;\n  // Try to parse JSON from the response\n  const jsonMatch = socialText.match(/\\{[\\s\\S]*\\}/);\n  if (jsonMatch) {\n    socialContent = JSON.parse(jsonMatch[0]);\n  }\n} catch (e) {\n  socialContent = {\n    linkedin_post: socialResponse.content[0].text,\n    twitter_post: 'Error parsing Twitter content',\n    newsletter_content: 'Error parsing newsletter content'\n  };\n}\n\ntry {\n  const newsletterText = newsletterResponse.content[0].text;\n  const jsonMatch = newsletterText.match(/\\{[\\s\\S]*\\}/);\n  if (jsonMatch) {\n    newsletterContent = JSON.parse(jsonMatch[0]);\n  }\n} catch (e) {\n  newsletterContent = {\n    subject_line: 'CTC Weekly Newsletter',\n    preview_text: 'This week in creative technology',\n    full_content: newsletterResponse.content[0].text\n  };\n}\n\nconst today = new Date().toISOString().split('T')[0];\n\nreturn [\n  {\n    json: {\n      date: today,\n      platform: 'LinkedIn',\n      content: socialContent.linkedin_post || '',\n      status: 'Draft',\n      type: 'Social Media'\n    }\n  },\n  {\n    json: {\n      date: today,\n      platform: 'Twitter/X',\n      content: socialContent.twitter_post || '',\n      status: 'Draft',\n      type: 'Social Media'\n    }\n  },\n  {\n    json: {\n      date: today,\n      platform: 'Newsletter',\n      subject: newsletterContent.subject_line || '',\n      preview: newsletterContent.preview_text || '',\n      content: JSON.stringify(newsletterContent, null, 2),\n      status: 'Draft',\n      type: 'Newsletter'\n    }\n  }\n];"
+      },
+      "id": "parse-content",
+      "name": "Parse & Format Content",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [460, 0]
+    },
+    {
+      "parameters": {
+        "operation": "append",
+        "documentId": {
+          "__rl": true,
+          "mode": "id",
+          "value": "={{ $env.GOOGLE_SHEET_ID }}"
+        },
+        "sheetName": {
+          "__rl": true,
+          "mode": "list",
+          "value": "Content Calendar"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "Date": "={{ $json.date }}",
+            "Platform": "={{ $json.platform }}",
+            "Type": "={{ $json.type }}",
+            "Subject": "={{ $json.subject || '' }}",
+            "Content": "={{ $json.content }}",
+            "Status": "={{ $json.status }}"
+          }
+        },
+        "options": {}
+      },
+      "id": "save-to-sheets",
+      "name": "Save to Google Sheets",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.5,
+      "position": [700, 0],
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "google-sheets",
+          "name": "Google Sheets OAuth2"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "summary",
+              "name": "summary",
+              "value": "=Content generated successfully!\n\n📱 Social Media: 2 posts (LinkedIn + Twitter)\n📧 Newsletter: 1 draft\n\nAll content saved to Google Sheets for review.",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "summary",
+      "name": "Execution Summary",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [920, 0]
+    }
+  ],
+  "connections": {
+    "Weekly Schedule": {
+      "main": [
+        [
+          {
+            "node": "Generate Social Media Content",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Generate Newsletter Content",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Generate Social Media Content": {
+      "main": [
+        [
+          {
+            "node": "Parse & Format Content",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Generate Newsletter Content": {
+      "main": [
+        [
+          {
+            "node": "Parse & Format Content",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Parse & Format Content": {
+      "main": [
+        [
+          {
+            "node": "Save to Google Sheets",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Save to Google Sheets": {
+      "main": [
+        [
+          {
+            "node": "Execution Summary",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "staticData": null,
+  "tags": [
+    {
+      "name": "content",
+      "createdAt": "2024-01-01T00:00:00.000Z",
+      "updatedAt": "2024-01-01T00:00:00.000Z"
+    },
+    {
+      "name": "CTC",
+      "createdAt": "2024-01-01T00:00:00.000Z",
+      "updatedAt": "2024-01-01T00:00:00.000Z"
+    }
+  ],
+  "triggerCount": 1,
+  "pinData": {}
+}

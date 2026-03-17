@@ -37,7 +37,7 @@ const NetworkDashboardPage: React.FC = () => {
   // Track user presence to avoid sending email notifications when they're active
   usePresence();
   const navigate = useNavigate();
-  const { user, session, signOut, loading: authLoading } = useAuth();
+  const { user, session, signOut, loading: authLoading, isCompanyUser } = useAuth();
   const [profile, setProfile] = useState<NetworkProfile | null>(null);
   const [loading, setLoading] = useState(true);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
@@ -50,6 +50,7 @@ const NetworkDashboardPage: React.FC = () => {
   
   // New profile creation flow state
   const [firstName, setFirstName] = useState('');
+  const [enrichUrl, setEnrichUrl] = useState('');
   const [showNameStep, setShowNameStep] = useState(false);
   const [isGenerating, setIsGenerating] = useState(false);
   const [generateError, setGenerateError] = useState('');
@@ -86,10 +87,15 @@ const NetworkDashboardPage: React.FC = () => {
       return;
     }
 
+    if (!authLoading && isCompanyUser) {
+      navigate('/company/dashboard');
+      return;
+    }
+
     if (user) {
       fetchData();
     }
-  }, [user, authLoading, navigate, fetchData]);
+  }, [user, authLoading, isCompanyUser, navigate, fetchData]);
 
   // Fetch unread message count
   useEffect(() => {
@@ -277,7 +283,7 @@ const NetworkDashboardPage: React.FC = () => {
         });
       }
 
-      const response = await fetch('/api/update-profile-enrichment', {
+      const response = await fetch('/api/profiles/update-enrichment', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -289,7 +295,13 @@ const NetworkDashboardPage: React.FC = () => {
         }),
       });
 
-      const result = await response.json();
+      let result: any;
+      try {
+        result = await response.json();
+      } catch {
+        console.error('Failed to parse enrichment response. Status:', response.status);
+        throw new Error(`Server error (${response.status}). Please try again.`);
+      }
 
       if (!response.ok || !result.success) {
         throw new Error(result.error || 'Failed to apply enrichment');
@@ -414,7 +426,7 @@ const NetworkDashboardPage: React.FC = () => {
       </div>
 
       {/* Header */}
-      <header className="relative border-b border-zinc-800/50 backdrop-blur-sm bg-black/50 sticky top-0 z-40">
+      <header className="relative border-b border-zinc-800/50 backdrop-blur-sm bg-black/50">
         <div className="max-w-6xl mx-auto px-6 py-4 flex items-center justify-between">
           <div className="flex items-center gap-3">
             <Link to="/directory" className="text-xs font-medium tracking-[0.2em] text-zinc-500 uppercase hover:text-zinc-300 transition-colors">
@@ -425,10 +437,10 @@ const NetworkDashboardPage: React.FC = () => {
           </div>
           <button
             onClick={handleSignOut}
-            className="flex items-center gap-2 px-4 py-2 text-zinc-400 hover:text-white text-sm transition-all hover:bg-zinc-800/50 rounded-lg"
+            className="flex items-center gap-2 px-4 py-2 text-sm text-zinc-400 hover:text-white hover:bg-zinc-800/50 rounded-xl transition-all border border-transparent hover:border-zinc-700/50"
           >
             <LogOut className="h-4 w-4" />
-            Sign Out
+            <span className="hidden sm:inline">Sign Out</span>
           </button>
         </div>
       </header>
@@ -472,10 +484,10 @@ const NetworkDashboardPage: React.FC = () => {
               <>
                 <h1 className="text-4xl font-bold text-white mb-4 tracking-tight">Let's build your profile</h1>
                 <p className="text-zinc-400 mb-8 max-w-md mx-auto text-lg leading-relaxed">
-                  Enter your name and we'll search the web to auto-fill your profile with your public work, skills, and bio.
+                  Enter your name and a link to your work — we'll search the web to auto-fill your profile.
                 </p>
                 
-                <div className="max-w-sm mx-auto mb-8">
+                <div className="max-w-md mx-auto mb-8 space-y-3">
                   <input
                     type="text"
                     value={firstName}
@@ -488,15 +500,36 @@ const NetworkDashboardPage: React.FC = () => {
                     className="w-full px-6 py-4 bg-zinc-900/50 border border-zinc-700/50 rounded-xl text-white text-center text-lg placeholder:text-zinc-500 focus:outline-none focus:border-violet-500/50 focus:ring-2 focus:ring-violet-500/20 transition-all"
                     onKeyDown={(e) => {
                       if (e.key === 'Enter' && firstName.trim()) {
-                        navigate(`/directory/create?name=${encodeURIComponent(firstName.trim())}`);
+                        if (!enrichUrl.trim()) {
+                          document.getElementById('enrich-url-input')?.focus();
+                        }
                       }
                     }}
                   />
+                  
+                  {firstName.trim() && (
+                    <div className="animate-in fade-in slide-in-from-top-2 duration-300">
+                      <div className="relative">
+                        <Globe className="absolute left-4 top-1/2 -translate-y-1/2 h-4 w-4 text-zinc-500" />
+                        <input
+                          id="enrich-url-input"
+                          type="url"
+                          value={enrichUrl}
+                          onChange={(e) => setEnrichUrl(e.target.value)}
+                          placeholder="LinkedIn, portfolio, or website URL"
+                          className="w-full pl-11 pr-4 py-3.5 bg-zinc-900/50 border border-zinc-700/50 rounded-xl text-white text-sm placeholder:text-zinc-500 focus:outline-none focus:border-violet-500/50 focus:ring-2 focus:ring-violet-500/20 transition-all"
+                        />
+                      </div>
+                      <p className="text-zinc-600 text-xs mt-1.5 text-center">
+                        Adding a URL greatly improves results — LinkedIn, portfolio site, Behance, GitHub, etc.
+                      </p>
+                    </div>
+                  )}
                 </div>
 
                 {/* Error Message */}
                 {generateError && (
-                  <div className="max-w-sm mx-auto mb-6 p-3 bg-red-500/10 border border-red-500/20 rounded-xl flex items-center justify-center gap-2 text-red-400 text-sm">
+                  <div className="max-w-md mx-auto mb-6 p-3 bg-red-500/10 border border-red-500/20 rounded-xl flex items-center justify-center gap-2 text-red-400 text-sm">
                     <AlertCircle className="h-4 w-4 flex-shrink-0" />
                     {generateError}
                   </div>
@@ -511,14 +544,22 @@ const NetworkDashboardPage: React.FC = () => {
                         setIsGenerating(true);
                         setGenerateError('');
                         
+                        const url = enrichUrl.trim();
+                        const isLinkedIn = url.toLowerCase().includes('linkedin.com');
+                        
                         try {
-                          const response = await fetch('/api/enrich-profile-by-name', {
+                          const response = await fetch('/api/enrich-profile-search', {
                             method: 'POST',
                             headers: { 'Content-Type': 'application/json' },
                             body: JSON.stringify({
                               fullName: firstName.trim(),
                               currentSkills: [],
                               currentBio: '',
+                              linkedinUrl: isLinkedIn ? url : '',
+                              portfolioUrl: !isLinkedIn && url ? url : '',
+                              location: '',
+                              focusAreas: [],
+                              existingProjects: [],
                             }),
                           });
                           
@@ -532,14 +573,17 @@ const NetworkDashboardPage: React.FC = () => {
                           }
                           
                           const data = JSON.parse(text);
+                          console.log('[Dashboard Enrich] API response:', data);
                           
-                          if (data.success) {
-                            // Encode the data and pass to create page
+                          const hasData = (data.discoveredProjects?.length > 0) ||
+                            (data.additionalSkills?.length > 0) ||
+                            data.enrichedBio;
+
+                          if (data.success && hasData) {
                             const enrichmentData = encodeURIComponent(JSON.stringify(data));
                             navigate(`/directory/create?name=${encodeURIComponent(firstName.trim())}&enrichment=${enrichmentData}`);
                           } else {
-                            // Still navigate but without enrichment
-                            navigate(`/directory/create?name=${encodeURIComponent(firstName.trim())}`);
+                            navigate(`/directory/create?name=${encodeURIComponent(firstName.trim())}&mode=generate`);
                           }
                         } catch (err) {
                           console.error('Generate error:', err);
@@ -582,6 +626,7 @@ const NetworkDashboardPage: React.FC = () => {
                   onClick={() => {
                     setShowNameStep(false);
                     setFirstName('');
+                    setEnrichUrl('');
                     setGenerateError('');
                   }}
                   className="mt-8 text-sm text-zinc-500 hover:text-zinc-300 transition-colors"
@@ -590,7 +635,7 @@ const NetworkDashboardPage: React.FC = () => {
                 </button>
                 
                 <p className="text-zinc-500 text-xs mt-6 max-w-md mx-auto leading-relaxed">
-                  AI auto-fill searches your portfolio, LinkedIn, and public profiles to populate your skills, bio, work history, and projects. You can review and edit everything before saving.
+                  We search your portfolio, LinkedIn, and public profiles to populate your skills, bio, work history, and projects. You can review and edit everything before saving.
                 </p>
               </>
             )}
@@ -885,7 +930,7 @@ const NetworkDashboardPage: React.FC = () => {
 
             {/* Footer Actions */}
             <div className="pt-8 border-t border-zinc-800/50 animate-in fade-in slide-in-from-bottom-4 duration-500 delay-400">
-              <div className="flex flex-wrap gap-6">
+              <div className="flex flex-wrap items-center gap-6">
                 <Link
                   to="/directory"
                   className="text-sm text-zinc-400 hover:text-white transition-colors inline-flex items-center gap-1"
@@ -893,6 +938,13 @@ const NetworkDashboardPage: React.FC = () => {
                   Browse Directory
                   <ArrowUpRight className="w-3.5 h-3.5" />
                 </Link>
+                <button
+                  onClick={handleSignOut}
+                  className="text-sm text-zinc-400 hover:text-white transition-colors inline-flex items-center gap-1.5"
+                >
+                  <LogOut className="h-3.5 w-3.5" />
+                  Sign Out
+                </button>
                 <button
                   onClick={() => setShowDeleteConfirm(true)}
                   className="text-sm text-red-400/70 hover:text-red-400 transition-colors"

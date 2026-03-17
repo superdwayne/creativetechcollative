@@ -1,7 +1,8 @@
-import React, { useEffect, useState } from 'react';
-import { Menu, X, Sparkles } from 'lucide-react';
+import React, { useEffect, useState, useRef, useCallback } from 'react';
+import { Menu, X, LogOut } from 'lucide-react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
+import { useHaptics } from '@/hooks/useHaptics';
 
 interface NavigationProps {
   showCubeIcon: boolean;
@@ -15,47 +16,51 @@ const Navigation: React.FC<NavigationProps> = ({
 }) => {
   const navigate = useNavigate();
   const location = useLocation();
-  const { user, session } = useAuth();
-  const [isBetaUser, setIsBetaUser] = useState(false);
-  const [betaLoading, setBetaLoading] = useState(true);
+  const { user, session, signOut, isCompanyUser } = useAuth();
+  const { tap } = useHaptics();
 
-  // Check if user has beta access
-  useEffect(() => {
-    const checkBetaAccess = async () => {
-      if (!user || !session) {
-        setIsBetaUser(false);
-        setBetaLoading(false);
-        return;
-      }
+  // Scroll-direction-aware nav hide/show for mobile
+  const [navHidden, setNavHidden] = useState(false);
+  const lastScrollY = useRef(0);
+  const ticking = useRef(false);
 
-      try {
-        const response = await fetch('/api/beta/status', {
-          method: 'GET',
-          headers: {
-            'Content-Type': 'application/json',
-            Authorization: `Bearer ${session.access_token}`,
-          },
-        });
-
-        if (response.ok) {
-          const data = await response.json();
-          // User is a beta user if they have approved beta application OR have an approved profile
-          const hasBetaAccess = data.betaApplication?.status === 'approved' || 
-                                data.profileStatus === 'approved';
-          setIsBetaUser(hasBetaAccess);
+  const handleScroll = useCallback(() => {
+    if (ticking.current) return;
+    ticking.current = true;
+    requestAnimationFrame(() => {
+      const currentY = window.scrollY;
+      // Only apply on mobile (< 768px)
+      if (window.innerWidth < 768) {
+        if (currentY > lastScrollY.current && currentY > 72) {
+          setNavHidden(true);
         } else {
-          setIsBetaUser(false);
+          setNavHidden(false);
         }
-      } catch (err) {
-        console.error('[Navigation] Beta check error:', err);
-        setIsBetaUser(false);
-      } finally {
-        setBetaLoading(false);
+      } else {
+        setNavHidden(false);
       }
-    };
+      lastScrollY.current = currentY;
+      ticking.current = false;
+    });
+  }, []);
 
-    checkBetaAccess();
-  }, [user, session]);
+  useEffect(() => {
+    window.addEventListener('scroll', handleScroll, { passive: true });
+    return () => window.removeEventListener('scroll', handleScroll);
+  }, [handleScroll]);
+
+  // Check if user is signed in
+  const isSignedIn = !!(user && session);
+
+  // Determine where the profile button should go
+  const profilePath = isCompanyUser ? '/company/dashboard' : '/directory/dashboard';
+  const profileLabel = isCompanyUser ? 'Dashboard' : 'Profile';
+
+  const handleSignOut = async () => {
+    await signOut();
+    setMobileMenuOpen(false);
+    navigate('/');
+  };
 
   // Always scroll to top when the route changes (desktop and mobile)
   useEffect(() => {
@@ -69,30 +74,37 @@ const Navigation: React.FC<NavigationProps> = ({
     { id: 'newsletter', label: 'Newsletter', path: '/newsletter' },
   ];
 
-  // Right nav items - conditionally include BetaHub for beta users and Sign Up for signed-in users
+  // Right nav items - show Sign In for guests, Profile/Dashboard for signed-in users
   const rightNavItems = [
     { id: 'playground', label: 'Playground', path: '/playground' },
     { id: 'partners', label: 'Partners', path: '/partners' },
     { id: 'contact', label: 'Contact', path: '/contact' },
-    // Sign Up link - for all signed-in users
-    ...(user && session ? [{ id: 'signup', label: 'Sign Up', path: '/beta', isSignUp: true }] : []),
-    // BetaHub link - only for approved beta users
-    ...(isBetaUser && !betaLoading ? [{ id: 'betahub', label: 'BetaHub', path: '/beta/hub', isBeta: true }] : []),
+    { 
+      id: 'auth', 
+      label: isSignedIn ? profileLabel : 'Beta Sign Up', 
+      path: isSignedIn ? profilePath : '/beta', 
+      isAuth: true,
+      isSignedIn 
+    },
   ];
 
   // All nav items for mobile
   const allNavItems = [
     { id: 'home', label: 'Home', path: '/' },
     ...leftNavItems,
-    ...rightNavItems.filter(item => !('isBeta' in item && item.isBeta) && !('isSignUp' in item && item.isSignUp)), // Exclude beta and signup from regular items
+    ...rightNavItems.filter(item => !('isAuth' in item)),
     { id: 'collaborations', label: 'Collaborations', path: '/collaborations' },
-    // Add Sign Up for signed-in users
-    ...(user && session ? [{ id: 'signup', label: 'Sign Up', path: '/beta', isSignUp: true }] : []),
-    // Add BetaHub at the end for beta users
-    ...(isBetaUser && !betaLoading ? [{ id: 'betahub', label: 'BetaHub', path: '/beta/hub', isBeta: true }] : []),
+    { 
+      id: 'auth', 
+      label: isSignedIn ? profileLabel : 'Beta Sign Up', 
+      path: isSignedIn ? profilePath : '/beta', 
+      isAuth: true,
+      isSignedIn 
+    },
   ];
 
   const handleNavigation = (path: string) => {
+    tap();
     // Check if the path corresponds to a section on the home page
     const sectionMap: { [key: string]: string } = {
       '/mission': 'mission',
@@ -156,7 +168,7 @@ const Navigation: React.FC<NavigationProps> = ({
   return (
     <>
       {/* Top Navigation - Centered Logo Layout */}
-      <div className="fixed top-0 left-0 right-0 z-50">
+      <div className={`fixed top-0 left-0 right-0 z-50 transition-transform duration-300 ${navHidden ? '-translate-y-full' : 'translate-y-0'}`}>
         <div className="w-full px-6 py-4 bg-black/90 backdrop-blur-sm border-b border-white/10">
           <div className="flex items-center justify-between">
             
@@ -204,16 +216,15 @@ const Navigation: React.FC<NavigationProps> = ({
                   key={item.id}
                   onClick={() => handleNavigation(item.path)}
                   className={`text-sm font-secondary tracking-wide transition-colors flex items-center gap-1.5 ${
-                    'isSignUp' in item && item.isSignUp
-                      ? 'bg-white text-black px-4 py-1.5 rounded-full hover:bg-zinc-200 font-medium'
-                      : 'isBeta' in item && item.isBeta
-                        ? 'text-purple-400 hover:text-purple-300'
-                        : isActive(item.path)
-                          ? 'text-white' 
-                          : 'text-zinc-400 hover:text-white'
+                    'isAuth' in item && item.isAuth
+                      ? item.isSignedIn
+                        ? 'bg-green-500 text-white px-4 py-1.5 rounded-full hover:bg-green-600 font-medium'
+                        : 'bg-white text-black px-4 py-1.5 rounded-full hover:bg-zinc-200 font-medium'
+                      : isActive(item.path)
+                        ? 'text-white' 
+                        : 'text-zinc-400 hover:text-white'
                   }`}
                 >
-                  {'isBeta' in item && item.isBeta && <Sparkles className="h-3.5 w-3.5" />}
                   {item.label}
                 </button>
               ))}
@@ -221,7 +232,7 @@ const Navigation: React.FC<NavigationProps> = ({
 
             {/* Mobile Menu Button */}
             <button
-              onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
+              onClick={() => { tap(); setMobileMenuOpen(!mobileMenuOpen); }}
               className="md:hidden p-2 text-zinc-300 hover:text-white transition-colors"
               aria-label="Toggle mobile menu"
             >
@@ -256,22 +267,25 @@ const Navigation: React.FC<NavigationProps> = ({
                     key={item.id}
                     onClick={() => handleNavigation(item.path)}
                     className={`block w-full text-left transition-all duration-300 transform hover:translate-x-4 ${
-                      'isSignUp' in item && item.isSignUp
-                        ? 'text-white'
-                        : 'isBeta' in item && item.isBeta
-                          ? 'text-purple-400 hover:text-purple-300'
-                          : isActive(item.path)
-                            ? 'text-white' 
-                            : 'text-zinc-500 hover:text-white'
+                      'isAuth' in item && item.isAuth
+                        ? item.isSignedIn
+                          ? 'text-green-400'
+                          : 'text-white'
+                        : isActive(item.path)
+                          ? 'text-white' 
+                          : 'text-zinc-500 hover:text-white'
                     }`}
                     style={{
                       animationDelay: `${index * 100}ms`
                     }}
                   >
                     <span className={`text-4xl font-medium font-secondary uppercase tracking-tight leading-none flex items-center gap-3 ${
-                      'isSignUp' in item && item.isSignUp ? 'bg-white text-black px-6 py-2 rounded-full inline-flex' : ''
+                      'isAuth' in item && item.isAuth 
+                        ? item.isSignedIn 
+                          ? 'bg-green-500 text-white px-6 py-2 rounded-full inline-flex' 
+                          : 'bg-white text-black px-6 py-2 rounded-full inline-flex'
+                        : ''
                     }`}>
-                      {'isBeta' in item && item.isBeta && <Sparkles className="h-8 w-8" />}
                       {item.label}
                     </span>
                   </button>
@@ -281,6 +295,15 @@ const Navigation: React.FC<NavigationProps> = ({
 
             {/* Footer */}
             <div className="p-8 border-t border-zinc-800">
+              {isSignedIn && (
+                <button
+                  onClick={handleSignOut}
+                  className="flex items-center gap-3 text-zinc-500 hover:text-white transition-colors mb-6"
+                >
+                  <LogOut className="h-5 w-5" />
+                  <span className="text-sm font-secondary uppercase tracking-wider">Sign Out</span>
+                </button>
+              )}
               <p className="text-zinc-500 text-sm font-secondary uppercase tracking-wider">
                 Creative Technology Collective
               </p>

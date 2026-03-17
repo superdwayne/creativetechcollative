@@ -67,7 +67,7 @@ const InfiniteGridCanvas: React.FC<InfiniteGridCanvasProps> = ({ memberData }) =
   // Render loop
   const render = useCallback(() => {
     const canvas = canvasRef.current; if (!canvas) return;
-    const ctx = canvas.getContext('2d'); if (!ctx) return;
+    const ctx = canvas.getContext('2d', { willReadFrequently: true }); if (!ctx) return;
 
     ctx.fillStyle = '#000000';
     ctx.fillRect(0, 0, canvas.width, canvas.height);
