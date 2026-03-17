@@ -345,9 +345,9 @@ As a creative technologist and educator, Edwin focuses on making complex technol
   return (
     <div className="min-h-screen bg-black text-white overflow-hidden">
       {/* Main Content */}
-      <div className="flex flex-col lg:flex-row min-h-screen">
-        
-        {/* Left Side - Text Content */}
+      <div className="flex flex-col min-h-screen">
+
+        {/* Text Content */}
         <div className="flex-1 flex flex-col justify-center px-8 md:px-16 lg:px-24 py-20 lg:py-0">
           {/* Small Label */}
           <div className="mb-8">
@@ -389,7 +389,7 @@ As a creative technologist and educator, Edwin focuses on making complex technol
           </div>
 
           {/* Bottom Stats/Info */}
-          <div className="flex gap-12 mt-20 pt-8 border-t border-zinc-800">
+          <div className="flex gap-12 mt-20 pt-8">
             <div>
               <span className="block text-3xl font-primary font-medium">25</span>
               <span className="text-xs font-secondary text-zinc-500 tracking-wide uppercase">Members</span>
@@ -405,23 +405,14 @@ As a creative technologist and educator, Edwin focuses on making complex technol
           </div>
         </div>
 
-        {/* Right Side - Cube (hidden on mobile since cube is disabled there) */}
-        <div className="hidden lg:flex flex-1 relative items-center justify-center lg:min-h-screen">
-          {/* Background gradient */}
-          <div className="absolute inset-0 bg-gradient-to-br from-zinc-900/50 via-black to-black" />
-          
-          {/* Cube Container */}
-          <div className="relative z-10 w-full h-full flex items-center justify-center">
-            <ImageCube 
-              size={5.5} 
-              rotationSpeed={0.008} 
-              position={{ x: 0, y: 0, z: 0 }} 
-              forceVisible={true} 
-            />
-          </div>
-
-          {/* Decorative Elements */}
-          
+        {/* Cube renders as fixed overlay, no container needed */}
+        <div className="hidden lg:block">
+          <ImageCube
+            size={5.5}
+            rotationSpeed={0.008}
+            position={{ x: 0, y: 0, z: 0 }}
+            forceVisible={true}
+          />
         </div>
       </div>
 
