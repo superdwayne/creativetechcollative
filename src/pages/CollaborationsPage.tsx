@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { ExternalLink, Calendar, ChevronLeft, ChevronRight, Loader2 } from 'lucide-react';
 import { getWebhookUrl } from '@/utils/webhookUtils';
+import { n8nFetch } from '@/utils/n8nProxy';
 
 interface CaseStudy {
   id: string;
@@ -166,27 +167,8 @@ const CasesPage: React.FC = () => {
       try {
         setError(null);
 
-        // Get credentials from environment variables
         const webhookUrl = getWebhookUrl('cases');
-        const username = import.meta.env.VITE_N8N_BASIC_AUTH_USERNAME;
-        const password = import.meta.env.VITE_N8N_BASIC_AUTH_PASSWORD;
-
-        if (!username || !password) {
-          throw new Error('Authentication credentials not configured');
-        }
-
-        // Create Basic Auth header
-        const basicAuth = btoa(`${username}:${password}`);
-
-        const response = await fetch(webhookUrl, {
-          method: 'GET',
-          headers: {
-            'Authorization': `Basic ${basicAuth}`,
-            'Content-Type': 'application/json'
-          },
-          // Add timeout
-          signal: AbortSignal.timeout(15000) // 15 second timeout
-        });
+        const response = await n8nFetch(webhookUrl, 'GET');
 
         if (!response.ok) {
           throw new Error(`Failed to fetch cases: ${response.status} ${response.statusText}`);

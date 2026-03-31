@@ -1,3 +1,5 @@
+import { checkRateLimit, RateLimitError, rateLimitResponse, getClientIp } from './_lib/rate-limit.js';
+
 export const config = {
   runtime: 'edge',
   maxDuration: 60, // Optimized for parallel operations
@@ -537,8 +539,16 @@ async function analyzeWithAI(
 }
 
 export default async function handler(req: Request) {
+  // Rate limit: 10 requests per minute per IP (AI-powered search)
+  try {
+    checkRateLimit(`enrich-search:${getClientIp(req)}`, 10, 60_000);
+  } catch (err) {
+    if (err instanceof RateLimitError) return rateLimitResponse(err);
+    throw err;
+  }
+
   const startTime = Date.now();
-  
+
   if (req.method !== 'POST') {
     return new Response(JSON.stringify({ error: 'Method not allowed' }), {
       status: 405,

@@ -23,6 +23,22 @@ const PlaygroundPage: React.FC = () => {
 
   const playgrounds: Playground[] = [
     {
+      id: 'ai-agent-interface',
+      title: 'AI Agent Interface',
+      description: 'A locally-run AI agent powered by Ollama interfacing with an ESP32 microcontroller, built with the Cinder MCP. Natural language commands control real hardware in real-time — bridging large language models with embedded systems for tangible, interactive AI experiences.',
+      videoUrl: '/collaborations/ai-agent-interface.mp4',
+      externalUrl: 'https://github.com/superdwayne/cinder-mcp',
+      type: 'video'
+    },
+    {
+      id: 'cinder-mcp',
+      title: 'Cinder MCP',
+      description: 'A Model Context Protocol server for Cinder, the creative C++ framework. Let your AI agent build real-time graphics applications — generative art, interactive installations, and audiovisual experiences — by controlling Cinder directly through natural language prompts.',
+      videoUrl: '/collaborations/cinder-mcp.mp4',
+      externalUrl: 'https://github.com/superdwayne/cinder-mcp',
+      type: 'video'
+    },
+    {
       id: 'figify',
       title: 'Figify',
       description: 'A Figma plugin that converts screenshots into fully editable Figma designs using AI. Drop in a screenshot, AI identifies every component, and Figma generates the design — real frames, real text layers, fully editable, not a flattened image.',
@@ -43,7 +59,7 @@ const PlaygroundPage: React.FC = () => {
       title: 'SpeakEasy',
       description: 'A teleprompter that sits right next to your MacBook camera, in the notch area. It uses real-time speech recognition to track your voice and automatically scrolls the script to match what you\'re saying. Fuzzy word matching handles mispronunciations, skipped words, and ad-libs without losing your place.',
       videoUrl: '/collaborations/speakeasy.mp4',
-      externalUrl: 'https://www.linkedin.com/posts/ddpmarshall_macos-ai-swiftui-activity-7428023740464082944-j-pL',
+      externalUrl: 'https://testflight.apple.com/join/aE7U34fQ',
       type: 'video'
     },
     {

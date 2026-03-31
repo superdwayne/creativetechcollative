@@ -1,6 +1,7 @@
 import React, { useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { ArrowLeft, Clock, Tag, Share2, Twitter, Linkedin, Link as LinkIcon } from 'lucide-react';
+import DOMPurify from 'dompurify';
 import { getArticleBySlug, articles, Article } from '../data/articles';
 import Footer from '../components/ui/footer';
 
@@ -259,7 +260,7 @@ const ArticlePage: React.FC = () => {
         <div className="max-w-3xl mx-auto">
           <div className="article-content">
             <div 
-              dangerouslySetInnerHTML={{ __html: parseMarkdown(article.content) }} 
+              dangerouslySetInnerHTML={{ __html: DOMPurify.sanitize(parseMarkdown(article.content)) }} 
               className="
                 [&>h2]:text-2xl [&>h2]:md:text-3xl [&>h2]:font-primary [&>h2]:font-medium [&>h2]:tracking-tight [&>h2]:mt-12 [&>h2]:mb-6 [&>h2]:text-white
                 [&>h3]:text-xl [&>h3]:font-primary [&>h3]:font-medium [&>h3]:mt-8 [&>h3]:mb-4 [&>h3]:text-white

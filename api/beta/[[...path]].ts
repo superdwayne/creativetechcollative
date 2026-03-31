@@ -6,6 +6,7 @@ import {
   EMAIL_FROM_DOMAIN,
   PUBLIC_URL,
 } from '../_lib/email-templates.js';
+import { isAdmin } from '../_lib/admin.js';
 
 // Initialize Supabase client
 const supabaseUrl = process.env.VITE_SUPABASE_URL || process.env.SUPABASE_URL;
@@ -13,15 +14,6 @@ const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
 
 // Get admin notification email
 const ADMIN_NOTIFICATION_EMAIL = process.env.ADMIN_NOTIFICATION_EMAIL || `admin@${EMAIL_FROM_DOMAIN}`;
-
-/**
- * Check if a user is an admin based on ADMIN_USER_IDS env var
- */
-function isAdmin(userId: string): boolean {
-  const adminUserIds = process.env.ADMIN_USER_IDS || '';
-  const adminIds = adminUserIds.split(',').map((id) => id.trim()).filter(Boolean);
-  return adminIds.includes(userId);
-}
 
 /**
  * Send email via Resend
@@ -252,7 +244,7 @@ async function handleStatus(
     profileStatus,
     hasCompany,
     companyStatus,
-    isAdmin: isAdmin(user.id),
+    isAdmin: await isAdmin(user.id, supabase),
   });
 }
 

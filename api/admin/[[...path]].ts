@@ -18,19 +18,11 @@ import {
   PUBLIC_URL,
 } from '../_lib/email-templates.js';
 import type { UpdateSection } from '../_lib/email-templates.js';
+import { isAdmin } from '../_lib/admin.js';
 
 // Initialize Supabase client
 const supabaseUrl = process.env.VITE_SUPABASE_URL || process.env.SUPABASE_URL;
 const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
-
-/**
- * Check if a user is an admin based on ADMIN_USER_IDS env var
- */
-function isAdmin(userId: string): boolean {
-  const adminUserIds = process.env.ADMIN_USER_IDS || '';
-  const adminIds = adminUserIds.split(',').map((id) => id.trim()).filter(Boolean);
-  return adminIds.includes(userId);
-}
 
 /**
  * Generate a random password for account creation (user will use magic link)
@@ -96,7 +88,7 @@ async function authenticateAdmin(
     return { user: null, error: 'Invalid token' };
   }
 
-  if (!isAdmin(user.id)) {
+  if (!(await isAdmin(user.id, supabase))) {
     return { user: null, error: 'Admin access required' };
   }
 

@@ -76,8 +76,8 @@ async function sendWebhookNotification(
   matchScore: number
 ): Promise<boolean> {
   const webhookUrl = getWebhookUrl();
-  const username = process.env.VITE_N8N_BASIC_AUTH_USERNAME;
-  const password = process.env.VITE_N8N_BASIC_AUTH_PASSWORD;
+  const username = process.env.N8N_BASIC_AUTH_USERNAME;
+  const password = process.env.N8N_BASIC_AUTH_PASSWORD;
 
   if (!username || !password) {
     console.warn('[MEMBER-NOTIFICATION] Webhook credentials not configured');

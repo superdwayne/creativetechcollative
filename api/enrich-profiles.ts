@@ -1,5 +1,7 @@
 import { createClient } from '@supabase/supabase-js';
 import { z } from 'zod';
+import { checkRateLimit, RateLimitError, rateLimitResponse, getClientIp } from './_lib/rate-limit.js';
+import { isAdmin } from './_lib/admin.js';
 
 export const config = {
   runtime: 'edge',
@@ -28,14 +30,7 @@ interface EnrichmentProgress {
 // Maximum concurrent profile enrichments to avoid rate limits
 const MAX_CONCURRENT = 10;
 
-/**
- * Check if a user is an admin based on ADMIN_USER_IDS env var
- */
-function isAdmin(userId: string): boolean {
-  const adminUserIds = process.env.ADMIN_USER_IDS || '';
-  const adminIds = adminUserIds.split(',').map((id) => id.trim()).filter(Boolean);
-  return adminIds.includes(userId);
-}
+// Admin check imported from ./_lib/admin.ts
 
 /**
  * Get profiles that need enrichment (no embedding or outdated)
@@ -231,6 +226,14 @@ async function processProfilesInBatches(
 }
 
 export default async function handler(req: Request) {
+  // Rate limit: 5 requests per minute per IP (batch OpenAI calls)
+  try {
+    checkRateLimit(`enrich:${getClientIp(req)}`, 5, 60_000);
+  } catch (err) {
+    if (err instanceof RateLimitError) return rateLimitResponse(err);
+    throw err;
+  }
+
   // Only allow POST requests
   if (req.method !== 'POST') {
     return new Response(JSON.stringify({ error: 'Method not allowed' }), {
@@ -283,7 +286,7 @@ export default async function handler(req: Request) {
   }
 
   // Check if user is admin
-  if (!isAdmin(user.id)) {
+  if (!(await isAdmin(user.id, supabase))) {
     return new Response(JSON.stringify({ error: 'Admin access required' }), {
       status: 403,
       headers: { 'Content-Type': 'application/json' },

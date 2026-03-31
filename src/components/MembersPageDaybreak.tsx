@@ -3,6 +3,7 @@ import { motion, useScroll, useTransform, AnimatePresence } from 'framer-motion'
 import { Loader2, ArrowRight, Mail, Globe, Linkedin, Github } from 'lucide-react';
 import Footer from './ui/footer';
 import { getWebhookUrl } from '@/utils/webhookUtils';
+import { n8nFetch } from '@/utils/n8nProxy';
 
 interface MemberData {
   id: string;
@@ -40,22 +41,7 @@ const MembersPageDaybreak: React.FC = () => {
       try {
         setError(null);
         const webhookUrl = getWebhookUrl('members');
-        const username = import.meta.env.VITE_N8N_BASIC_AUTH_USERNAME;
-        const password = import.meta.env.VITE_N8N_BASIC_AUTH_PASSWORD;
-
-        if (!username || !password) {
-          throw new Error('Authentication credentials not configured');
-        }
-
-        const basicAuth = btoa(`${username}:${password}`);
-        const response = await fetch(webhookUrl, {
-          method: 'GET',
-          headers: {
-            'Authorization': `Basic ${basicAuth}`,
-            'Content-Type': 'application/json'
-          },
-          signal: AbortSignal.timeout(15000)
-        });
+        const response = await n8nFetch(webhookUrl, 'GET');
 
         if (!response.ok) {
           throw new Error(`Failed to fetch members: ${response.status} ${response.statusText}`);

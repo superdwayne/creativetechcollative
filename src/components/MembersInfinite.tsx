@@ -2,6 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { Loader2 } from 'lucide-react';
 import Footer from './ui/footer';
 import { getWebhookUrl } from '@/utils/webhookUtils';
+import { n8nFetch } from '@/utils/n8nProxy';
 import InfinityGrid from './InfinityGrid';
 
 interface MemberData {
@@ -32,27 +33,8 @@ const MembersInfinite: React.FC = () => {
         setError(null);
         setIsLoading(true);
 
-        const username = import.meta.env.VITE_N8N_BASIC_AUTH_USERNAME;
-        const password = import.meta.env.VITE_N8N_BASIC_AUTH_PASSWORD;
-
-        if (!username || !password) {
-          setUseFallback(true);
-          setMemberData(fallbackMembers);
-          setIsLoading(false);
-          return;
-        }
-
         const webhookUrl = getWebhookUrl('members');
-        const basicAuth = btoa(`${username}:${password}`);
-
-        const response = await fetch(webhookUrl, {
-          method: 'GET',
-          headers: {
-            'Authorization': `Basic ${basicAuth}`,
-            'Content-Type': 'application/json'
-          },
-          signal: AbortSignal.timeout(10000)
-        });
+        const response = await n8nFetch(webhookUrl, 'GET');
 
         if (!response.ok) throw new Error(`Failed: ${response.status}`);
 

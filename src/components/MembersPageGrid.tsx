@@ -3,6 +3,7 @@ import Footer from './ui/footer';
 import InfiniteGridCanvas from './InfiniteGridCanvas';
 import { MemberData } from '../types/member';
 import { getWebhookUrl } from '@/utils/webhookUtils';
+import { n8nFetch } from '@/utils/n8nProxy';
 
 const MembersPageGrid: React.FC = () => {
   const [memberData, setMemberData] = useState<MemberData[]>([]);
@@ -13,11 +14,7 @@ const MembersPageGrid: React.FC = () => {
     const fetchMembers = async () => {
       try {
         const webhookUrl = getWebhookUrl('members');
-        const username = import.meta.env.VITE_N8N_BASIC_AUTH_USERNAME;
-        const password = import.meta.env.VITE_N8N_BASIC_AUTH_PASSWORD;
-        if (!username || !password) throw new Error('Auth not configured');
-        const basicAuth = btoa(`${username}:${password}`);
-        const res = await fetch(webhookUrl, { headers: { 'Authorization': `Basic ${basicAuth}` } , signal: AbortSignal.timeout(15000)});
+        const res = await n8nFetch(webhookUrl, 'GET');
         if (!res.ok) throw new Error(`Fetch failed: ${res.status}`);
         const data = await res.json();
         const transformed: MemberData[] = (Array.isArray(data) ? data : []).map((item: any, index: number) => {

@@ -4,6 +4,7 @@ import { ButtonColorful } from '../components/ui/button-colorful';
 import { Input } from '../components/ui/input';
 import { Loader2 } from 'lucide-react';
 import { getWebhookUrl } from '@/utils/webhookUtils';
+import { n8nFetch } from '@/utils/n8nProxy';
 
 const MembershipFormPage: React.FC = () => {
   const [formData, setFormData] = useState({
@@ -89,31 +90,19 @@ const MembershipFormPage: React.FC = () => {
 
     try {
       const webhookUrl = getWebhookUrl('membership-form');
-      const username = import.meta.env.VITE_N8N_BASIC_AUTH_USERNAME;
-      const password = import.meta.env.VITE_N8N_BASIC_AUTH_PASSWORD;
-      
-      if (!webhookUrl || !username || !password) {
+
+      if (!webhookUrl) {
         throw new Error('Configuration missing');
       }
 
-      const basicAuth = btoa(`${username}:${password}`);
-
-      const response = await fetch(webhookUrl, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Basic ${basicAuth}`
-        },
-        body: JSON.stringify({
-          firstName: formData.firstName.trim(),
-          lastName: formData.lastName.trim(),
-          location: formData.location.trim(),
-          jobTitle: formData.jobTitle.trim(),
-          email: formData.email.trim(),
-          timestamp: new Date().toISOString(),
-          source: 'membership_application'
-        }),
-        signal: AbortSignal.timeout(10000)
+      const response = await n8nFetch(webhookUrl, 'POST', {
+        firstName: formData.firstName.trim(),
+        lastName: formData.lastName.trim(),
+        location: formData.location.trim(),
+        jobTitle: formData.jobTitle.trim(),
+        email: formData.email.trim(),
+        timestamp: new Date().toISOString(),
+        source: 'membership_application'
       });
 
       if (response.ok) {
@@ -135,8 +124,6 @@ const MembershipFormPage: React.FC = () => {
       
       if (error.name === 'TimeoutError') {
         setSubmitMessage('Request timed out. Please check your connection and try again.');
-      } else if (error.message === 'Configuration missing') {
-        setSubmitMessage('Service configuration error. Please contact support.');
       } else if (error.message.includes('Failed to fetch')) {
         setSubmitMessage('Unable to connect to server. Please try again later.');
       } else {

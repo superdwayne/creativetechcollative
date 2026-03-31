@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { getWebhookUrl } from '../utils/webhookUtils';
+import { n8nFetch } from '../utils/n8nProxy';
 
 const ContactPage: React.FC = () => {
   // Contact form state
@@ -68,30 +69,13 @@ const ContactPage: React.FC = () => {
 
     try {
       const webhookUrl = getWebhookUrl('ctc-contact');
-      const username = import.meta.env.VITE_N8N_BASIC_AUTH_USERNAME;
-      const password = import.meta.env.VITE_N8N_BASIC_AUTH_PASSWORD;
-      
-      if (!username || !password) {
-        throw new Error('Authentication credentials not configured');
-      }
-
-      const basicAuth = btoa(`${username}:${password}`);
-
-      const response = await fetch(webhookUrl, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Basic ${basicAuth}`
-        },
-        body: JSON.stringify({
-          name: capitalizedName,
-          email: formData.email.trim(),
-          subject: formData.subject.trim(),
-          message: formData.message.trim(),
-          timestamp: new Date().toISOString(),
-          source: 'contact_page_form'
-        }),
-        signal: AbortSignal.timeout(10000)
+      const response = await n8nFetch(webhookUrl, 'POST', {
+        name: capitalizedName,
+        email: formData.email.trim(),
+        subject: formData.subject.trim(),
+        message: formData.message.trim(),
+        timestamp: new Date().toISOString(),
+        source: 'contact_page_form'
       });
 
       if (response.ok) {
@@ -111,8 +95,6 @@ const ContactPage: React.FC = () => {
       
       if (error.name === 'TimeoutError') {
         setSubmitMessage('Request timed out. Please check your connection and try again.');
-      } else if (error.message === 'Authentication credentials not configured') {
-        setSubmitMessage('Service configuration error. Please contact support.');
       } else if (error.message.includes('Failed to fetch')) {
         setSubmitMessage('Unable to connect to server. Please try again later.');
       } else {

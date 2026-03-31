@@ -4,6 +4,7 @@ import { useNavigate } from 'react-router-dom';
 import Footer from '../components/ui/footer';
 import ImageCube from '../components/ImageCube';
 import { getWebhookUrl } from '@/utils/webhookUtils';
+import { n8nFetch } from '@/utils/n8nProxy';
 import { useFeatureFlags } from '@/utils/featureFlags';
 import FeatureFlagAdmin from '../components/FeatureFlagAdmin';
 import EmailSignup from '../components/EmailSignup';
@@ -276,41 +277,14 @@ const ResourcesPage: React.FC<ResourcesPageProps> = ({
         setLoading(true);
         setError(null);
 
-        // Get credentials from environment variables
         const webhookUrl = getWebhookUrl('resources');
-        const username = import.meta.env.VITE_N8N_BASIC_AUTH_USERNAME;
-        const password = import.meta.env.VITE_N8N_BASIC_AUTH_PASSWORD;
 
         console.log('Webhook URL:', webhookUrl);
-        console.log('Username configured:', !!username);
-        console.log('Password configured:', !!password);
-        console.log('Username length:', username?.length);
-        console.log('Password length:', password?.length);
-
-        if (!username || !password) {
-          throw new Error('Authentication credentials not configured');
-        }
-
-        // Create Basic Auth header - URL decode the password first
-        const decodedPassword = decodeURIComponent(password);
-        const basicAuth = btoa(`${username}:${decodedPassword}`);
-
         console.log('Attempting to fetch from:', webhookUrl);
-        console.log('Basic Auth header (first 20 chars):', `Basic ${basicAuth}`.substring(0, 20) + '...');
 
-        const response = await fetch(webhookUrl, {
-          method: 'GET',
-          headers: {
-            'Authorization': `Basic ${basicAuth}`,
-            'Content-Type': 'application/json',
-            'Accept': 'application/json'
-          },
-          // Add timeout
-          signal: AbortSignal.timeout(15000) // 15 second timeout
-        });
+        const response = await n8nFetch(webhookUrl, 'GET');
 
         console.log('Response status:', response.status);
-        console.log('Response headers:', Object.fromEntries(response.headers.entries()));
 
         if (!response.ok) {
           const errorText = await response.text().catch(() => 'Unknown error');

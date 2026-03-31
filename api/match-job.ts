@@ -1,5 +1,7 @@
 import { createClient } from '@supabase/supabase-js';
 import { z } from 'zod';
+import { checkRateLimit, RateLimitError, rateLimitResponse, getClientIp } from './_lib/rate-limit.js';
+import { isAdmin } from './_lib/admin.js';
 
 export const config = {
   runtime: 'edge',
@@ -40,14 +42,7 @@ interface MatchingResult {
   overallAnalysis?: string;
 }
 
-/**
- * Check if a user is an admin based on ADMIN_USER_IDS env var
- */
-function isAdmin(userId: string): boolean {
-  const adminUserIds = process.env.ADMIN_USER_IDS || '';
-  const adminIds = adminUserIds.split(',').map((id) => id.trim()).filter(Boolean);
-  return adminIds.includes(userId);
-}
+// Admin check imported from ./_lib/admin.ts
 
 /**
  * Check if a user owns the company that submitted the job
@@ -425,6 +420,14 @@ Order candidates by matchScore descending (best matches first). Include all cand
 }
 
 export default async function handler(req: Request) {
+  // Rate limit: 10 requests per minute per IP (expensive AI calls)
+  try {
+    checkRateLimit(`match-job:${getClientIp(req)}`, 10, 60_000);
+  } catch (err) {
+    if (err instanceof RateLimitError) return rateLimitResponse(err);
+    throw err;
+  }
+
   // Only allow POST requests
   if (req.method !== 'POST') {
     return new Response(JSON.stringify({ error: 'Method not allowed' }), {
@@ -519,7 +522,7 @@ export default async function handler(req: Request) {
     }
 
     // Check authorization: must be admin or the company that owns the job
-    const userIsAdmin = isAdmin(user.id);
+    const userIsAdmin = await isAdmin(user.id, supabase);
     const userIsOwner = await isJobOwner(supabase, user.id, jobId);
 
     if (!userIsAdmin && !userIsOwner) {

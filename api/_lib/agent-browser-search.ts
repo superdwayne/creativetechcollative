@@ -15,10 +15,10 @@
  * @see https://github.com/vercel-labs/agent-browser
  */
 
-import { exec } from 'child_process';
+import { execFile } from 'child_process';
 import { promisify } from 'util';
 
-const execAsync = promisify(exec);
+const execFileAsync = promisify(execFile);
 
 /**
  * Content extracted from a page
@@ -65,12 +65,12 @@ async function runAgentBrowser(
   // Always use JSON output for parsing
   baseArgs.push('--json');
 
-  const fullCommand = `npx agent-browser ${baseArgs.join(' ')} ${command} ${args.map((a) => `"${a.replace(/"/g, '\\"')}"`).join(' ')}`;
+  const allArgs = ['agent-browser', ...baseArgs, command, ...args];
 
-  console.log(`[AGENT-BROWSER] Running: ${fullCommand}`);
+  console.log(`[AGENT-BROWSER] Running: npx ${allArgs.join(' ')}`);
 
   try {
-    const { stdout, stderr } = await execAsync(fullCommand, {
+    const { stdout, stderr } = await execFileAsync('npx', allArgs, {
       timeout: options.timeout || 30000,
       maxBuffer: 10 * 1024 * 1024, // 10MB buffer for large snapshots
     });

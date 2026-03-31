@@ -6,6 +6,7 @@ import { ButtonColorful } from '../components/ui/button-colorful';
 import { Input } from '../components/ui/input';
 import { Loader2 } from 'lucide-react';
 import { getWebhookUrl } from '@/utils/webhookUtils';
+import { n8nFetch } from '@/utils/n8nProxy';
 
 interface WhitepaperData {
   id: string;
@@ -74,23 +75,7 @@ const WhitepaperPage: React.FC = () => {
         console.log('Fetching whitepaper data for route:', route);
 
         const webhookUrl = getWebhookUrl('whitepaper-pages');
-        const username = import.meta.env.VITE_N8N_BASIC_AUTH_USERNAME;
-        const password = import.meta.env.VITE_N8N_BASIC_AUTH_PASSWORD;
-
-        if (!username || !password) {
-          throw new Error('Authentication credentials not configured');
-        }
-
-        const basicAuth = btoa(`${username}:${password}`);
-
-        const response = await fetch(webhookUrl, {
-          method: 'GET',
-          headers: {
-            'Authorization': `Basic ${basicAuth}`,
-            'Content-Type': 'application/json'
-          },
-          signal: AbortSignal.timeout(15000)
-        });
+        const response = await n8nFetch(webhookUrl, 'GET');
 
         if (!response.ok) {
           throw new Error(`Failed to fetch whitepaper data: ${response.status} ${response.statusText}`);
@@ -198,32 +183,20 @@ const WhitepaperPage: React.FC = () => {
 
     try {
       const webhookUrl = getWebhookUrl('whitepaper');
-      const username = import.meta.env.VITE_N8N_BASIC_AUTH_USERNAME;
-      const password = import.meta.env.VITE_N8N_BASIC_AUTH_PASSWORD;
-      
-      if (!webhookUrl || !username || !password) {
+
+      if (!webhookUrl) {
         throw new Error('Configuration missing');
       }
 
-      const basicAuth = btoa(`${username}:${password}`);
-
-      const response = await fetch(webhookUrl, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Basic ${basicAuth}`
-        },
-        body: JSON.stringify({
-          name: capitalizedName,
-          email: email.trim(),
-          whitepaper_route: route,
-          whitepaper_id: whitepaperData?.id || 'default',
-          whitepaper_title: whitepaperData?.title || 'Unknown Whitepaper',
-          file_url: whitepaperData?.file || '',
-          timestamp: new Date().toISOString(),
-          source: 'whitepaper_signup'
-        }),
-        signal: AbortSignal.timeout(10000)
+      const response = await n8nFetch(webhookUrl, 'POST', {
+        name: capitalizedName,
+        email: email.trim(),
+        whitepaper_route: route,
+        whitepaper_id: whitepaperData?.id || 'default',
+        whitepaper_title: whitepaperData?.title || 'Unknown Whitepaper',
+        file_url: whitepaperData?.file || '',
+        timestamp: new Date().toISOString(),
+        source: 'whitepaper_signup'
       });
 
       if (response.ok) {
@@ -240,8 +213,6 @@ const WhitepaperPage: React.FC = () => {
       
       if (error.name === 'TimeoutError') {
         setSubmitMessage('Request timed out. Please check your connection and try again.');
-      } else if (error.message === 'Configuration missing') {
-        setSubmitMessage('Service configuration error. Please contact support.');
       } else if (error.message.includes('Failed to fetch')) {
         setSubmitMessage('Unable to connect to server. Please try again later.');
       } else {

@@ -1,5 +1,6 @@
 import Stripe from 'stripe';
 import { createClient } from '@supabase/supabase-js';
+import { checkRateLimit, RateLimitError, rateLimitResponse, getClientIp } from '../_lib/rate-limit.js';
 
 export const config = {
   runtime: 'edge',
@@ -13,6 +14,14 @@ const BUNDLE_PRICES: Record<string, { credits: number; priceCents: number }> = {
 };
 
 export default async function handler(req: Request): Promise<Response> {
+  // Rate limit: 100 requests per minute per IP
+  try {
+    checkRateLimit(`stripe:${getClientIp(req)}`, 100, 60_000);
+  } catch (err) {
+    if (err instanceof RateLimitError) return rateLimitResponse(err);
+    throw err;
+  }
+
   // Only allow POST requests
   if (req.method !== 'POST') {
     return new Response(JSON.stringify({ error: 'Method not allowed' }), {

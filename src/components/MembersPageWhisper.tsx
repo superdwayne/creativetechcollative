@@ -2,6 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { motion } from 'framer-motion';
 import { Loader2, Github, Linkedin, Mail, Globe } from 'lucide-react';
 import { getWebhookUrl } from '@/utils/webhookUtils';
+import { n8nFetch } from '@/utils/n8nProxy';
 import { useNavigate } from 'react-router-dom';
 
 interface MemberData {
@@ -30,22 +31,7 @@ const MembersPageWhisper: React.FC = () => {
       try {
         setError(null);
         const webhookUrl = getWebhookUrl('members');
-        const username = import.meta.env.VITE_N8N_BASIC_AUTH_USERNAME;
-        const password = import.meta.env.VITE_N8N_BASIC_AUTH_PASSWORD;
-
-        if (!username || !password) {
-          throw new Error('Authentication credentials not configured');
-        }
-
-        const basicAuth = btoa(`${username}:${password}`);
-        const response = await fetch(webhookUrl, {
-          method: 'GET',
-          headers: {
-            'Authorization': `Basic ${basicAuth}`,
-            'Content-Type': 'application/json'
-          },
-          signal: AbortSignal.timeout(15000)
-        });
+        const response = await n8nFetch(webhookUrl, 'GET');
 
         if (!response.ok) {
           throw new Error(`Failed to fetch members: ${response.status} ${response.statusText}`);

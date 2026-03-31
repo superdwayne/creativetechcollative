@@ -3,6 +3,7 @@ import { Phone, Mail, Globe, MapPin, Loader2 } from 'lucide-react';
 import { MorphingText } from './morphing-text';
 import { ButtonColorful } from './button-colorful';
 import { getWebhookUrl } from '@/utils/webhookUtils';
+import { n8nFetch } from '@/utils/n8nProxy';
 
 interface Contact2Props {
   title: string;
@@ -96,34 +97,14 @@ export const Contact2: React.FC<Contact2Props> = ({
     setSubmitMessage('');
 
     try {
-      // Get credentials from environment variables
       const webhookUrl = getWebhookUrl('ctc-contact');
-      const username = import.meta.env.VITE_N8N_BASIC_AUTH_USERNAME;
-      const password = import.meta.env.VITE_N8N_BASIC_AUTH_PASSWORD;
-      
-      if (!username || !password) {
-        throw new Error('Authentication credentials not configured');
-      }
-
-      // Create Basic Auth header
-      const basicAuth = btoa(`${username}:${password}`);
-
-      const response = await fetch(webhookUrl, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Basic ${basicAuth}`
-        },
-        body: JSON.stringify({
-          name: capitalizedName,
-          email: formData.email.trim(),
-          subject: formData.subject.trim(),
-          message: formData.message.trim(),
-          timestamp: new Date().toISOString(),
-          source: 'contact_form'
-        }),
-        // Add timeout
-        signal: AbortSignal.timeout(10000) // 10 second timeout
+      const response = await n8nFetch(webhookUrl, 'POST', {
+        name: capitalizedName,
+        email: formData.email.trim(),
+        subject: formData.subject.trim(),
+        message: formData.message.trim(),
+        timestamp: new Date().toISOString(),
+        source: 'contact_form'
       });
 
       if (response.ok) {
@@ -143,8 +124,6 @@ export const Contact2: React.FC<Contact2Props> = ({
       
       if (error.name === 'TimeoutError') {
         setSubmitMessage('Request timed out. Please check your connection and try again.');
-      } else if (error.message === 'Authentication credentials not configured') {
-        setSubmitMessage('Service configuration error. Please contact support.');
       } else if (error.message.includes('Failed to fetch')) {
         setSubmitMessage('Unable to connect to server. Please try again later.');
       } else {

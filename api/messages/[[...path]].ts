@@ -1,5 +1,6 @@
 import { createClient, SupabaseClient } from '@supabase/supabase-js';
 import { messageNotificationEmail, EMAIL_FROM_DOMAIN } from '../_lib/email-templates.js';
+import { checkRateLimit, RateLimitError, rateLimitResponse, getClientIp } from '../_lib/rate-limit.js';
 
 export const config = {
   runtime: 'edge',
@@ -1591,6 +1592,14 @@ export default async function handler(req: Request) {
   const { user, error: authError } = await authenticateUser(req, supabase);
   if (authError) {
     return jsonResponse({ error: authError }, 401);
+  }
+
+  // Rate limit: 30 requests per minute per authenticated user
+  try {
+    checkRateLimit(`messages:${user.id}`, 30, 60_000);
+  } catch (err) {
+    if (err instanceof RateLimitError) return rateLimitResponse(err);
+    throw err;
   }
 
   try {
